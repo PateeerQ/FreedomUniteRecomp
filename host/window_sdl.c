@@ -13,6 +13,7 @@
  * achievement toasts, the text box for the game's keyboard -- is drawn here
  * into an image with stb_truetype and handed to psp_render_gl_overlay. */
 #include "window.h"
+#include "region.h"
 #include "achievements.h"
 
 #if MHFU_SDL_WINDOW
@@ -415,7 +416,7 @@ static float small_r(const layout *L, int g) { return 0.068f * L->h * L->k[g]; }
  * and with the weapon out: the hunter's weapon state at 0x090B3A52 is not 0
  * (0 sheathed, 1 out, 2 attacking, 3 Dual Blades' demon mode; from F9 dumps
  * and a trace on the phone). */
-#define MHFU_WEAPON_OUT 0x090B3A52u
+#define MHFU_WEAPON_OUT MHFU_ADDR_WEAPON_OUT
 static int hunt_ctx(void) {
     if (!mhfu_in_quest()) return CTX_FREE;
     return psp_read8(MHFU_WEAPON_OUT) ? CTX_DRAWN : CTX_SHEATHED;
@@ -452,7 +453,7 @@ enum { ICON_CROUCH, ICON_DODGE, ICON_RUN, ICON_SHEATHE, ICON_ITEM, ICON_SWORD, I
  * only in a quest (before one, the class is whatever the save holds, even on
  * the loading screens). With the Target Camera mod on, every weapon also gets
  * its target button (L + Up). */
-#define MHFU_WEAPON_CLASS 0x090B3628u
+#define MHFU_WEAPON_CLASS MHFU_ADDR_WEAPON_CLASS
 #define SKILLS 3
 typedef struct { int pic; uint32_t bits; } skill;
 #define GUARD { ICON_GUARD, PSP_CTRL_RTRIGGER }
