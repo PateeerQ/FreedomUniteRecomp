@@ -2,6 +2,7 @@
 behind a switch.
 
     python tools/fps60_patch.py work/gen work/gen_ovl      (setup.ps1 runs it)
+    python tools/fps60_patch.py --region US work/us/gen work/us/gen_ovl
 
 This is the "60 FPS" cheat for ULES-01213 from the CWCheat Database Plus (the
 database PPSSPP uses), turned into C: cheats write the game's code, and here
@@ -90,6 +91,30 @@ OVERLAY = [
     [("before", 0x09ADD930, "blez", "$v0, 0x09ADD948",
       "if (mhfu_fps60() && mhfu_fps_tog(3) == 0) r_v0 = r_v0 + 1;")],
 ]
+
+# The USA build (--region US): the database's ULUS-10391 "60 FPS (Alpha)" only
+# drops the vblank wait (the game runs at double speed), so the EU cheat is used
+# there too. Each of its instructions was found again in the US code by the
+# instructions around it (the way tools/region_seeds.py moves seeds, 2026-11-05):
+# the EBOOT ones at the same address, the overlay ones (lobby_task, game_task,
+# the other tasks that share their code) 0x100 higher, each with the same word.
+# The two data words it reads: .bss +0x120 and the heap +0x140 (host/region.h).
+US_OVERLAY_SHIFT = 0x100
+US_DATA = {"0x08B59914u": "0x08B59A34u", "0x090AF21Cu": "0x090AF35Cu"}
+
+
+def to_us(p):
+    """One patch in the USA build's terms."""
+    p = list(p)
+    if p[1] >= 0x09000000:                               # overlay code
+        p[1] += US_OVERLAY_SHIFT
+        p[3] = re.sub(r"0x(09[0-9A-F]{6})", lambda m: f"0x{int(m.group(1), 16) + US_OVERLAY_SHIFT:08X}", p[3])
+    for k in range(4, len(p)):
+        if isinstance(p[k], str):
+            for eu, us in US_DATA.items():
+                p[k] = p[k].replace(eu, us)
+    return tuple(p)
+
 
 COMMENT = re.compile(r"^\s*/\* ([0-9A-F]{8})  (\S+)\s+(.*?) \*/\s*$")
 
@@ -209,7 +234,14 @@ def patch_unit(files, groups):
 
 
 def main():
+    global EBOOT, OVERLAY
     args = sys.argv[1:]
+    if "--region" in args:
+        k = args.index("--region")
+        if args[k + 1].upper() == "US":
+            EBOOT = [to_us(p) for p in EBOOT]
+            OVERLAY = [[to_us(p) for p in g] for g in OVERLAY]
+        del args[k:k + 2]
     undo = "--revert" in args
     dirs = [a for a in args if a != "--revert"] or [os.path.join("work", "gen"), os.path.join("work", "gen_ovl")]
     units = []                                             # (name, files, groups)
