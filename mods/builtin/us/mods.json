@@ -1,0 +1,149 @@
+[
+ {
+  "id": "targetcam",
+  "name": "Target Camera + Crosshair",
+  "description": "Community mod: Target Camera Mod v0.7, with its crosshair.",
+  "default": true,
+  "base": 165803520,
+  "size": 6656,
+  "entries": [
+   165803520,
+   165803904
+  ],
+  "hooks": [
+   {
+    "addr": 143160564,
+    "unit": "eboot",
+    "orig": 2388918772,
+    "word": 175668608,
+    "kind": "j",
+    "target": 165803520,
+    "mnemonic": "lw"
+   },
+   {
+    "addr": 143037456,
+    "unit": "eboot",
+    "orig": 2758028698,
+    "word": 175668704,
+    "kind": "j",
+    "target": 165803904,
+    "mnemonic": "sh"
+   }
+  ],
+  "returns": [
+   143037460,
+   143160568
+  ],
+  "notes": [
+   "0891F9FC: through the game's register, EU offset -0x22b6"
+  ],
+  "overlay": "FD0E9095"
+ },
+ {
+  "id": "damage",
+  "name": "Damage Numbers",
+  "description": "Community mod: Damage Numbers Display v0.4.",
+  "default": true,
+  "base": 165873120,
+  "size": 1240,
+  "entries": [
+   165873120,
+   165873316,
+   165873504,
+   165874352
+  ],
+  "hooks": [
+   {
+    "addr": 142876084,
+    "unit": "eboot",
+    "orig": 237017523,
+    "word": 175686104,
+    "kind": "j",
+    "target": 165873504,
+    "mnemonic": "jal"
+   },
+   {
+    "addr": 143037468,
+    "unit": "eboot",
+    "orig": 65011720,
+    "word": 175686316,
+    "kind": "j",
+    "target": 165874352,
+    "mnemonic": "jr"
+   },
+   {
+    "addr": 163858652,
+    "unit": "game_sub",
+    "orig": 604176385,
+    "word": 604176392,
+    "kind": "word",
+    "mnemonic": "addiu"
+   },
+   {
+    "addr": 162298580,
+    "unit": "game_task",
+    "orig": 2795635428,
+    "word": 175686008,
+    "kind": "j",
+    "target": 165873120,
+    "mnemonic": "sh"
+   },
+   {
+    "addr": 162957908,
+    "unit": "game_task",
+    "orig": 604110854,
+    "word": 175686057,
+    "kind": "j",
+    "target": 165873316,
+    "mnemonic": "addiu"
+   }
+  ],
+  "returns": [
+   142876092,
+   143201100,
+   162298584,
+   162957912
+  ],
+  "notes": [
+   "09E30640: a number shows for 54 HUD frames, not 18 (0.6 s at 30 fps: too short)"
+  ],
+  "overlay": "4877FF2D"
+ },
+ {
+  "id": "gathering",
+  "name": "Gathering Node Indicators",
+  "description": "Community mod: Gathering Nodes Mod v0.4.",
+  "default": true,
+  "base": 165941520,
+  "size": 1756,
+  "entries": [
+   165941520
+  ],
+  "hooks": [
+   {
+    "addr": 142892260,
+    "unit": "eboot",
+    "orig": 1006766228,
+    "word": 175703108,
+    "kind": "j",
+    "target": 165941520,
+    "mnemonic": "lui",
+    "delay": 0
+   },
+   {
+    "addr": 142892264,
+    "unit": "eboot",
+    "orig": 2487596936,
+    "word": 0,
+    "kind": "word",
+    "mnemonic": "lhu",
+    "companion": true
+   }
+  ],
+  "returns": [
+   142892268
+  ],
+  "notes": [],
+  "overlay": "B1F8A8B3"
+ }
+]
