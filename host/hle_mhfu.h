@@ -14,6 +14,9 @@ int mhfu_overlay_slot(uint32_t addr);
 /* Overlays loaded this run that have no recompiled version yet. */
 int mhfu_overlays_missing(void);
 
+/* A quest is on (game_task.ovl loaded), for the touch controls. */
+int mhfu_in_quest(void);
+
 /* VTimer handler calls so far: MHFU's frame clock is one. */
 uint64_t mhfu_vtimer_fired(void);
 
