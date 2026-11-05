@@ -73,15 +73,15 @@ param(
     [string]$Config = "Release",
     # The USA build (setup.ps1 with the ULUS10391 EBOOT: work\us, build-us), or
     # the Japanese Portable 2nd G (ULJM05500: work\jp, build-jp).
-    [ValidateSet("EU", "US", "JP")] [string]$Region = "EU"
+    [ValidateSet("EU", "US", "JP", "FUC")] [string]$Region = "EU"
 )
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
-$sub = @{ EU = ""; US = "us"; JP = "jp" }[$Region]
+$sub = @{ EU = ""; US = "us"; JP = "jp"; FUC = "fuc" }[$Region]
 $work = if ($sub) { Join-Path $repo "work\$sub" } else { Join-Path $repo "work" }
 $buildDir = if ($sub) { "build-$sub" } else { "build" }
-$gameId = @{ EU = "ULES01213"; US = "ULUS10391"; JP = "ULJM05500" }[$Region]
+$gameId = @{ EU = "ULES01213"; US = "ULUS10391"; JP = "ULJM05500"; FUC = "ULJM05500" }[$Region]
 
 $exe = @(
     "$repo\$buildDir\$Config\mhfu_host.exe",
@@ -114,7 +114,7 @@ $isoTxt = Join-Path $work "iso.txt"
 if (-not $Iso -and (Test-Path $isoTxt)) { $Iso = (Get-Content $isoTxt -TotalCount 1).Trim() }
 $isoArg = ""
 if ($Iso) {
-    if (-not (Test-Path $Iso)) { throw "disc image not found: $Iso" }
+    if (-not (Test-Path -LiteralPath $Iso)) { throw "disc image not found: $Iso" }
     $isoArg = "--iso `"$((Resolve-Path $Iso).Path)`""
 } else {
     Write-Warning "No disc image (run setup.ps1 again, or pass -Iso); disc0: uses work\root\disc"
