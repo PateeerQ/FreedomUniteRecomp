@@ -269,17 +269,20 @@ static void text_centered(canvas *c, float cx, float cy, int px, uint32_t col, c
  * directions, and a finger slides from button to button. The drawer turns the
  * controls on, off or automatic -- off while a controller is connected. */
 
-enum { T_NONE, T_STICK, T_DPAD, T_CROSS, T_CIRCLE, T_SQUARE, T_TRIANGLE, T_L, T_R, T_SELECT, T_START, T_MENU, T_EDGE, T_RSTICK, T_SWIPE };
+enum { T_NONE, T_STICK, T_DPAD, T_CROSS, T_CIRCLE, T_SQUARE, T_TRIANGLE, T_L, T_R, T_SELECT, T_START, T_MENU, T_EDGE, T_RSTICK, T_SWIPE,
+       T_SKILL0, T_SKILL1, T_SKILL2 };
 enum { VPAD_AUTO, VPAD_ON, VPAD_OFF };
-enum { G_STICK, G_DPAD, G_FACE, G_L, G_R, G_SELECT, G_START, G_MENU, G_RSTICK, G_COUNT };
-static const char *const k_group_name[G_COUNT] = { "stick", "dpad", "face", "l", "r", "select", "start", "menu", "rstick" };
+enum { G_STICK, G_DPAD, G_FACE, G_L, G_R, G_SELECT, G_START, G_MENU, G_RSTICK, G_SKILL, G_COUNT };
+static const char *const k_group_name[G_COUNT] = { "stick", "dpad", "face", "l", "r", "select", "start", "menu", "rstick", "skill" };
 
 static int     g_vpad_mode = VPAD_AUTO;
 static int     g_vpad_alpha = 100;                    /* percent */
+static int     g_skills_on = 1;                        /* the weapon buttons */
 static int     g_menu_open;
 static int     g_edit;                                 /* the layout editor is open */
 static int     g_edit_sel = -1;                        /* the group being edited */
 static uint32_t g_touch_buttons;
+static int     g_skill_down;                            /* the weapon buttons held, a bit each */
 static int     g_touch_ax = -1, g_touch_ay = -1;         /* the stick, 0-255; -1 not touched */
 static float   g_touch_rx, g_touch_ry;                  /* where the camera swipe went down */
 static int     g_touch_rheld;                           /* a camera swipe is on */
@@ -332,6 +335,7 @@ static void settings_load(void) {
         if (sscanf(line, "virtual_gamepad=%d", &v) == 1 && v >= 0 && v <= 2) g_vpad_mode = v;
         if (sscanf(line, "show_fps=%d", &v) == 1) g_show_fps_init = v;
         if (sscanf(line, "button_opacity=%d", &v) == 1 && v >= 10 && v <= 100) g_vpad_alpha = v;
+        if (sscanf(line, "weapon_buttons=%d", &v) == 1) g_skills_on = v != 0;
         if (sscanf(line, "resolution=%d", &v) == 1 && v >= 1 && v <= 4) g_res_setting = v;
         if (sscanf(line, "fps60=%d", &v) == 1) g_fps60 = v != 0;
         if (sscanf(line, "widescreen=%d", &v) == 1) g_wide = v != 0;
@@ -351,7 +355,7 @@ static void settings_save(void) {
     fprintf(f, "# MHFU: the in-game menu's settings\nvirtual_gamepad=%d\nshow_fps=%d\nbutton_opacity=%d\n",
             g_vpad_mode, g_show_fps_init, g_vpad_alpha);
     if (g_res_setting) fprintf(f, "resolution=%d\n", g_res_setting);
-    fprintf(f, "fps60=%d\nwidescreen=%d\n", g_fps60, g_wide);
+    fprintf(f, "fps60=%d\nwidescreen=%d\nweapon_buttons=%d\n", g_fps60, g_wide, g_skills_on);
     for (int i = 0; i < mhfu_mod_count(); i++) fprintf(f, "mod_%s=%d\n", mhfu_mod_id(i), mhfu_mod_on(i));
     for (int g = 0; g < G_COUNT; g++)
         if (g_place[g].set)
@@ -370,7 +374,7 @@ static layout layout_for(float w, float h) {
         { 0.24f * h, h - 0.26f * h }, { 0.24f * h, 0.40f * h }, { w - 0.25f * h, 0.50f * h },
         { 0.20f * h, 0.09f * h }, { w - 0.20f * h, 0.09f * h },
         { w / 2 - 0.13f * h, h - 0.0725f * h }, { w / 2 + 0.13f * h, h - 0.0725f * h }, { w / 2, 0.08f * h },
-        { w - 0.58f * h, h - 0.20f * h },
+        { w - 0.58f * h, h - 0.20f * h }, { w - 0.56f * h, 0.50f * h },
     };
     for (int g = 0; g < G_COUNT; g++) {
         L.x[g] = g_place[g].set ? g_place[g].cx * w : def[g][0];
@@ -387,6 +391,36 @@ static float dpad_r(const layout *L)  { return 0.15f * L->h * L->k[G_DPAD]; }
 static float face_o(const layout *L)  { return 0.12f * L->h * L->k[G_FACE]; }
 static float face_r(const layout *L)  { return 0.068f * L->h * L->k[G_FACE]; }
 static float menu_r(const layout *L)  { return 0.055f * L->h * L->k[G_MENU]; }
+static float skill_r(const layout *L) { return 0.062f * L->h * L->k[G_SKILL]; }
+
+/* The weapon buttons: a column left of the face buttons whose buttons follow
+ * the weapon the hunter carries, each holding a PSP combination (the game
+ * sees the buttons pressed together). The class is the game's own id at
+ * 0x090B3628 (CLAUDE.md), the same in the village and in a quest. With the
+ * Target Camera mod on, every weapon also gets its target button (L + Up). */
+#define MHFU_WEAPON_CLASS 0x090B3628u
+#define SKILLS 3
+typedef struct { const char *label; uint32_t bits; } skill;
+static const skill k_skills[11][SKILLS] = {
+    [6] = { { "DEMON", PSP_CTRL_RTRIGGER }, { "DANCE", PSP_CTRL_TRIANGLE | PSP_CTRL_CIRCLE } },   /* Dual Blades */
+    [7] = { { "SPIRIT", PSP_CTRL_RTRIGGER }, { "FADE", PSP_CTRL_TRIANGLE | PSP_CTRL_CIRCLE } },   /* Long Sword */
+};
+static int skills_now(skill out[SKILLS]) {
+    int n = 0;
+    if (!g_skills_on) return 0;
+    const unsigned cls = psp_read8(MHFU_WEAPON_CLASS);
+    if (cls < 11)
+        for (int i = 0; i < SKILLS && k_skills[cls][i].label; i++) out[n++] = k_skills[cls][i];
+    for (int i = 0; i < mhfu_mod_count() && n < SKILLS; i++)
+        if (!strcmp(mhfu_mod_id(i), "targetcam") && mhfu_mod_on(i))
+            out[n++] = (skill){ "TARGET", PSP_CTRL_LTRIGGER | PSP_CTRL_UP };
+    return n;
+}
+/* Where button i of n is: the column is centred on the group. */
+static void skill_pos(const layout *L, int i, int n, float *x, float *y) {
+    *x = L->x[G_SKILL];
+    *y = L->y[G_SKILL] + (i - (n - 1) / 2.0f) * skill_r(L) * 2.4f;
+}
 /* L, R, Select and Start are pills: half their width and height. */
 static void pill_size(const layout *L, int g, float *hw, float *hh) {
     const int shoulder = g == G_L || g == G_R;
@@ -403,6 +437,7 @@ static void group_box(const layout *L, int g, float *x0, float *y0, float *x1, f
     case G_DPAD: rx = ry = dpad_r(L); break;
     case G_FACE: rx = ry = face_o(L) + face_r(L); break;
     case G_MENU: rx = ry = menu_r(L); break;
+    case G_SKILL: rx = skill_r(L); ry = skill_r(L) * 3.4f; break;      /* room for all three */
     default: pill_size(L, g, &rx, &ry); break;
     }
     *x0 = L->x[g] - rx; *y0 = L->y[g] - ry; *x1 = L->x[g] + rx; *y1 = L->y[g] + ry;
@@ -429,6 +464,13 @@ static int hit(const layout *L, float x, float y) {
         if (d < bd) { bd = d; best = face[i].e; }
     }
     if (best) return best;
+    skill sk[SKILLS];
+    const int ns = skills_now(sk);
+    for (int i = 0; i < ns; i++) {
+        float sx, sy;
+        skill_pos(L, i, ns, &sx, &sy);
+        if (dist(x, y, sx, sy) < skill_r(L) * 1.2f) return T_SKILL0 + i;
+    }
     if (dist(x, y, L->x[G_DPAD], L->y[G_DPAD]) < dpad_r(L) * 1.25f) return T_DPAD;
     if (dist(x, y, L->x[G_STICK], L->y[G_STICK]) < stick_r(L) * 1.6f) return T_STICK;
     return T_NONE;
@@ -440,6 +482,10 @@ static uint32_t elem_button(int e) {
     case T_SQUARE: return PSP_CTRL_SQUARE;   case T_TRIANGLE: return PSP_CTRL_TRIANGLE;
     case T_L: return PSP_CTRL_LTRIGGER;      case T_R: return PSP_CTRL_RTRIGGER;
     case T_SELECT: return PSP_CTRL_SELECT;   case T_START: return PSP_CTRL_START;
+    case T_SKILL0: case T_SKILL1: case T_SKILL2: {
+        skill sk[SKILLS];
+        return e - T_SKILL0 < skills_now(sk) ? sk[e - T_SKILL0].bits : 0;
+    }
     default: return 0;
     }
 }
@@ -448,7 +494,7 @@ static uint32_t elem_button(int e) {
 static void touch_update(float w, float h) {
     const layout L = layout_for(w, h);
     uint32_t b = 0;
-    int ax = -1, ay = -1, rheld = 0;
+    int ax = -1, ay = -1, rheld = 0, sd = 0;
     float rx = 0, ry = 0;
     for (int i = 0; i < FINGERS; i++) {
         const finger *f = &g_fingers[i];
@@ -484,9 +530,13 @@ static void touch_update(float w, float h) {
                 if (a > 112.5f || a < -112.5f) b |= PSP_CTRL_LEFT;
                 if (a > -157.5f && a < -22.5f) b |= PSP_CTRL_UP;
             }
-        } else b |= elem_button(f->elem);
+        } else {
+            b |= elem_button(f->elem);
+            if (f->elem >= T_SKILL0) sd |= 1 << (f->elem - T_SKILL0);
+        }
     }
     g_touch_buttons = b;
+    g_skill_down = sd;
     g_touch_ax = ax;
     g_touch_ay = ay;
     g_touch_rx = rx;
@@ -499,6 +549,7 @@ static void touch_update(float w, float h) {
 static void touch_release_all(void) {
     memset(g_fingers, 0, sizeof g_fingers);
     g_touch_buttons = 0;
+    g_skill_down = 0;
     g_touch_ax = g_touch_ay = -1;
     g_touch_rx = g_touch_ry = 0;
     g_touch_rheld = 0;
@@ -572,6 +623,17 @@ static void draw_vpad(canvas *c, float s) {
             segment(c, S(cx), S(cy - k * 1.1f), S(cx + k), S(cy + k * 0.7f), t * 1.4f, sc); segment(c, S(cx + k), S(cy + k * 0.7f), S(cx - k), S(cy + k * 0.7f), t * 1.4f, sc);
             segment(c, S(cx - k), S(cy + k * 0.7f), S(cx), S(cy - k * 1.1f), t * 1.4f, sc);
         }
+    }
+    /* the weapon buttons; in the editor, an empty column shows where they go */
+    skill sk[SKILLS];
+    const int ns = skills_now(sk), shown = ns ? ns : g_edit ? SKILLS : 0;
+    const float kr = skill_r(&L);
+    for (int i = 0; i < shown; i++) {
+        float cx, cy;
+        skill_pos(&L, i, shown, &cx, &cy);
+        disc(c, S(cx), S(cy), S(kr), g_skill_down & 1 << i ? on : fillc);
+        ring(c, S(cx), S(cy), S(kr), t, line);
+        text_centered(c, S(cx), S(cy), (int)(kr * 0.48f * s), white, ns ? sk[i].label : "WEAPON");
     }
 #undef S
 }
@@ -722,7 +784,7 @@ static void draw_editor(canvas *c, float s) {
  * Android dialogs (MhfuActivity, over JNI): they need text fields. */
 
 enum { R_HEAD, R_ITEM };
-enum { M_RESUME, M_NET, M_ACH, M_VPAD, M_EDIT, M_OPACITY, M_FPS, M_RES, M_SMOOTH, M_WIDE, M_CHEATS, M_MOD0, M_MOD1, M_MOD2, M_SAVES, M_FILES, M_CRASH, M_UPDATE, M_ABOUT, M_EXIT };
+enum { M_RESUME, M_NET, M_ACH, M_VPAD, M_EDIT, M_OPACITY, M_SKILLS, M_FPS, M_RES, M_SMOOTH, M_WIDE, M_CHEATS, M_MOD0, M_MOD1, M_MOD2, M_SAVES, M_FILES, M_CRASH, M_UPDATE, M_ABOUT, M_EXIT };
 typedef struct { int kind, id; const char *text; } menu_row;
 static const menu_row k_menu[] = {
     { R_HEAD, -1, "GAME" },     { R_ITEM, M_RESUME, "Back to game" },
@@ -730,7 +792,7 @@ static const menu_row k_menu[] = {
     { R_HEAD, -1, "ONLINE" },   { R_ITEM, M_NET, "Multiplayer" }, { R_ITEM, M_ACH, "RetroAchievements" },
 #endif
     { R_HEAD, -1, "CONTROLS" }, { R_ITEM, M_VPAD, "Virtual gamepad" }, { R_ITEM, M_EDIT, "Edit button layout" },
-    { R_ITEM, M_OPACITY, "Button opacity" },
+    { R_ITEM, M_OPACITY, "Button opacity" }, { R_ITEM, M_SKILLS, "Weapon buttons" },
     { R_HEAD, -1, "DISPLAY" },  { R_ITEM, M_RES, "Resolution" }, { R_ITEM, M_SMOOTH, "60 FPS (beta)" },
     { R_ITEM, M_FPS, "Show FPS" },
     { R_HEAD, -1, "MODS" },     { R_ITEM, M_WIDE, "Widescreen" },
@@ -796,6 +858,7 @@ static const char *menu_value(int id) {
     switch (id) {
     case M_VPAD: return vp[g_vpad_mode];
     case M_FPS: return g_show_fps ? "On" : "Off";
+    case M_SKILLS: return g_skills_on ? "On" : "Off";
     case M_SMOOTH: return !g_fps60 ? "Off" : mhfu_fps_target() >= 60 ? "On" : "On (room at 30)";
     case M_WIDE: return mhfu_mod_widescreen() ? "On" : "Off";
     case M_MOD0: case M_MOD1: case M_MOD2:
@@ -918,6 +981,7 @@ static void menu_tap(float px, float py, float w, float h) {
             switch (r->id) {
             case M_RESUME: menu_set(0); break;
             case M_VPAD: g_vpad_mode = (g_vpad_mode + 1) % 3; settings_save(); break;
+            case M_SKILLS: g_skills_on = !g_skills_on; touch_release_all(); settings_save(); break;
             case M_FPS: g_show_fps = !g_show_fps; g_show_fps_init = g_show_fps; settings_save(); break;
             case M_SMOOTH: g_fps60 = !g_fps60; mhfu_fps_set_preferred(g_fps60 ? 60 : 30); settings_save(); break;
             case M_WIDE: g_wide = !mhfu_mod_widescreen(); mhfu_mod_set_widescreen(g_wide); settings_save(); break;
