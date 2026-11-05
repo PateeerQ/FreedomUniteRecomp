@@ -20,6 +20,7 @@
 #include "psprecomp/hle.h"
 #include "psprecomp/render.h"
 #include "gamepad.h"
+#include "hle_mhfu.h"
 #include "input.h"
 #include "keys.h"
 #include "lobby.h"
@@ -270,22 +271,25 @@ static void text_centered(canvas *c, float cx, float cy, int px, uint32_t col, c
  * controls on, off or automatic -- off while a controller is connected. */
 
 enum { T_NONE, T_STICK, T_DPAD, T_CROSS, T_CIRCLE, T_SQUARE, T_TRIANGLE, T_L, T_R, T_SELECT, T_START, T_MENU, T_EDGE, T_RSTICK, T_SWIPE,
-       T_SKILL0, T_SKILL1, T_SKILL2, T_ATTACK, T_ROLL, T_ITEM };
+       T_SKILL0, T_SKILL1, T_SKILL2, T_ATTACK, T_ROLL, T_ITEM, T_RUN };
 enum { VPAD_AUTO, VPAD_ON, VPAD_OFF };
-enum { G_STICK, G_DPAD, G_FACE, G_L, G_R, G_SELECT, G_START, G_MENU, G_RSTICK, G_SKILL, G_ATTACK, G_ROLL, G_ITEM, G_COUNT };
+enum { G_STICK, G_DPAD, G_FACE, G_L, G_R, G_SELECT, G_START, G_MENU, G_RSTICK, G_SKILL, G_ATTACK, G_ROLL, G_ITEM, G_RUN, G_COUNT };
 static const char *const k_group_name[G_COUNT] = { "stick", "dpad", "face", "l", "r", "select", "start", "menu", "rstick", "skill",
-                                                   "attack", "roll", "item" };
-/* The button styles, chosen in the drawer: the PSP's face buttons and d-pad,
- * or the mobile one (an attack pad that is dragged like a stick, Roll and
- * Item), or Auto: the mobile one while the weapon is out, the PSP's while it is
- * sheathed (menus, the village, gathering). The stick, L, R, Select, Start and
- * the weapon buttons in all. */
-enum { STYLE_PSP, STYLE_MOBILE, STYLE_AUTO };
+                                                   "attack", "roll", "item", "run" };
+/* The button styles, chosen in the drawer: the PSP's face buttons and d-pad
+ * everywhere, or the mobile one, which follows what the hunter does. In a
+ * quest with the weapon sheathed: the attack pad (Triangle draws, Circle
+ * gathers), Crouch (Cross), Run (R) and Item (Square); with the weapon out:
+ * the attack pad, Dodge (Cross), Sheathe (Square) and the weapon buttons (R
+ * is on the pad and on them). Outside quests (the village, the halls, their
+ * menus) the PSP's buttons. The stick, L, Select and Start in all. */
+enum { STYLE_PSP, STYLE_MOBILE };
+enum { CTX_FREE, CTX_SHEATHED, CTX_DRAWN };
 
 static int     g_vpad_mode = VPAD_AUTO;
 static int     g_vpad_alpha = 100;                    /* percent */
 static int     g_skills_on = 1;                        /* the weapon buttons */
-static int     g_style = STYLE_AUTO;                    /* the button style */
+static int     g_style = STYLE_MOBILE;                  /* the button style */
 static float   g_attack_kx, g_attack_ky;                /* the attack pad's knob, -1..1 */
 static int     g_attack_held;
 static int     g_menu_open;
@@ -346,7 +350,7 @@ static void settings_load(void) {
         if (sscanf(line, "show_fps=%d", &v) == 1) g_show_fps_init = v;
         if (sscanf(line, "button_opacity=%d", &v) == 1 && v >= 10 && v <= 100) g_vpad_alpha = v;
         if (sscanf(line, "weapon_buttons=%d", &v) == 1) g_skills_on = v != 0;
-        if (sscanf(line, "button_style=%d", &v) == 1 && v >= 0 && v <= 2) g_style = v;
+        if (sscanf(line, "button_style=%d", &v) == 1 && v >= 0) g_style = v ? STYLE_MOBILE : STYLE_PSP;   /* 2: the old Auto */
         if (sscanf(line, "resolution=%d", &v) == 1 && v >= 1 && v <= 4) g_res_setting = v;
         if (sscanf(line, "fps60=%d", &v) == 1) g_fps60 = v != 0;
         if (sscanf(line, "widescreen=%d", &v) == 1) g_wide = v != 0;
@@ -387,6 +391,7 @@ static layout layout_for(float w, float h) {
         { w / 2 - 0.13f * h, h - 0.0725f * h }, { w / 2 + 0.13f * h, h - 0.0725f * h }, { w / 2, 0.08f * h },
         { w - 0.58f * h, h - 0.20f * h }, { w - 0.56f * h, 0.50f * h },
         { w - 0.26f * h, 0.60f * h }, { w - 0.13f * h, 0.88f * h }, { w - 0.44f * h, 0.88f * h },
+        { w - 0.12f * h, 0.30f * h },
     };
     for (int g = 0; g < G_COUNT; g++) {
         L.x[g] = g_place[g].set ? g_place[g].cx * w : def[g][0];
@@ -405,21 +410,28 @@ static float face_r(const layout *L)  { return 0.068f * L->h * L->k[G_FACE]; }
 static float menu_r(const layout *L)  { return 0.055f * L->h * L->k[G_MENU]; }
 static float skill_r(const layout *L) { return 0.062f * L->h * L->k[G_SKILL]; }
 static float attack_r(const layout *L) { return 0.16f * L->h * L->k[G_ATTACK]; }
-static float small_r(const layout *L, int g) { return 0.068f * L->h * L->k[g]; }   /* Roll, Item */
+static float small_r(const layout *L, int g) { return 0.068f * L->h * L->k[g]; }   /* Roll, Item, Run */
 
-/* The weapon is out: the hunter's weapon state at 0x090B3A52 is not 0 (0
- * sheathed, 1 out, 2 attacking, 3 Dual Blades' demon mode; from F9 dumps and a
- * trace on the phone). In Auto the editor
- * shows the set that is on now, so drawing the weapon edits the mobile one. */
+/* Where the hunter is: in a quest (game_task.ovl loaded, hle_mhfu.c) or not,
+ * and with the weapon out: the hunter's weapon state at 0x090B3A52 is not 0
+ * (0 sheathed, 1 out, 2 attacking, 3 Dual Blades' demon mode; from F9 dumps
+ * and a trace on the phone). */
 #define MHFU_WEAPON_OUT 0x090B3A52u
-static int mobile_now(void) {
-    return g_style == STYLE_MOBILE || (g_style == STYLE_AUTO && psp_read8(MHFU_WEAPON_OUT) != 0);
+static int hunt_ctx(void) {
+    if (!mhfu_in_quest()) return CTX_FREE;
+    return psp_read8(MHFU_WEAPON_OUT) ? CTX_DRAWN : CTX_SHEATHED;
 }
+/* The mobile buttons are on; the editor shows all of them, to place. */
+static int mobile_now(void) { return g_style == STYLE_MOBILE && (g_edit || hunt_ctx() != CTX_FREE); }
 static int group_shown(int g) {
     if (g == G_RSTICK) return 0;                       /* the camera is a swipe now */
     const int m = mobile_now();
     if (g == G_FACE || g == G_DPAD) return !m;
-    if (g == G_ATTACK || g == G_ROLL || g == G_ITEM) return m;
+    if (!m) return g != G_ATTACK && g != G_ROLL && g != G_ITEM && g != G_RUN;
+    if (g == G_R) return 0;                            /* Run, the pad and the weapon buttons have it */
+    if (g_edit) return 1;
+    if (g == G_RUN) return hunt_ctx() == CTX_SHEATHED;
+    if (g == G_SKILL) return hunt_ctx() == CTX_DRAWN;
     return 1;
 }
 
@@ -478,7 +490,7 @@ static void group_box(const layout *L, int g, float *x0, float *y0, float *x1, f
     case G_MENU: rx = ry = menu_r(L); break;
     case G_SKILL: rx = skill_r(L); ry = skill_r(L) * 3.4f; break;      /* room for all three */
     case G_ATTACK: rx = ry = attack_r(L); break;
-    case G_ROLL: case G_ITEM: rx = ry = small_r(L, g); break;
+    case G_ROLL: case G_ITEM: case G_RUN: rx = ry = small_r(L, g); break;
     default: pill_size(L, g, &rx, &ry); break;
     }
     *x0 = L->x[g] - rx; *y0 = L->y[g] - ry; *x1 = L->x[g] + rx; *y1 = L->y[g] + ry;
@@ -492,6 +504,7 @@ static int hit(const layout *L, float x, float y) {
     static const int pills[4] = { G_L, G_R, G_SELECT, G_START }, pill_elem[4] = { T_L, T_R, T_SELECT, T_START };
     for (int i = 0; i < 4; i++) {
         float hw, hh;
+        if (!group_shown(pills[i])) continue;
         pill_size(L, pills[i], &hw, &hh);
         if (fabsf(x - L->x[pills[i]]) < hw * 1.1f && fabsf(y - L->y[pills[i]]) < hh * 1.6f) return pill_elem[i];
     }
@@ -499,6 +512,7 @@ static int hit(const layout *L, float x, float y) {
     if (m) {
         if (dist(x, y, L->x[G_ROLL], L->y[G_ROLL]) < small_r(L, G_ROLL) * 1.3f) return T_ROLL;
         if (dist(x, y, L->x[G_ITEM], L->y[G_ITEM]) < small_r(L, G_ITEM) * 1.3f) return T_ITEM;
+        if (group_shown(G_RUN) && dist(x, y, L->x[G_RUN], L->y[G_RUN]) < small_r(L, G_RUN) * 1.3f) return T_RUN;
         if (dist(x, y, L->x[G_ATTACK], L->y[G_ATTACK]) < attack_r(L) * 1.15f) return T_ATTACK;
     } else {
         const float fo = face_o(L);
@@ -513,7 +527,7 @@ static int hit(const layout *L, float x, float y) {
         if (best) return best;
     }
     skill sk[SKILLS];
-    const int ns = skills_now(sk);
+    const int ns = group_shown(G_SKILL) ? skills_now(sk) : 0;
     for (int i = 0; i < ns; i++) {
         float sx, sy;
         skill_pos(L, i, ns, &sx, &sy);
@@ -531,6 +545,7 @@ static uint32_t elem_button(int e) {
     case T_L: return PSP_CTRL_LTRIGGER;      case T_R: return PSP_CTRL_RTRIGGER;
     case T_SELECT: return PSP_CTRL_SELECT;   case T_START: return PSP_CTRL_START;
     case T_ROLL: return PSP_CTRL_CROSS;      case T_ITEM: return PSP_CTRL_SQUARE;
+    case T_RUN: return PSP_CTRL_RTRIGGER;
     case T_SKILL0: case T_SKILL1: case T_SKILL2: {
         skill sk[SKILLS];
         return e - T_SKILL0 < skills_now(sk) ? sk[e - T_SKILL0].bits : 0;
@@ -641,6 +656,41 @@ static void face_shape(canvas *c, float cx, float cy, float k, int shape, float 
     }
 }
 
+/* The mobile buttons' pictures at (cx, cy), half size k, in pixels. */
+enum { ICON_CROUCH, ICON_DODGE, ICON_RUN, ICON_SHEATHE };
+static void icon(canvas *c, float cx, float cy, float k, int which, float t, uint32_t col) {
+    switch (which) {
+    case ICON_CROUCH:                                  /* down, onto the ground */
+        segment(c, cx - k, cy - k * 0.7f, cx, cy + k * 0.1f, t, col); segment(c, cx, cy + k * 0.1f, cx + k, cy - k * 0.7f, t, col);
+        segment(c, cx - k * 1.1f, cy + k * 0.7f, cx + k * 1.1f, cy + k * 0.7f, t, col);
+        break;
+    case ICON_DODGE: {                                 /* a turning arrow */
+        float px = cx + k * cosf(2.6f), py = cy - k * sinf(2.6f);
+        for (int i = 1; i <= 10; i++) {
+            const float a = 2.6f - i * 0.47f, x = cx + k * cosf(a), y = cy - k * sinf(a);
+            segment(c, px, py, x, y, t, col);
+            px = x; py = y;
+        }
+        const float a = 2.6f - 10 * 0.47f, tx = sinf(a), ty = cosf(a);     /* along the arc, clockwise */
+        segment(c, px, py, px - tx * k * 0.5f + ty * k * 0.35f, py - ty * k * 0.5f - tx * k * 0.35f, t, col);
+        segment(c, px, py, px - tx * k * 0.5f - ty * k * 0.35f, py - ty * k * 0.5f + tx * k * 0.35f, t, col);
+        break;
+    }
+    case ICON_RUN:                                     /* two chevrons forward */
+        for (int i = 0; i < 2; i++) {
+            const float x = cx - k * 0.7f + i * k * 0.8f;
+            segment(c, x, cy - k * 0.7f, x + k * 0.6f, cy, t, col); segment(c, x + k * 0.6f, cy, x, cy + k * 0.7f, t, col);
+        }
+        break;
+    default:                                           /* a sword down into its sheath */
+        segment(c, cx, cy - k * 1.1f, cx, cy + k * 0.6f, t, col);
+        segment(c, cx - k * 0.6f, cy - k * 0.55f, cx + k * 0.6f, cy - k * 0.55f, t, col);
+        segment(c, cx - k * 0.4f, cy - k * 0.1f, cx - k * 0.4f, cy + k, t, col); segment(c, cx - k * 0.4f, cy + k, cx + k * 0.4f, cy + k, t, col);
+        segment(c, cx + k * 0.4f, cy + k, cx + k * 0.4f, cy - k * 0.1f, t, col);
+        break;
+    }
+}
+
 static void draw_vpad(canvas *c, float s) {
     const layout L = layout_for((float)c->w / s, (float)c->h / s);
     const uint32_t line = va(236, 194, 104, 150), fillc = va(20, 15, 10, 70), on = va(236, 194, 104, 150);
@@ -649,7 +699,7 @@ static void draw_vpad(canvas *c, float s) {
 #define S(v) ((v) * s)
     /* L, R, Select, Start */
     draw_pill(c, s, &L, G_L, PSP_CTRL_LTRIGGER, "L", fillc, on, line, white, t);
-    draw_pill(c, s, &L, G_R, PSP_CTRL_RTRIGGER, "R", fillc, on, line, white, t);
+    if (group_shown(G_R)) draw_pill(c, s, &L, G_R, PSP_CTRL_RTRIGGER, "R", fillc, on, line, white, t);
     draw_pill(c, s, &L, G_SELECT, PSP_CTRL_SELECT, "SELECT", fillc, on, line, white, t);
     draw_pill(c, s, &L, G_START, PSP_CTRL_START, "START", fillc, on, line, white, t);
     /* the d-pad: four arms */
@@ -708,20 +758,26 @@ static void draw_vpad(canvas *c, float s) {
         disc(c, S(kx), S(ky), S(ar * 0.34f), g_attack_held ? on : va(236, 194, 104, 90));
         ring(c, S(kx), S(ky), S(ar * 0.34f), t, line);
         face_shape(c, S(kx), S(ky), S(ar * 0.13f), 3, t * 1.4f, held == PSP_CTRL_TRIANGLE ? white : face[3].tint);
-        /* Roll and Item */
-        const struct { int g; uint32_t bit; int shape; const char *label; } sm[2] = {
-            { G_ROLL, PSP_CTRL_CROSS, 0, "ROLL" }, { G_ITEM, PSP_CTRL_SQUARE, 2, "ITEM" } };
-        for (int i = 0; i < 2; i++) {
+        /* Cross (Crouch, or Dodge with the weapon out), Square (Item, or
+         * Sheathe) and Run (R, sheathed) */
+        const int out = !g_edit && hunt_ctx() == CTX_DRAWN;
+        const struct { int g; uint32_t bit; int pic; const char *label; } sm[3] = {
+            { G_ROLL, PSP_CTRL_CROSS, out ? ICON_DODGE : ICON_CROUCH, out ? "DODGE" : g_edit ? "CROUCH/DODGE" : "CROUCH" },
+            { G_ITEM, PSP_CTRL_SQUARE, out ? ICON_SHEATHE : -1, out ? "SHEATHE" : g_edit ? "ITEM/SHEATHE" : "ITEM" },
+            { G_RUN, PSP_CTRL_RTRIGGER, ICON_RUN, "RUN" } };
+        for (int i = 0; i < 3; i++) {
+            if (!group_shown(sm[i].g)) continue;
             const float rr = small_r(&L, sm[i].g), cx = L.x[sm[i].g], cy = L.y[sm[i].g];
             disc(c, S(cx), S(cy), S(rr), g_touch_buttons & sm[i].bit ? on : fillc);
             ring(c, S(cx), S(cy), S(rr), t, line);
-            face_shape(c, S(cx), S(cy - rr * 0.18f), S(rr * 0.30f), sm[i].shape, t * 1.3f, face[sm[i].shape == 0 ? 0 : 2].tint);
-            text_centered(c, S(cx), S(cy + rr * 0.52f), (int)(rr * 0.30f * s), white, sm[i].label);
+            if (sm[i].pic < 0) face_shape(c, S(cx), S(cy - rr * 0.18f), S(rr * 0.30f), 2, t * 1.3f, face[2].tint);
+            else icon(c, S(cx), S(cy - rr * 0.18f), S(rr * 0.36f), sm[i].pic, t * 1.3f, white);
+            text_centered(c, S(cx), S(cy + rr * 0.55f), (int)(rr * (strlen(sm[i].label) > 7 ? 0.22f : 0.28f) * s), white, sm[i].label);
         }
     }
     /* the weapon buttons; in the editor, an empty column shows where they go */
     skill sk[SKILLS];
-    const int ns = skills_now(sk), shown = ns ? ns : g_edit ? SKILLS : 0;
+    const int ns = group_shown(G_SKILL) ? skills_now(sk) : 0, shown = ns ? ns : g_edit ? SKILLS : 0;
     const float kr = skill_r(&L);
     for (int i = 0; i < shown; i++) {
         float cx, cy;
@@ -955,7 +1011,7 @@ static const char *menu_value(int id) {
     case M_VPAD: return vp[g_vpad_mode];
     case M_FPS: return g_show_fps ? "On" : "Off";
     case M_SKILLS: return g_skills_on ? "On" : "Off";
-    case M_STYLE: return g_style == STYLE_AUTO ? "Auto" : g_style == STYLE_MOBILE ? "Mobile" : "Legacy PSP";
+    case M_STYLE: return g_style == STYLE_MOBILE ? "Mobile" : "Legacy PSP";
     case M_SMOOTH: return !g_fps60 ? "Off" : mhfu_fps_target() >= 60 ? "On" : "On (room at 30)";
     case M_WIDE: return mhfu_mod_widescreen() ? "On" : "Off";
     case M_MOD0: case M_MOD1: case M_MOD2:
@@ -1078,7 +1134,7 @@ static void menu_tap(float px, float py, float w, float h) {
             switch (r->id) {
             case M_RESUME: menu_set(0); break;
             case M_VPAD: g_vpad_mode = (g_vpad_mode + 1) % 3; settings_save(); break;
-            case M_STYLE: g_style = (g_style + 1) % 3; touch_release_all(); settings_save(); break;
+            case M_STYLE: g_style = !g_style; touch_release_all(); settings_save(); break;
             case M_SKILLS: g_skills_on = !g_skills_on; touch_release_all(); settings_save(); break;
             case M_FPS: g_show_fps = !g_show_fps; g_show_fps_init = g_show_fps; settings_save(); break;
             case M_SMOOTH: g_fps60 = !g_fps60; mhfu_fps_set_preferred(g_fps60 ? 60 : 30); settings_save(); break;
