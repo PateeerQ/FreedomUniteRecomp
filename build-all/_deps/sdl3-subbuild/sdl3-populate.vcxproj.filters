@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\sdl3-subbuild\CMakeFiles\693c980ddf7f512eb5267859e6eae15c\sdl3-populate-mkdir.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\sdl3-subbuild\CMakeFiles\693c980ddf7f512eb5267859e6eae15c\sdl3-populate-download.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\sdl3-subbuild\CMakeFiles\693c980ddf7f512eb5267859e6eae15c\sdl3-populate-update.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\sdl3-subbuild\CMakeFiles\693c980ddf7f512eb5267859e6eae15c\sdl3-populate-patch.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\sdl3-subbuild\CMakeFiles\693c980ddf7f512eb5267859e6eae15c\sdl3-populate-configure.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\sdl3-subbuild\CMakeFiles\693c980ddf7f512eb5267859e6eae15c\sdl3-populate-build.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\sdl3-subbuild\CMakeFiles\693c980ddf7f512eb5267859e6eae15c\sdl3-populate-install.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\sdl3-subbuild\CMakeFiles\693c980ddf7f512eb5267859e6eae15c\sdl3-populate-test.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\sdl3-subbuild\CMakeFiles\81758bd7e878b4f80545652a6aeffdd9\sdl3-populate-complete.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\sdl3-subbuild\CMakeFiles\389621a5906f3d65414d0ffd0ee34765\sdl3-populate.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\sdl3-subbuild\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="E:\Project\MHFU-Android\build-all\_deps\sdl3-subbuild\CMakeFiles\sdl3-populate" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{F5CD0EA9-488F-3DBD-ADFA-A5B2D6DE1EC6}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

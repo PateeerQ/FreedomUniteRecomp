@@ -1,0 +1,10 @@
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\SDL3-SUBBUILD\CMAKEFILES\389621A5906F3D65414D0FFD0EE34765\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SE:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild -BE:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/sdl3-populate.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

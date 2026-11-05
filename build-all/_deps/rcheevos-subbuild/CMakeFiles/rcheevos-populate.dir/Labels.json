@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/CMakeFiles/rcheevos-populate"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/CMakeFiles/b1def2886a3a63d2929e8a0365a67f29/rcheevos-populate.rule"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/CMakeFiles/e6c1416be807ce1077379d2119ad7e0e/rcheevos-populate-complete.rule"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/CMakeFiles/5cfb0f5f1beaab6b2072c0e7755cb2e7/rcheevos-populate-build.rule"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/CMakeFiles/5cfb0f5f1beaab6b2072c0e7755cb2e7/rcheevos-populate-configure.rule"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/CMakeFiles/5cfb0f5f1beaab6b2072c0e7755cb2e7/rcheevos-populate-download.rule"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/CMakeFiles/5cfb0f5f1beaab6b2072c0e7755cb2e7/rcheevos-populate-install.rule"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/CMakeFiles/5cfb0f5f1beaab6b2072c0e7755cb2e7/rcheevos-populate-mkdir.rule"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/CMakeFiles/5cfb0f5f1beaab6b2072c0e7755cb2e7/rcheevos-populate-patch.rule"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/CMakeFiles/5cfb0f5f1beaab6b2072c0e7755cb2e7/rcheevos-populate-test.rule"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/CMakeFiles/5cfb0f5f1beaab6b2072c0e7755cb2e7/rcheevos-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"rcheevos-populate"
+		],
+		"name" : "rcheevos-populate"
+	}
+}

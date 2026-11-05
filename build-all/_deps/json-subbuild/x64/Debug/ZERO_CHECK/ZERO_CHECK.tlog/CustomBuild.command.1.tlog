@@ -1,0 +1,10 @@
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\JSON-SUBBUILD\CMAKEFILES\5896DB36A6C87674263124EBDF2D641C\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SE:/Project/MHFU-Android/build-all/_deps/json-subbuild -BE:/Project/MHFU-Android/build-all/_deps/json-subbuild --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file E:/Project/MHFU-Android/build-all/_deps/json-subbuild/json-populate.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

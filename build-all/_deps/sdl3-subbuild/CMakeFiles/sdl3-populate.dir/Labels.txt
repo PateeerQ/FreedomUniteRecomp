@@ -1,0 +1,14 @@
+# Target labels
+ sdl3-populate
+# Source files and their labels
+E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/CMakeFiles/sdl3-populate
+E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/CMakeFiles/389621a5906f3d65414d0ffd0ee34765/sdl3-populate.rule
+E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/CMakeFiles/81758bd7e878b4f80545652a6aeffdd9/sdl3-populate-complete.rule
+E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/CMakeFiles/693c980ddf7f512eb5267859e6eae15c/sdl3-populate-build.rule
+E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/CMakeFiles/693c980ddf7f512eb5267859e6eae15c/sdl3-populate-configure.rule
+E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/CMakeFiles/693c980ddf7f512eb5267859e6eae15c/sdl3-populate-download.rule
+E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/CMakeFiles/693c980ddf7f512eb5267859e6eae15c/sdl3-populate-install.rule
+E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/CMakeFiles/693c980ddf7f512eb5267859e6eae15c/sdl3-populate-mkdir.rule
+E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/CMakeFiles/693c980ddf7f512eb5267859e6eae15c/sdl3-populate-patch.rule
+E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/CMakeFiles/693c980ddf7f512eb5267859e6eae15c/sdl3-populate-test.rule
+E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/CMakeFiles/693c980ddf7f512eb5267859e6eae15c/sdl3-populate-update.rule

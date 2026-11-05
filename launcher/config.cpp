@@ -57,9 +57,14 @@ void init(const char *exe_dir) {
 
 const std::string &exe_dir() { return g_exe; }
 const std::string &base() { return g_base; }
-std::string work() { return MHFU_WORK_SUB[0] ? S(P(g_base) / "work" / MHFU_WORK_SUB) : S(P(g_base) / "work"); }
-std::string launcher() { return S(P(work()) / "launcher"); }
-std::string host_exe() { return S(P(g_exe) / "mhfu_host.exe"); }
+// Each release keeps its own work folder (work/, work/us, ...: saves, profiles,
+// the EBOOT); the launcher's own files are shared, in work/launcher.
+std::string work() { return region().sub[0] ? S(P(g_base) / "work" / region().sub) : S(P(g_base) / "work"); }
+std::string launcher() { return S(P(g_base) / "work" / "launcher"); }
+std::string host_exe() {
+    const std::string h = region_host_exe(region_index());
+    return h.empty() ? S(P(g_exe) / "mhfu_host.exe") : h;
+}
 
 std::string iso(const Config &c) {
     if (!c.iso.empty()) return c.iso;
@@ -70,7 +75,7 @@ std::string iso(const Config &c) {
 }
 
 std::string eboot(const Config &c) {
-    return c.eboot.empty() ? S(P(work()) / MHFU_EBOOT_FILE) : c.eboot;
+    return c.eboot.empty() ? S(P(work()) / region().eboot_file) : c.eboot;
 }
 
 std::string profile_root(const std::string &name) {
@@ -166,14 +171,49 @@ bool config_load(Config &c) {
         else if (k == "close_on_start") b(c.close_on_start);
         else if (k == "extra_env") c.extra_env = v;
         else if (k == "extra_args") c.extra_args = v;
-        else if (k == "iso") c.iso = v;
-        else if (k == "eboot") c.eboot = v;
+        else if (k == "iso") c.iso_of[MHFU_REGION_TAG] = v;          // before releases had their own
+        else if (k == "eboot") c.eboot_of[MHFU_REGION_TAG] = v;
+        else if (k.rfind("iso_", 0) == 0) c.iso_of[k.substr(4)] = v;
+        else if (k.rfind("eboot_", 0) == 0) c.eboot_of[k.substr(6)] = v;
+        else if (k == "region") c.region = v;
         else if (k == "ra_user") c.ra_user = v;
         else if (k == "ra_key") c.ra_key = v;
         else if (k == "ra_token") c.ra_token = v;
         else if (k == "ra_ingame") b(c.ra_ingame);
     }
+    c.iso = c.iso_of[c.region];
+    c.eboot = c.eboot_of[c.region];
     return true;
+}
+
+// Once, at start. The release to start: the one chosen before, if its game is here; else
+    // the first whose disc is known (setup.ps1's iso.txt, or one chosen); else
+    // the first built.
+void config_choose_region(Config &c) {
+    int pick = -1;
+    for (int i = 0; i < REGION_COUNT; i++)
+        if (c.region == k_regions[i].tag && region_built(i)) pick = i;
+    for (int i = 0; i < REGION_COUNT && pick < 0; i++) {
+        if (!region_built(i)) continue;
+        region_select(i);
+        if (!c.iso_of[k_regions[i].tag].empty() || file_exists(S(P(paths::work()) / "iso.txt"))) pick = i;
+    }
+    for (int i = 0; i < REGION_COUNT && pick < 0; i++)
+        if (region_built(i)) pick = i;
+    if (pick < 0) pick = region_index();                 // nothing built yet: the one this was built with
+    region_select(pick);
+    c.region = k_regions[pick].tag;
+    c.iso = c.iso_of[c.region];
+    c.eboot = c.eboot_of[c.region];
+}
+
+void config_use_region(Config &c, int i) {
+    c.iso_of[c.region] = c.iso;
+    c.eboot_of[c.region] = c.eboot;
+    region_select(i);
+    c.region = k_regions[i].tag;
+    c.iso = c.iso_of[c.region];
+    c.eboot = c.eboot_of[c.region];
 }
 
 bool config_save(const Config &c) {
@@ -193,8 +233,12 @@ bool config_save(const Config &c) {
     o << "close_on_start=" << (c.close_on_start ? 1 : 0) << "\n";
     o << "extra_env=" << escape(c.extra_env) << "\n";
     o << "extra_args=" << escape(c.extra_args) << "\n";
-    o << "iso=" << escape(c.iso) << "\n";
-    o << "eboot=" << escape(c.eboot) << "\n";
+    o << "region=" << escape(c.region) << "\n";
+    std::map<std::string, std::string> isos = c.iso_of, eboots = c.eboot_of;
+    isos[c.region] = c.iso;
+    eboots[c.region] = c.eboot;
+    for (auto &m : isos) if (!m.second.empty()) o << "iso_" << m.first << "=" << escape(m.second) << "\n";
+    for (auto &m : eboots) if (!m.second.empty()) o << "eboot_" << m.first << "=" << escape(m.second) << "\n";
     o << "# The Web API key is stored here in plain text.\n";
     o << "ra_user=" << escape(c.ra_user) << "\n";
     o << "ra_key=" << escape(c.ra_key) << "\n";

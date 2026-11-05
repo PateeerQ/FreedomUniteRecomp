@@ -94,6 +94,10 @@
 #define MHFU_HAS_BUILTIN_MODS   1
 #endif
 
+#if MHFU_REGION_FUC
+#define MHFU_EBOOT_FILE "ULJM05500_FUC_EBOOT.BIN"   /* not the JP one's: both in one app's folder */
+#else
 #define MHFU_EBOOT_FILE MHFU_GAME_ID "_EBOOT.BIN"
+#endif
 
 #endif

@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\json-subbuild\CMakeFiles\a4ff594befe760529ccac9aaef40ff00\json-populate-mkdir.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\json-subbuild\CMakeFiles\a4ff594befe760529ccac9aaef40ff00\json-populate-download.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\json-subbuild\CMakeFiles\a4ff594befe760529ccac9aaef40ff00\json-populate-update.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\json-subbuild\CMakeFiles\a4ff594befe760529ccac9aaef40ff00\json-populate-patch.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\json-subbuild\CMakeFiles\a4ff594befe760529ccac9aaef40ff00\json-populate-configure.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\json-subbuild\CMakeFiles\a4ff594befe760529ccac9aaef40ff00\json-populate-build.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\json-subbuild\CMakeFiles\a4ff594befe760529ccac9aaef40ff00\json-populate-install.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\json-subbuild\CMakeFiles\a4ff594befe760529ccac9aaef40ff00\json-populate-test.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\json-subbuild\CMakeFiles\356ed9e6d4ddeaf9267aeadd832366df\json-populate-complete.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\json-subbuild\CMakeFiles\5896db36a6c87674263124ebdf2d641c\json-populate.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\json-subbuild\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="E:\Project\MHFU-Android\build-all\_deps\json-subbuild\CMakeFiles\json-populate" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{AF018A91-92A2-3634-99F5-A81CBB95158E}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

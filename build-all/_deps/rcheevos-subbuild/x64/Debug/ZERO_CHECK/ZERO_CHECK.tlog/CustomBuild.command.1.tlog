@@ -1,0 +1,10 @@
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\RCHEEVOS-SUBBUILD\CMAKEFILES\B1DEF2886A3A63D2929E8A0365A67F29\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SE:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild -BE:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/rcheevos-populate.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

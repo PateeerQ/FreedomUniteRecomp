@@ -1,0 +1,150 @@
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\SDL3-SUBBUILD\CMAKEFILES\693C980DDF7F512EB5267859E6EAE15C\SDL3-POPULATE-MKDIR.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -Dcfgdir=/Debug -P E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/sdl3-populate-prefix/tmp/sdl3-populate-mkdirs.cmake
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/sdl3-populate-prefix/src/sdl3-populate-stamp/Debug/sdl3-populate-mkdir
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\SDL3-SUBBUILD\CMAKEFILES\693C980DDF7F512EB5267859E6EAE15C\SDL3-POPULATE-DOWNLOAD.RULE
+setlocal
+cd E:\Project\MHFU-Android\build-all\_deps
+if %errorlevel% neq 0 goto :cmEnd
+E:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE -P E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/sdl3-populate-prefix/tmp/sdl3-populate-gitclone.cmake
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/sdl3-populate-prefix/src/sdl3-populate-stamp/Debug/sdl3-populate-download
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\SDL3-SUBBUILD\CMAKEFILES\693C980DDF7F512EB5267859E6EAE15C\SDL3-POPULATE-UPDATE.RULE
+setlocal
+cd E:\Project\MHFU-Android\build-all\_deps\sdl3-src
+if %errorlevel% neq 0 goto :cmEnd
+E:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -Dcan_fetch=YES -DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE -P E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/sdl3-populate-prefix/tmp/sdl3-populate-gitupdate.cmake
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\SDL3-SUBBUILD\CMAKEFILES\693C980DDF7F512EB5267859E6EAE15C\SDL3-POPULATE-PATCH.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/sdl3-populate-prefix/src/sdl3-populate-stamp/Debug/sdl3-populate-patch
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\SDL3-SUBBUILD\CMAKEFILES\693C980DDF7F512EB5267859E6EAE15C\SDL3-POPULATE-CONFIGURE.RULE
+setlocal
+cd E:\Project\MHFU-Android\build-all\_deps\sdl3-build
+if %errorlevel% neq 0 goto :cmEnd
+E:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/sdl3-populate-prefix/src/sdl3-populate-stamp/Debug/sdl3-populate-configure
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\SDL3-SUBBUILD\CMAKEFILES\693C980DDF7F512EB5267859E6EAE15C\SDL3-POPULATE-BUILD.RULE
+setlocal
+cd E:\Project\MHFU-Android\build-all\_deps\sdl3-build
+if %errorlevel% neq 0 goto :cmEnd
+E:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/sdl3-populate-prefix/src/sdl3-populate-stamp/Debug/sdl3-populate-build
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\SDL3-SUBBUILD\CMAKEFILES\693C980DDF7F512EB5267859E6EAE15C\SDL3-POPULATE-INSTALL.RULE
+setlocal
+cd E:\Project\MHFU-Android\build-all\_deps\sdl3-build
+if %errorlevel% neq 0 goto :cmEnd
+E:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/sdl3-populate-prefix/src/sdl3-populate-stamp/Debug/sdl3-populate-install
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\SDL3-SUBBUILD\CMAKEFILES\693C980DDF7F512EB5267859E6EAE15C\SDL3-POPULATE-TEST.RULE
+setlocal
+cd E:\Project\MHFU-Android\build-all\_deps\sdl3-build
+if %errorlevel% neq 0 goto :cmEnd
+E:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/sdl3-populate-prefix/src/sdl3-populate-stamp/Debug/sdl3-populate-test
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\SDL3-SUBBUILD\CMAKEFILES\81758BD7E878B4F80545652A6AEFFDD9\SDL3-POPULATE-COMPLETE.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E make_directory E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/CMakeFiles/Debug
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/CMakeFiles/Debug/sdl3-populate-complete
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/sdl3-populate-prefix/src/sdl3-populate-stamp/Debug/sdl3-populate-done
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\SDL3-SUBBUILD\CMAKEFILES\389621A5906F3D65414D0FFD0EE34765\SDL3-POPULATE.RULE
+setlocal
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\SDL3-SUBBUILD\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SE:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild -BE:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild --check-stamp-file E:/Project/MHFU-Android/build-all/_deps/sdl3-subbuild/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

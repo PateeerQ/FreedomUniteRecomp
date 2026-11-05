@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/json-subbuild/CMakeFiles/json-populate"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/json-subbuild/CMakeFiles/5896db36a6c87674263124ebdf2d641c/json-populate.rule"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/json-subbuild/CMakeFiles/356ed9e6d4ddeaf9267aeadd832366df/json-populate-complete.rule"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/json-subbuild/CMakeFiles/a4ff594befe760529ccac9aaef40ff00/json-populate-build.rule"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/json-subbuild/CMakeFiles/a4ff594befe760529ccac9aaef40ff00/json-populate-configure.rule"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/json-subbuild/CMakeFiles/a4ff594befe760529ccac9aaef40ff00/json-populate-download.rule"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/json-subbuild/CMakeFiles/a4ff594befe760529ccac9aaef40ff00/json-populate-install.rule"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/json-subbuild/CMakeFiles/a4ff594befe760529ccac9aaef40ff00/json-populate-mkdir.rule"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/json-subbuild/CMakeFiles/a4ff594befe760529ccac9aaef40ff00/json-populate-patch.rule"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/json-subbuild/CMakeFiles/a4ff594befe760529ccac9aaef40ff00/json-populate-test.rule"
+		},
+		{
+			"file" : "E:/Project/MHFU-Android/build-all/_deps/json-subbuild/CMakeFiles/a4ff594befe760529ccac9aaef40ff00/json-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"json-populate"
+		],
+		"name" : "json-populate"
+	}
+}

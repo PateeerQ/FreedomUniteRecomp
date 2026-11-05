@@ -1,0 +1,150 @@
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\RCHEEVOS-SUBBUILD\CMAKEFILES\5CFB0F5F1BEAAB6B2072C0E7755CB2E7\RCHEEVOS-POPULATE-MKDIR.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -Dcfgdir=/Debug -P E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/rcheevos-populate-prefix/tmp/rcheevos-populate-mkdirs.cmake
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/rcheevos-populate-prefix/src/rcheevos-populate-stamp/Debug/rcheevos-populate-mkdir
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\RCHEEVOS-SUBBUILD\CMAKEFILES\5CFB0F5F1BEAAB6B2072C0E7755CB2E7\RCHEEVOS-POPULATE-DOWNLOAD.RULE
+setlocal
+cd E:\Project\MHFU-Android\build-all\_deps
+if %errorlevel% neq 0 goto :cmEnd
+E:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE -P E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/rcheevos-populate-prefix/tmp/rcheevos-populate-gitclone.cmake
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/rcheevos-populate-prefix/src/rcheevos-populate-stamp/Debug/rcheevos-populate-download
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\RCHEEVOS-SUBBUILD\CMAKEFILES\5CFB0F5F1BEAAB6B2072C0E7755CB2E7\RCHEEVOS-POPULATE-UPDATE.RULE
+setlocal
+cd E:\Project\MHFU-Android\build-all\_deps\rcheevos-src
+if %errorlevel% neq 0 goto :cmEnd
+E:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -Dcan_fetch=YES -DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE -P E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/rcheevos-populate-prefix/tmp/rcheevos-populate-gitupdate.cmake
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\RCHEEVOS-SUBBUILD\CMAKEFILES\5CFB0F5F1BEAAB6B2072C0E7755CB2E7\RCHEEVOS-POPULATE-PATCH.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/rcheevos-populate-prefix/src/rcheevos-populate-stamp/Debug/rcheevos-populate-patch
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\RCHEEVOS-SUBBUILD\CMAKEFILES\5CFB0F5F1BEAAB6B2072C0E7755CB2E7\RCHEEVOS-POPULATE-CONFIGURE.RULE
+setlocal
+cd E:\Project\MHFU-Android\build-all\_deps\rcheevos-build
+if %errorlevel% neq 0 goto :cmEnd
+E:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/rcheevos-populate-prefix/src/rcheevos-populate-stamp/Debug/rcheevos-populate-configure
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\RCHEEVOS-SUBBUILD\CMAKEFILES\5CFB0F5F1BEAAB6B2072C0E7755CB2E7\RCHEEVOS-POPULATE-BUILD.RULE
+setlocal
+cd E:\Project\MHFU-Android\build-all\_deps\rcheevos-build
+if %errorlevel% neq 0 goto :cmEnd
+E:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/rcheevos-populate-prefix/src/rcheevos-populate-stamp/Debug/rcheevos-populate-build
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\RCHEEVOS-SUBBUILD\CMAKEFILES\5CFB0F5F1BEAAB6B2072C0E7755CB2E7\RCHEEVOS-POPULATE-INSTALL.RULE
+setlocal
+cd E:\Project\MHFU-Android\build-all\_deps\rcheevos-build
+if %errorlevel% neq 0 goto :cmEnd
+E:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/rcheevos-populate-prefix/src/rcheevos-populate-stamp/Debug/rcheevos-populate-install
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\RCHEEVOS-SUBBUILD\CMAKEFILES\5CFB0F5F1BEAAB6B2072C0E7755CB2E7\RCHEEVOS-POPULATE-TEST.RULE
+setlocal
+cd E:\Project\MHFU-Android\build-all\_deps\rcheevos-build
+if %errorlevel% neq 0 goto :cmEnd
+E:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/rcheevos-populate-prefix/src/rcheevos-populate-stamp/Debug/rcheevos-populate-test
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\RCHEEVOS-SUBBUILD\CMAKEFILES\E6C1416BE807CE1077379D2119AD7E0E\RCHEEVOS-POPULATE-COMPLETE.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E make_directory E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/CMakeFiles/Debug
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/CMakeFiles/Debug/rcheevos-populate-complete
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/rcheevos-populate-prefix/src/rcheevos-populate-stamp/Debug/rcheevos-populate-done
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\RCHEEVOS-SUBBUILD\CMAKEFILES\B1DEF2886A3A63D2929E8A0365A67F29\RCHEEVOS-POPULATE.RULE
+setlocal
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\RCHEEVOS-SUBBUILD\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SE:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild -BE:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild --check-stamp-file E:/Project/MHFU-Android/build-all/_deps/rcheevos-subbuild/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

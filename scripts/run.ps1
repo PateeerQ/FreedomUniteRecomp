@@ -96,7 +96,7 @@ New-Item -ItemType Directory -Force (Join-Path $work "overlays") | Out-Null
 # stderr into error records (fatal under 'Stop'), so let cmd merge the two
 # streams before PowerShell sees them.
 if (-not $NoTraceIo) { $env:PSPRECOMP_TRACE_IO = "1" }
-$eboot = Join-Path $work "${gameId}_EBOOT.BIN"
+$eboot = Join-Path $work $(if ($Region -eq "FUC") { "ULJM05500_FUC_EBOOT.BIN" } else { "${gameId}_EBOOT.BIN" })
 $root  = Join-Path $work "root"
 if ($DeviceRoot) {
     # A second device: its own memory stick and net.cfg, the same disc.

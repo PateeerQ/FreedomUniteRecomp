@@ -20,23 +20,12 @@ int saves_in(const std::string &root) {
     int n = 0;
     std::error_code e;
     for (auto &d : fs::directory_iterator(P(root) / "ms" / "PSP" / "SAVEDATA", e))
-        if (d.is_directory() && d.path().filename().u8string().rfind(MHFU_GAME_ID, 0) == 0) n++;
+        if (d.is_directory() && d.path().filename().u8string().rfind(region().game_id, 0) == 0) n++;
     return n;
 }
 
-// The disc's product code appears in its first files (UMD_DATA.BIN, PARAM.SFO).
-static bool iso_is_ours(const std::string &iso) {
-    std::ifstream f(P(iso), std::ios::binary);
-    if (!f) return false;
-    std::string buf(1 << 20, '\0');
-    for (int chunk = 0; chunk < 32; chunk++) {
-        f.read(buf.data(), (std::streamsize)buf.size());
-        const std::string got = buf.substr(0, (size_t)f.gcount());
-        if (got.find(MHFU_GAME_ID_DASH) != std::string::npos || got.find(MHFU_GAME_ID) != std::string::npos) return true;
-        if (f.gcount() < (std::streamsize)buf.size()) break;
-    }
-    return false;
-}
+// The disc is the release in use (regions.h: its PARAM.SFO, FUComplete's FUC folder).
+static bool iso_is_ours(const std::string &iso) { return region_of_disc(iso) == region_index(); }
 
 static int count_dirs(const fs::path &p) {
     int n = 0;
@@ -61,20 +50,22 @@ std::vector<Check> ready_check(const Config &c, const std::string &gpu) {
     if (iso.empty()) out.push_back({false, false, "Game dump", "no ISO set (run setup.ps1, or choose it under Advanced)"});
     else if (!file_exists(iso)) out.push_back({false, false, "Game dump", "not found: " + iso});
     else if (!iso_is_ours(iso))
-        out.push_back({false, true, "Game dump", "not recognised as " MHFU_GAME_ID " (" MHFU_REGION_NAME "): " + P(iso).filename().u8string()});
-    else out.push_back({true, false, "Game dump", "Monster Hunter Freedom Unite, " MHFU_GAME_ID " (" MHFU_REGION_NAME ")"});
+        out.push_back({false, true, "Game dump", std::string("not recognised as ") + region().game_id + " (" + region().name + "): " + P(iso).filename().u8string()});
+    else out.push_back({true, false, "Game dump", std::string(region().title) + ", " + region().game_id + " (" + region().name + ")"});
 
     std::string head = read_text(eboot).substr(0, 4);
-    if (!file_exists(eboot)) out.push_back({false, false, "Decrypted EBOOT", "not found: " + eboot});
+    if (!file_exists(eboot) && region().eboot_on_disc)            // FUComplete: nothing to dump
+        out.push_back({true, false, "EBOOT", "taken from the disc when the game starts"});
+    else if (!file_exists(eboot)) out.push_back({false, false, "Decrypted EBOOT", "not found: " + eboot});
     else if (head != "\x7F" "ELF") out.push_back({false, false, "Decrypted EBOOT", "not decrypted (no ELF header)"});
     else out.push_back({true, false, "Decrypted EBOOT", P(eboot).filename().u8string()});
 
     const int ovl = count_dirs(P(paths::work()) / "gen_ovl");
-    if (!file_exists(paths::host_exe())) out.push_back({false, false, "Recompiled game", "mhfu_host.exe is missing: run setup.ps1"});
+    if (!file_exists(paths::host_exe())) out.push_back({false, false, "Recompiled game", P(paths::host_exe()).filename().u8string() + " is missing: run setup.ps1"});
     else if (ovl == 0)                  // a release: the overlays are inside mhfu_host.exe
-        out.push_back({true, false, "Recompiled game", "mhfu_host.exe"});
+        out.push_back({true, false, "Recompiled game", P(paths::host_exe()).filename().u8string()});
     else out.push_back({true, ovl < 298, "Recompiled game",
-                        "mhfu_host.exe, " + std::to_string(ovl) + " of 298 overlays recompiled"});
+                        P(paths::host_exe()).filename().u8string() + ", " + std::to_string(ovl) + " of 298 overlays recompiled"});
 
     const int fonts = count_files(P(paths::profile_root("Default")) / "flash0" / "font", ".pgf");
     if (!fonts) out.push_back({false, false, "PSP fonts", "none in work/root/flash0/font: all text would be blank"});
@@ -184,6 +175,9 @@ bool game_start(const Config &c, std::string &err) {
 
     const std::string keys = (P(paths::launcher()) / "input.ini").u8string();
     if (!file_exists(keys)) keys_save(keys, keys_defaults());
+    // FUComplete's EBOOT is plain on its disc: taken from there the first time.
+    if (region().eboot_on_disc && !file_exists(paths::eboot(c)) && !eboot_from_disc(paths::iso(c), paths::eboot(c), err))
+        return false;
 
     std::wstring cmd = quote(paths::host_exe()) + L" " + quote(paths::eboot(c)) + L" " + quote(root);
     if (!paths::iso(c).empty()) cmd += L" --iso " + quote(paths::iso(c));
@@ -236,7 +230,7 @@ bool game_start(const Config &c, std::string &err) {
     const BOOL ok = CreateProcessW(NULL, cmd.data(), NULL, NULL, TRUE, CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT,
                                    block.data(), dir.c_str(), &si, &pi);
     CloseHandle(out);
-    if (!ok) { err = "could not start mhfu_host.exe (error " + std::to_string(GetLastError()) + ")"; return false; }
+    if (!ok) { err = "could not start " + P(paths::host_exe()).filename().u8string() + " (error " + std::to_string(GetLastError()) + ")"; return false; }
     CloseHandle(pi.hThread);
     {
         std::lock_guard<std::mutex> l(g_lock);

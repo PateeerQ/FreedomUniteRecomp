@@ -428,7 +428,7 @@ static void banner(float w) {
     dl->AddText(g_small, g_small->FontSize, ImVec2(tx, p.y + h - 102), col(C_GOLD), "HUNTER'S GUILD  \xC2\xB7  POKKE VILLAGE");
     dl->AddText(g_big, g_big->FontSize, ImVec2(tx + 1, p.y + h - 79), IM_COL32(0, 0, 0, 160), "Monster Hunter Freedom Unite");
     dl->AddText(g_big, g_big->FontSize, ImVec2(tx, p.y + h - 80), col(C_TEXT), "Monster Hunter Freedom Unite");
-    dl->AddText(g_body, g_body->FontSize, ImVec2(tx, p.y + h - 40), col(C_DIM), MHFU_GAME_ID "  \xC2\xB7  " MHFU_REGION_NAME "  \xC2\xB7  PSP");
+    dl->AddText(g_body, g_body->FontSize, ImVec2(tx, p.y + h - 40), col(C_DIM), (std::string(region().game_id) + "  \xC2\xB7  " + region().name + "  \xC2\xB7  PSP").c_str());
     ImGui::Dummy(ImVec2(w, h));
 }
 
@@ -540,8 +540,8 @@ static void page_play(float w, float h) {
     ImGui::SetCursorPosX(lw);
     if (ImGui::Checkbox("Fullscreen", &g_cfg.fullscreen)) changed();
     ImGui::SameLine();
-    if (MHFU_HAS_FPS60 && ImGui::Checkbox("60 FPS (beta)", &g_cfg.fps60)) changed();
-    if (MHFU_HAS_FPS60 && ImGui::IsItemHovered())
+    if (region().fps60 && ImGui::Checkbox("60 FPS (beta)", &g_cfg.fps60)) changed();
+    if (region().fps60 && ImGui::IsItemHovered())
         ImGui::SetTooltip("The game at 60 frames a second. In a room everyone plays at the slowest player's rate.\n"
                           "Beta: tell PateeerQ if something runs too fast or too slow. F4 in game toggles it.");
     label("Volume");
@@ -1056,6 +1056,20 @@ static void page_advanced(float w, float) {
     ImGui::Spacing();
 
     heading("Files");
+    // The release to start: each one built is here (a universal install has them all).
+    ImGui::SetNextItemWidth(-190);
+    if (ImGui::BeginCombo("Game", (std::string(region().title) + " (" + region().name + ")").c_str())) {
+        for (int i = 0; i < REGION_COUNT; i++) {
+            if (!region_built(i)) continue;
+            const std::string label = std::string(k_regions[i].title) + " (" + k_regions[i].name + ")";
+            if (ImGui::Selectable(label.c_str(), i == region_index()) && i != region_index()) {
+                config_use_region(g_cfg, i);
+                changed();
+                g_recheck = true;
+            }
+        }
+        ImGui::EndCombo();
+    }
     ImGui::SetNextItemWidth(-190);
     const std::string iso_hint = paths::iso(Config{});
     if (ImGui::InputTextWithHint("##iso", iso_hint.empty() ? "the game's .iso" : iso_hint.c_str(), &g_cfg.iso)) { changed(); g_recheck = true; }
@@ -1086,7 +1100,7 @@ static void page_mods(float w, float) {
     begin_panel("modsp", ImVec2(0, 0));
 
     heading("Built-in mods");
-    for (int i = 0; i < (MHFU_HAS_BUILTIN_MODS ? k_nbuiltin_mods : 0); i++) {
+    for (int i = 0; i < (region().mods ? k_nbuiltin_mods : 0); i++) {
         const BuiltinMod &m = k_builtin_mods[i];
         auto it = g_cfg.mods.find(m.id);
         bool on = it == g_cfg.mods.end() ? true : it->second;
@@ -1099,10 +1113,11 @@ static void page_mods(float w, float) {
         ImGui::PopFont();
     }
     ImGui::PushFont(g_small);
-    if (MHFU_HAS_BUILTIN_MODS)
-        dim(MHFU_IS_US ?"Community mods for the US game, recompiled with it."
-                           : "Community mods for the US game, moved to this (" MHFU_REGION_NAME ") version and recompiled with it.");
-    else dim("Not in the " MHFU_REGION_NAME " build yet.");
+    if (region().mods)
+        dim(region().mods_native ? "Community mods for the US game, recompiled with it."
+                                 : "Community mods for the US game, moved to this (%s) version and recompiled with it.",
+            region().name);
+    else dim("Not in the %s build yet.", region().name);
     ImGui::PopFont();
     ImGui::Spacing();
 
@@ -1112,7 +1127,7 @@ static void page_mods(float w, float) {
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 34);
     dim("The camera takes the window's shape and the picture is stretched over it (with an Output wider than 16:9).");
     ImGui::PopFont();
-    if (MHFU_HAS_FPS60 && ImGui::Checkbox("60 FPS (beta)", &g_cfg.fps60)) changed();
+    if (region().fps60 && ImGui::Checkbox("60 FPS (beta)", &g_cfg.fps60)) changed();
     ImGui::Spacing();
 
     heading("Cheats");
@@ -1122,7 +1137,7 @@ static void page_mods(float w, float) {
     if (job == CheatJob::Busy) ImGui::BeginDisabled();
     if (ImGui::Button("Get the cheat list")) cheats_download_start(path);
     if (job == CheatJob::Busy) ImGui::EndDisabled();
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip(MHFU_GAME_ID_DASH "'s cheats from the CWCheat Database Plus (the one PPSSPP uses).");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s's cheats from the CWCheat Database Plus (the one PPSSPP uses).", region().game_id_dash);
     ImGui::SameLine();
     if (ImGui::Button("Import a cheat file")) pick(3, "Cheats (CWCheat)", "ini;db;txt");
     ImGui::SameLine();
@@ -1194,9 +1209,9 @@ static void page_about(float w, float) {
     ImGui::EndGroup();
     ImGui::Spacing();
     heading("What it is");
-    dim("A native port of Monster Hunter Freedom Unite (PSP, " MHFU_GAME_ID "): the game's own code, statically "
+    dim("A native port of %s (PSP, %s): the game's own code, statically "
         "recompiled to x86-64 with psprecomp, running on a reimplementation of the PSP's firmware. No "
-        "emulator in between.");
+        "emulator in between.", region().title, region().game_id);
     heading("Built on");
     dim("psprecomp (sp00nznet) \xC2\xB7 SDL3 \xC2\xB7 FFmpeg (LGPL) \xC2\xB7 rcheevos \xC2\xB7 Dear ImGui \xC2\xB7 "
         "nlohmann/json \xC2\xB7 stb. PPSSPP's source was the reference for the firmware's behaviour.");
@@ -1266,6 +1281,7 @@ static void page_log(float w, float) {
 int main(int, char **) {
     paths::init(SDL_GetBasePath());
     config_load(g_cfg);
+    config_choose_region(g_cfg);
     g_ra_user_in = g_cfg.ra_user;
     g_keys = keys_load(keys_path());
     if (!file_exists(keys_path())) keys_save(keys_path(), g_keys);
@@ -1353,7 +1369,14 @@ int main(int, char **) {
                     const int n = cheats_import(cheats_path(paths::profile_root(g_cfg.profile)), read_text(g_pick_result), err);
                     g_status = n < 0 ? "Import: " + err : "Imported " + std::to_string(n) + " cheats.";
                 } else {
-                    (g_pick_target == 1 ? g_cfg.iso : g_cfg.eboot) = g_pick_result;
+                    if (g_pick_target == 1) {
+                        // A disc of another release built here: switch to it, the disc going with it.
+                        const int r = region_of_disc(g_pick_result);
+                        if (r >= 0 && r != region_index() && region_built(r)) config_use_region(g_cfg, r);
+                        g_cfg.iso = g_pick_result;
+                    } else {
+                        g_cfg.eboot = g_pick_result;
+                    }
                     changed();
                     g_recheck = true;
                 }

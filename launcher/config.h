@@ -14,6 +14,7 @@
 
 #include "../host/about.h"
 #include "../host/region.h"
+#include "regions.h"
 #define LAUNCHER_VERSION MHFU_VERSION
 
 struct Config {
@@ -35,6 +36,10 @@ struct Config {
     std::string extra_args;
     std::string iso;                    // empty: work/iso.txt (written by setup.ps1)
     std::string eboot;                  // empty: work/<game id>_EBOOT.BIN
+    // The release in use (regions.h: "EU", "US", "JP", "FUC"); "" at first: told
+    // from the disc. iso/eboot above are that release's; the others' wait here.
+    std::string region;
+    std::map<std::string, std::string> iso_of, eboot_of;
     std::string ra_user, ra_key;        // RetroAchievements username and Web API key
     std::string ra_token;               // the login token for unlocking in game (never the password)
     bool ra_ingame = true;              // unlock achievements while playing
@@ -55,8 +60,10 @@ bool create_profile(const std::string &name, std::string &err);
 bool delete_profile(const std::string &name, std::string &err);
 }
 
-bool config_load(Config &c);
+bool config_load(Config &c);           // also picks the release to start (regions.h)
 bool config_save(const Config &c);
+void config_use_region(Config &c, int i);   // switch release: its own disc and EBOOT come back
+void config_choose_region(Config &c);       // once at start: the release to start
 
 // Small helpers shared by the launcher's files.
 bool file_exists(const std::string &path);

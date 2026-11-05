@@ -98,161 +98,202 @@ if(MHFU_LAUNCHER)
 endif()
 
 # --- the host -------------------------------------------------------------------
+#
+# One host per region's recompiled code: the code is the game's own, so each
+# release of the game (Europe, USA, Japan, FUComplete) is a host of its own.
+# A normal build makes one, mhfu_host, from MHFU_GEN_DIR (scripts/setup.ps1
+# builds each region in its own build folder that way). MHFU_UNIVERSAL=ON makes
+# every region set up so far in one build: mhfu_host_eu, _us, _jp, _fuc (on
+# Android libmain_eu.so ...), which the launcher and the app choose from by the
+# disc the player has (scripts/build-universal.ps1).
 
-file(GLOB MHFU_GEN_SOURCES CONFIGURE_DEPENDS "${MHFU_GEN_DIR}/*.c")
-
-if(NOT MHFU_GEN_SOURCES)
-    message(STATUS
-        "No recompiled code in ${MHFU_GEN_DIR}: building psprecomp only. "
-        "Run scripts/setup.ps1, then configure again.")
-    return()
-endif()
-
-list(LENGTH MHFU_GEN_SOURCES MHFU_GEN_COUNT)
-message(STATUS "mhfu_host: ${MHFU_GEN_COUNT} generated source files")
-
-# Overlays: one directory per recompiled overlay, plus the table that names
-# them. Before any exist, an empty table.
-file(GLOB MHFU_OVL_SOURCES CONFIGURE_DEPENDS "${MHFU_OVL_DIR}/*/*.c")
-if(EXISTS "${MHFU_OVL_DIR}/overlays.c")
-    list(APPEND MHFU_OVL_SOURCES "${MHFU_OVL_DIR}/overlays.c")
-else()
-    set(MHFU_OVL_SOURCES host/overlays_none.c)
-endif()
-# The built-in mods' data (tools/mods_patch.py), or an empty table.
-if(EXISTS "${MHFU_OVL_DIR}/mods_builtin.c")
-    list(APPEND MHFU_OVL_SOURCES "${MHFU_OVL_DIR}/mods_builtin.c")
-else()
-    list(APPEND MHFU_OVL_SOURCES host/mods_none.c)
-endif()
-list(APPEND MHFU_GEN_SOURCES ${MHFU_OVL_SOURCES})
-
-if(ANDROID)
-    # SDL's Android activity loads libmain.so and calls its SDL_main.
-    # SDL3 for Android has some C++ (its HID code): link with the C++ driver,
-    # so the static libc++ (ANDROID_STL=c++_static) comes in.
-    enable_language(CXX)
-    add_library(mhfu_host SHARED host/main.c host/android.c host/achievements.c host/chat.c host/hle_mhfu.c host/input.c host/keys.c host/stats.c host/libfont.c host/utility.c
-               host/adhoc.c host/lobby.c host/mods.c host/audio.c host/atrac.c host/mpeg.c ${MHFU_GEN_SOURCES})
-    set_target_properties(mhfu_host PROPERTIES OUTPUT_NAME main LINKER_LANGUAGE CXX)
-    target_link_libraries(mhfu_host PRIVATE android log EGL GLESv3 OpenSLES)
-else()
-    add_executable(mhfu_host host/main.c host/achievements.c host/chat.c host/hle_mhfu.c host/input.c host/keys.c host/stats.c host/libfont.c host/utility.c
-               host/adhoc.c host/lobby.c host/mods.c host/audio.c host/atrac.c host/mpeg.c ${MHFU_GEN_SOURCES})
-endif()
-target_include_directories(mhfu_host PRIVATE "${MHFU_GEN_DIR}" host)
-target_link_libraries(mhfu_host PRIVATE psprecomp mhfu_net)
-if(WIN32)
-    target_sources(mhfu_host PRIVATE assets/icon/mhfu.rc)       # the crest, as the exe's icon
-    target_link_libraries(mhfu_host PRIVATE user32 gdi32 opengl32 ole32 windowscodecs)
-endif()
-
-# RetroAchievements while playing (host/achievements.c): rcheevos' rc_client,
-# built from source. It checks the achievements against guest memory every
-# frame and sends unlocks; the launcher signs the player in.
+option(MHFU_UNIVERSAL "A host for every region set up in work/ (mhfu_host_<region>)" OFF)
 option(MHFU_RCHEEVOS "RetroAchievements in game (rcheevos)" ON)
-if(MHFU_RCHEEVOS AND (WIN32 OR ANDROID))
-    include(FetchContent)
-    FetchContent_Declare(rcheevos
-        GIT_REPOSITORY https://github.com/RetroAchievements/rcheevos.git
-        GIT_TAG        v11.6.0
-        GIT_SHALLOW    TRUE)
-    FetchContent_MakeAvailable(rcheevos)   # no CMakeLists of its own: just fetched
-    file(GLOB RCHEEVOS_SOURCES
-        "${rcheevos_SOURCE_DIR}/src/rc_client.c" "${rcheevos_SOURCE_DIR}/src/rc_compat.c"
-        "${rcheevos_SOURCE_DIR}/src/rc_util.c" "${rcheevos_SOURCE_DIR}/src/rc_version.c"
-        "${rcheevos_SOURCE_DIR}/src/rapi/*.c" "${rcheevos_SOURCE_DIR}/src/rcheevos/*.c"
-        "${rcheevos_SOURCE_DIR}/src/rhash/*.c")
-    add_library(rcheevos STATIC ${RCHEEVOS_SOURCES})
-    target_include_directories(rcheevos PUBLIC "${rcheevos_SOURCE_DIR}/include" PRIVATE "${rcheevos_SOURCE_DIR}/src")
-    target_compile_definitions(rcheevos PUBLIC RC_CLIENT_SUPPORTS_HASH RC_DISABLE_LUA PRIVATE _CRT_SECURE_NO_WARNINGS)
-    set_target_properties(rcheevos PROPERTIES C_STANDARD 11)
-    target_link_libraries(mhfu_host PRIVATE rcheevos $<$<BOOL:${WIN32}>:winhttp>)
-    target_compile_definitions(mhfu_host PRIVATE MHFU_RCHEEVOS=1)
-endif()
-
-# The window: Win32 (host/window.c: the Multiplayer menu and dialogs) on
-# Windows, SDL3 (host/window_sdl.c) on Android and Linux. MHFU_SDL_WINDOW=ON
-# builds the SDL one on Windows too, to try it there.
+option(MHFU_TRACE "Record every recompiled function entry" ON)
 if(ANDROID OR NOT WIN32)
     set(MHFU_SDL_WINDOW_DEFAULT ON)
 else()
     set(MHFU_SDL_WINDOW_DEFAULT OFF)
 endif()
 option(MHFU_SDL_WINDOW "The SDL3 window instead of the Win32 one" ${MHFU_SDL_WINDOW_DEFAULT})
-if(MHFU_SDL_WINDOW)
-    if(NOT MHFU_GAMEPAD)
-        message(FATAL_ERROR "MHFU_SDL_WINDOW needs SDL3 (MHFU_GAMEPAD=ON)")
-    endif()
-    include(FetchContent)
-    FetchContent_Declare(stb
-        URL https://github.com/nothings/stb/archive/2c980bb59875b0d32144a71867fbdebb2f77cd20.tar.gz)
-    FetchContent_MakeAvailable(stb)
-    target_sources(mhfu_host PRIVATE host/window_sdl.c)
-    target_include_directories(mhfu_host PRIVATE "${stb_SOURCE_DIR}")
-    set_source_files_properties(host/window_sdl.c host/main.c host/window.c PROPERTIES COMPILE_DEFINITIONS MHFU_SDL_WINDOW=1)
-else()
-    target_sources(mhfu_host PRIVATE host/window.c)
+if(MHFU_SDL_WINDOW AND NOT MHFU_GAMEPAD)
+    message(FATAL_ERROR "MHFU_SDL_WINDOW needs SDL3 (MHFU_GAMEPAD=ON)")
 endif()
-
-if(MHFU_GAMEPAD)
-    target_sources(mhfu_host PRIVATE host/gamepad.c)
-    target_link_libraries(mhfu_host PRIVATE SDL3::SDL3-static)
-    target_compile_definitions(mhfu_host PRIVATE MHFU_GAMEPAD=1)
-endif()
-
-# Movies and music (host/mpeg.c, host/atrac.c): FFmpeg's H.264 and ATRAC3+
-# decoders, from a shared LGPL build in deps/ffmpeg (on Windows, BtbN's
-# win64-lgpl-shared). Without it the movies play black and the music is
-# silent. The DLLs are copied next to the executable.
 if(ANDROID)
     set(MHFU_FFMPEG_DEFAULT "${CMAKE_CURRENT_SOURCE_DIR}/deps/ffmpeg-android")
 else()
     set(MHFU_FFMPEG_DEFAULT "${CMAKE_CURRENT_SOURCE_DIR}/deps/ffmpeg")
 endif()
 set(MHFU_FFMPEG_DIR "${MHFU_FFMPEG_DEFAULT}" CACHE PATH "FFmpeg (include/, lib/, bin/)")
-if(EXISTS "${MHFU_FFMPEG_DIR}/include/libavcodec/avcodec.h")
-    message(STATUS "mhfu_host: FFmpeg from ${MHFU_FFMPEG_DIR}")
-    target_include_directories(mhfu_host PRIVATE "${MHFU_FFMPEG_DIR}/include")
-    foreach(lib avcodec swscale swresample avutil)
-        if(ANDROID)
-            # Static (scripts/build-ffmpeg-android.sh); named directly, since the
-            # NDK's toolchain only searches inside its sysroot.
-            target_link_libraries(mhfu_host PRIVATE "${MHFU_FFMPEG_DIR}/lib/lib${lib}.a")
+
+# What every host shares, made once.
+set(MHFU_HOST_SOURCES host/main.c host/achievements.c host/chat.c host/hle_mhfu.c host/input.c host/keys.c
+    host/stats.c host/libfont.c host/utility.c host/adhoc.c host/lobby.c host/mods.c host/audio.c host/atrac.c
+    host/mpeg.c)
+set(MHFU_HOST_DEPS_READY OFF)
+macro(mhfu_host_deps)
+    if(NOT MHFU_HOST_DEPS_READY)
+        set(MHFU_HOST_DEPS_READY ON)
+        # RetroAchievements while playing (host/achievements.c): rcheevos'
+        # rc_client, built from source; the launcher signs the player in.
+        if(MHFU_RCHEEVOS AND (WIN32 OR ANDROID))
+            include(FetchContent)
+            FetchContent_Declare(rcheevos
+                GIT_REPOSITORY https://github.com/RetroAchievements/rcheevos.git
+                GIT_TAG        v11.6.0
+                GIT_SHALLOW    TRUE)
+            FetchContent_MakeAvailable(rcheevos)   # no CMakeLists of its own: just fetched
+            file(GLOB RCHEEVOS_SOURCES
+                "${rcheevos_SOURCE_DIR}/src/rc_client.c" "${rcheevos_SOURCE_DIR}/src/rc_compat.c"
+                "${rcheevos_SOURCE_DIR}/src/rc_util.c" "${rcheevos_SOURCE_DIR}/src/rc_version.c"
+                "${rcheevos_SOURCE_DIR}/src/rapi/*.c" "${rcheevos_SOURCE_DIR}/src/rcheevos/*.c"
+                "${rcheevos_SOURCE_DIR}/src/rhash/*.c")
+            add_library(rcheevos STATIC ${RCHEEVOS_SOURCES})
+            target_include_directories(rcheevos PUBLIC "${rcheevos_SOURCE_DIR}/include" PRIVATE "${rcheevos_SOURCE_DIR}/src")
+            target_compile_definitions(rcheevos PUBLIC RC_CLIENT_SUPPORTS_HASH RC_DISABLE_LUA PRIVATE _CRT_SECURE_NO_WARNINGS)
+            set_target_properties(rcheevos PROPERTIES C_STANDARD 11)
+        endif()
+        # The SDL window draws its overlay with stb_truetype.
+        if(MHFU_SDL_WINDOW)
+            include(FetchContent)
+            FetchContent_Declare(stb
+                URL https://github.com/nothings/stb/archive/2c980bb59875b0d32144a71867fbdebb2f77cd20.tar.gz)
+            FetchContent_MakeAvailable(stb)
+            set_source_files_properties(host/window_sdl.c host/main.c host/window.c PROPERTIES COMPILE_DEFINITIONS MHFU_SDL_WINDOW=1)
+        endif()
+        if(EXISTS "${MHFU_FFMPEG_DIR}/include/libavcodec/avcodec.h")
+            message(STATUS "mhfu_host: FFmpeg from ${MHFU_FFMPEG_DIR}")
         else()
-            find_library(MHFU_FF_${lib} ${lib} PATHS "${MHFU_FFMPEG_DIR}/lib" NO_DEFAULT_PATH REQUIRED)
-            target_link_libraries(mhfu_host PRIVATE ${MHFU_FF_${lib}})
+            message(STATUS "mhfu_host: no FFmpeg in ${MHFU_FFMPEG_DIR}: movies black, music silent")
+        endif()
+    endif()
+endmacro()
+
+# mhfu_add_host(TARGET GEN_DIR OVL_DIR [OUTPUT_NAME]): one host from one
+# region's generated code. Returns quietly when GEN_DIR holds none.
+function(mhfu_add_host target gen_dir ovl_dir)
+    file(GLOB gen_sources CONFIGURE_DEPENDS "${gen_dir}/*.c")
+    if(NOT gen_sources)
+        message(STATUS "${target}: no recompiled code in ${gen_dir}: skipped (run scripts/setup.ps1)")
+        return()
+    endif()
+    list(LENGTH gen_sources gen_count)
+    message(STATUS "${target}: ${gen_count} generated source files from ${gen_dir}")
+    mhfu_host_deps()
+
+    # Overlays: one directory per recompiled overlay, plus the table that names
+    # them. Before any exist, an empty table. Then the built-in mods' data.
+    file(GLOB ovl_sources CONFIGURE_DEPENDS "${ovl_dir}/*/*.c")
+    if(EXISTS "${ovl_dir}/overlays.c")
+        list(APPEND ovl_sources "${ovl_dir}/overlays.c")
+    else()
+        set(ovl_sources host/overlays_none.c)
+    endif()
+    if(EXISTS "${ovl_dir}/mods_builtin.c")
+        list(APPEND ovl_sources "${ovl_dir}/mods_builtin.c")
+    else()
+        list(APPEND ovl_sources host/mods_none.c)
+    endif()
+    list(APPEND gen_sources ${ovl_sources})
+
+    if(ANDROID)
+        # SDL's Android activity loads libmain*.so and calls its SDL_main.
+        # SDL3 for Android has some C++ (its HID code): link with the C++ driver,
+        # so the static libc++ (ANDROID_STL=c++_static) comes in.
+        enable_language(CXX)
+        add_library(${target} SHARED ${MHFU_HOST_SOURCES} host/android.c ${gen_sources})
+        set_target_properties(${target} PROPERTIES LINKER_LANGUAGE CXX)
+        target_link_libraries(${target} PRIVATE android log EGL GLESv3 OpenSLES)
+    else()
+        add_executable(${target} ${MHFU_HOST_SOURCES} ${gen_sources})
+    endif()
+    if(ARGC GREATER 3)
+        set_target_properties(${target} PROPERTIES OUTPUT_NAME "${ARGV3}")
+    endif()
+    target_include_directories(${target} PRIVATE "${gen_dir}" host)
+    target_link_libraries(${target} PRIVATE psprecomp mhfu_net)
+    if(WIN32)
+        target_sources(${target} PRIVATE assets/icon/mhfu.rc)       # the crest, as the exe's icon
+        target_link_libraries(${target} PRIVATE user32 gdi32 opengl32 ole32 windowscodecs)
+    endif()
+    if(TARGET rcheevos)
+        target_link_libraries(${target} PRIVATE rcheevos $<$<BOOL:${WIN32}>:winhttp>)
+        target_compile_definitions(${target} PRIVATE MHFU_RCHEEVOS=1)
+    endif()
+    # The window: Win32 (host/window.c: the Multiplayer menu and dialogs) on
+    # Windows, SDL3 (host/window_sdl.c) on Android and Linux.
+    if(MHFU_SDL_WINDOW)
+        target_sources(${target} PRIVATE host/window_sdl.c)
+        target_include_directories(${target} PRIVATE "${stb_SOURCE_DIR}")
+    else()
+        target_sources(${target} PRIVATE host/window.c)
+    endif()
+    if(MHFU_GAMEPAD)
+        target_sources(${target} PRIVATE host/gamepad.c)
+        target_link_libraries(${target} PRIVATE SDL3::SDL3-static)
+        target_compile_definitions(${target} PRIVATE MHFU_GAMEPAD=1)
+    endif()
+    # Movies and music (host/mpeg.c, host/atrac.c): FFmpeg's H.264 and ATRAC3+
+    # decoders, from a shared LGPL build in deps/ffmpeg (on Windows, BtbN's
+    # win64-lgpl-shared; the DLLs are copied next to the executable).
+    if(EXISTS "${MHFU_FFMPEG_DIR}/include/libavcodec/avcodec.h")
+        target_include_directories(${target} PRIVATE "${MHFU_FFMPEG_DIR}/include")
+        foreach(lib avcodec swscale swresample avutil)
+            if(ANDROID)
+                # Static (scripts/build-ffmpeg-android.sh); named directly, since the
+                # NDK's toolchain only searches inside its sysroot.
+                target_link_libraries(${target} PRIVATE "${MHFU_FFMPEG_DIR}/lib/lib${lib}.a")
+            else()
+                find_library(MHFU_FF_${lib} ${lib} PATHS "${MHFU_FFMPEG_DIR}/lib" NO_DEFAULT_PATH REQUIRED)
+                target_link_libraries(${target} PRIVATE ${MHFU_FF_${lib}})
+            endif()
+        endforeach()
+        if(ANDROID)
+            target_link_libraries(${target} PRIVATE z m)
+            # FFmpeg's aarch64 assembly reaches its tables (ff_tx_tab_*) with
+            # relocations a shared library may only use for symbols it binds itself.
+            target_link_options(${target} PRIVATE "-Wl,-Bsymbolic")
+        endif()
+        target_compile_definitions(${target} PRIVATE MHFU_FFMPEG=1)
+        if(WIN32)
+            file(GLOB ff_dlls "${MHFU_FFMPEG_DIR}/bin/*.dll")
+            add_custom_command(TARGET ${target} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ff_dlls} "$<TARGET_FILE_DIR:${target}>")
+        endif()
+    endif()
+    # Function-entry tracing: the report then names the last function reached and
+    # dumps the recent call trail. Slower, but bring-up needs it.
+    if(MHFU_TRACE)
+        target_compile_definitions(${target} PRIVATE PSPRECOMP_TRACE)
+    endif()
+    set_target_properties(${target} PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
+    # Generated code is machine output: no warnings, and build it in parallel.
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /MP)
+        target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS)
+        set_source_files_properties(${gen_sources} PROPERTIES COMPILE_OPTIONS "/W0")
+    else()
+        set_source_files_properties(${gen_sources} PROPERTIES COMPILE_OPTIONS "-w")
+    endif()
+endfunction()
+
+if(MHFU_UNIVERSAL)
+    # Every region set up so far (scripts/setup.ps1's folders), each a host of its own.
+    set(MHFU_WORK_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/work" CACHE PATH "setup.ps1's work folder")
+    foreach(r eu us jp fuc)
+        if(r STREQUAL "eu")
+            set(w "${MHFU_WORK_ROOT}")
+        else()
+            set(w "${MHFU_WORK_ROOT}/${r}")
+        endif()
+        if(ANDROID)
+            mhfu_add_host(mhfu_host_${r} "${w}/gen" "${w}/gen_ovl" main_${r})
+        else()
+            mhfu_add_host(mhfu_host_${r} "${w}/gen" "${w}/gen_ovl")
         endif()
     endforeach()
-    if(ANDROID)
-        target_link_libraries(mhfu_host PRIVATE z m)
-        # FFmpeg's aarch64 assembly reaches its tables (ff_tx_tab_*) with
-        # relocations a shared library may only use for symbols it binds itself.
-        target_link_options(mhfu_host PRIVATE "-Wl,-Bsymbolic")
-    endif()
-    target_compile_definitions(mhfu_host PRIVATE MHFU_FFMPEG=1)
-    if(WIN32)
-        file(GLOB MHFU_FF_DLLS "${MHFU_FFMPEG_DIR}/bin/*.dll")
-        add_custom_command(TARGET mhfu_host POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${MHFU_FF_DLLS} "$<TARGET_FILE_DIR:mhfu_host>")
-    endif()
+elseif(ANDROID)
+    mhfu_add_host(mhfu_host "${MHFU_GEN_DIR}" "${MHFU_OVL_DIR}" main)
 else()
-    message(STATUS "mhfu_host: no FFmpeg in ${MHFU_FFMPEG_DIR}: movies black, music silent")
-endif()
-
-# Function-entry tracing: the report then names the last function reached and
-# dumps the recent call trail. Slower, but bring-up needs it.
-option(MHFU_TRACE "Record every recompiled function entry" ON)
-if(MHFU_TRACE)
-    target_compile_definitions(mhfu_host PRIVATE PSPRECOMP_TRACE)
-endif()
-set_target_properties(mhfu_host PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
-
-# Generated code is machine output: no warnings, and build it in parallel.
-if(MSVC)
-    target_compile_options(mhfu_host PRIVATE /MP)
-    target_compile_definitions(mhfu_host PRIVATE _CRT_SECURE_NO_WARNINGS)
-    set_source_files_properties(${MHFU_GEN_SOURCES} PROPERTIES COMPILE_OPTIONS "/W0")
-else()
-    set_source_files_properties(${MHFU_GEN_SOURCES} PROPERTIES COMPILE_OPTIONS "-w")
+    mhfu_add_host(mhfu_host "${MHFU_GEN_DIR}" "${MHFU_OVL_DIR}")
 endif()

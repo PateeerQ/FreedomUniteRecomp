@@ -287,7 +287,7 @@ Write-Host "  $($table.Count) overlay(s) recompiled"
 # --- 4. recompile the EBOOT --------------------------------------------------
 
 Step "Recompiling the EBOOT"
-$localEboot = Join-Path $work "${gameId}_EBOOT.BIN"
+$localEboot = Join-Path $work $(if ($Region -eq "FUC") { "ULJM05500_FUC_EBOOT.BIN" } else { "${gameId}_EBOOT.BIN" })
 Copy-Item -Force -LiteralPath $Eboot -Destination $localEboot
 & $tool info $localEboot | Tee-Object -FilePath (Join-Path $work "info.txt")
 # emit does not create its output directory; start it empty so no stale unit
