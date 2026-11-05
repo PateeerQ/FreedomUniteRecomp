@@ -1101,7 +1101,7 @@ static void page_mods(float w, float) {
     ImGui::PushFont(g_small);
     if (MHFU_HAS_BUILTIN_MODS)
         dim(MHFU_IS_US ?"Community mods for the US game, recompiled with it."
-                           : "Community mods for the US game, moved to this (EU) version and recompiled with it.");
+                           : "Community mods for the US game, moved to this (" MHFU_REGION_NAME ") version and recompiled with it.");
     else dim("Not in the " MHFU_REGION_NAME " build yet.");
     ImGui::PopFont();
     ImGui::Spacing();
