@@ -54,11 +54,14 @@
 #define MHFU_EBOOT_SIZE    1890112u
 #define MHFU_ADDR_OVL_TABLE     0x089C6B40u /* 0x08804000, 0x09A5A580, 0x09C14280, 0x09D15100, 0x09D5DF80 */
 #define MHFU_ADDR_SAVE_MANAGER  0x09A4099Cu /* the 14 EU loads of 0x09A44C60, found in the JP code */
-#define MHFU_ADDR_WEAPON_CLASS  0u          /* heap: not found yet */
-#define MHFU_ADDR_WEAPON_OUT    0u
-#define MHFU_ADDR_FPS60_TABLE   0u
+/* The heap is EU - 0x42C0 (64-byte blocks of village memory dumps of both,
+ * found again; the weapon class and its neighbours the same in both). */
+#define MHFU_ADDR_WEAPON_CLASS  0x090AF368u
+#define MHFU_ADDR_WEAPON_OUT    0x090AF792u
+#define MHFU_ADDR_FPS60_TABLE   0x09B029C8u /* lobby_task's data: 2.0, 3.0, 4.0, the same bytes around them */
 #define MHFU_ADDR_VFPU_ATAN     0u
-#define MHFU_HAS_FPS60          0
+/* 60 fps: tools/fps60_patch.py --region JP (46 patches, as in EU). */
+#define MHFU_HAS_FPS60          1
 #define MHFU_HAS_BUILTIN_MODS   0
 #else
 #define MHFU_REGION_EU     1
