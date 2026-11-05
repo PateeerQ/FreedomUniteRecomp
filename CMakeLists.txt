@@ -126,6 +126,21 @@ else()
 endif()
 set(MHFU_FFMPEG_DIR "${MHFU_FFMPEG_DEFAULT}" CACHE PATH "FFmpeg (include/, lib/, bin/)")
 
+# The internet relay's address (host/about.h): kept out of the sources, in
+# server/relay.txt ("host:port", gitignored with the rest of server/), or
+# -DMHFU_RELAY=host:port. Without either, rooms are on the LAN only.
+set(MHFU_RELAY "" CACHE STRING "The internet relay builds use by default (host:port)")
+set(MHFU_RELAY_VALUE "${MHFU_RELAY}")
+if(NOT MHFU_RELAY_VALUE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/server/relay.txt")
+    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/server/relay.txt" MHFU_RELAY_VALUE LIMIT_COUNT 1)
+    string(STRIP "${MHFU_RELAY_VALUE}" MHFU_RELAY_VALUE)
+endif()
+if(MHFU_RELAY_VALUE)
+    message(STATUS "mhfu_host: rooms over the internet through the relay in server/relay.txt")
+else()
+    message(STATUS "mhfu_host: no server/relay.txt: rooms on the LAN only")
+endif()
+
 # What every host shares, made once.
 set(MHFU_HOST_SOURCES host/main.c host/achievements.c host/chat.c host/hle_mhfu.c host/input.c host/keys.c
     host/stats.c host/libfont.c host/utility.c host/adhoc.c host/lobby.c host/mods.c host/audio.c host/atrac.c
@@ -210,6 +225,9 @@ function(mhfu_add_host target gen_dir ovl_dir)
         set_target_properties(${target} PROPERTIES OUTPUT_NAME "${ARGV3}")
     endif()
     target_include_directories(${target} PRIVATE "${gen_dir}" host)
+    if(MHFU_RELAY_VALUE)
+        target_compile_definitions(${target} PRIVATE "MHFU_DEFAULT_RELAY=\"${MHFU_RELAY_VALUE}\"")
+    endif()
     target_link_libraries(${target} PRIVATE psprecomp mhfu_net)
     if(WIN32)
         target_sources(${target} PRIVATE assets/icon/mhfu.rc)       # the crest, as the exe's icon
