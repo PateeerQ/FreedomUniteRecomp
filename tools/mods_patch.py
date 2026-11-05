@@ -197,8 +197,8 @@ def main():
     args = sys.argv[1:]
     if "--region" in args:                        # --region US: the USA build's mods (mods/builtin/us)
         k = args.index("--region")
-        if args[k + 1].upper() == "US":
-            MODS_DIR = os.path.join(MODS_DIR, "us")
+        if args[k + 1].upper() != "EU":
+            MODS_DIR = os.path.join(MODS_DIR, args[k + 1].lower())
         del args[k:k + 2]
     undo = "--revert" in args
     builtin = "--no-builtin" not in args
