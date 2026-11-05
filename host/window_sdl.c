@@ -310,7 +310,9 @@ static SDL_AtomicInt g_background;                   /* the app is in the backgr
 typedef struct { int set; float cx, cy, k; } placed;
 static placed g_place[G_COUNT];
 
-typedef struct { SDL_FingerID id; int elem; float x, y, sx, sy; } finger;   /* sx, sy: where it went down */
+/* sx, sy: where it went down, t0 when; dir: what the target button decided (TGT_*) */
+typedef struct { SDL_FingerID id; int elem; float x, y, sx, sy; uint64_t t0; int dir; } finger;
+enum { TGT_UNDECIDED, TGT_LOCK, TGT_LEFT, TGT_RIGHT };
 #define FINGERS 10
 static finger g_fingers[FINGERS];
 
@@ -480,7 +482,7 @@ static int skills_now(skill out[SKILLS]) {
         for (int i = 0; i < SKILLS && k_skills[cls][i].bits; i++) out[n++] = k_skills[cls][i];
     for (int i = 0; i < mhfu_mod_count() && n < SKILLS; i++)
         if (!strcmp(mhfu_mod_id(i), "targetcam") && mhfu_mod_on(i))
-            out[n++] = (skill){ ICON_TARGET, PSP_CTRL_LTRIGGER | PSP_CTRL_UP };
+            out[n++] = (skill){ ICON_TARGET, PSP_CTRL_LTRIGGER | PSP_CTRL_DOWN };   /* see target_bits */
     return n;
 }
 /* Where button i of n is: the column is centred on the group. */
@@ -570,6 +572,40 @@ static uint32_t elem_button(int e) {
     }
 }
 
+/* The target button (Target Camera mod): a tap, or a finger held still, is
+ * L + Down (lock on); slid left or right it is L + Left / L + Right (the
+ * next target that way). Nothing is sent until it is told which, so a slide
+ * never locks first: held still TARGET_HOLD_MS, or slid past a twentyfifth
+ * of the screen's height. A quick tap sends L + Down for TARGET_TAP_MS once
+ * the finger is up. Muhammad's layout, 2026-11-06. */
+#define TARGET_HOLD_MS 150
+#define TARGET_TAP_MS  120
+static uint64_t g_target_tap_until;
+static int is_target_elem(int e) {
+    if (e < T_SKILL0 || e > T_SKILL2) return 0;
+    skill sk[SKILLS];
+    return e - T_SKILL0 < skills_now(sk) && sk[e - T_SKILL0].pic == ICON_TARGET;
+}
+static uint32_t target_bits(finger *f, float h) {
+    const float dx = f->x - f->sx;
+    if (dx < -h * 0.04f) f->dir = TGT_LEFT;
+    else if (dx > h * 0.04f) f->dir = TGT_RIGHT;
+    else if (f->dir == TGT_UNDECIDED && SDL_GetTicks() - f->t0 >= TARGET_HOLD_MS) f->dir = TGT_LOCK;
+    switch (f->dir) {
+    case TGT_LOCK:  return PSP_CTRL_LTRIGGER | PSP_CTRL_DOWN;
+    case TGT_LEFT:  return PSP_CTRL_LTRIGGER | PSP_CTRL_LEFT;
+    case TGT_RIGHT: return PSP_CTRL_LTRIGGER | PSP_CTRL_RIGHT;
+    default:        return 0;
+    }
+}
+/* touch_update needs to run again by itself (time decides, not a finger). */
+static int target_pending(void) {
+    if (g_target_tap_until && SDL_GetTicks() < g_target_tap_until + 50) return 1;
+    for (int i = 0; i < FINGERS; i++)
+        if (g_fingers[i].elem && is_target_elem(g_fingers[i].elem) && g_fingers[i].dir == TGT_UNDECIDED) return 1;
+    return 0;
+}
+
 /* The PSP state of every finger, into what the game reads. */
 static void touch_update(float w, float h) {
     const layout L = layout_for(w, h);
@@ -619,11 +655,16 @@ static void touch_update(float w, float h) {
                 if (a > 112.5f || a < -112.5f) b |= PSP_CTRL_LEFT;
                 if (a > -157.5f && a < -22.5f) b |= PSP_CTRL_UP;
             }
+        } else if (is_target_elem(f->elem)) {
+            b |= target_bits(&g_fingers[i], h);
+            sd |= 1 << (f->elem - T_SKILL0);
         } else {
             b |= elem_button(f->elem);
             if (f->elem >= T_SKILL0 && f->elem <= T_SKILL2) sd |= 1 << (f->elem - T_SKILL0);
         }
     }
+    if (g_target_tap_until && SDL_GetTicks() < g_target_tap_until) b |= PSP_CTRL_LTRIGGER | PSP_CTRL_DOWN;
+    else g_target_tap_until = 0;
     g_touch_buttons = b;
     g_skill_down = sd;
     g_attack_held = atk;
@@ -2087,6 +2128,8 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
                             g_fingers[free_slot].elem = el;
                             g_fingers[free_slot].x = g_fingers[free_slot].sx = px;
                             g_fingers[free_slot].y = g_fingers[free_slot].sy = py;
+                            g_fingers[free_slot].t0 = SDL_GetTicks();
+                            g_fingers[free_slot].dir = TGT_UNDECIDED;
                         } else if (!el || !vpad_visible()) {   /* nothing there: the camera */
                             g_fingers[free_slot].id = e.tfinger.fingerID;
                             g_fingers[free_slot].elem = T_SWIPE;
@@ -2102,11 +2145,15 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
                         f->y = py;
                         /* A finger slides from button to button; the stick and
                          * the d-pad keep it wherever it goes. */
-                        if (f->elem != T_STICK && f->elem != T_DPAD && f->elem != T_SWIPE && f->elem != T_ATTACK) {
+                        if (f->elem != T_STICK && f->elem != T_DPAD && f->elem != T_SWIPE && f->elem != T_ATTACK &&
+                            !is_target_elem(f->elem)) {        /* the target button keeps its finger: it is slid */
                             const int el = hit(&L, px, py);
                             if (el && el != T_MENU && el != T_STICK && el != T_DPAD && el != T_RSTICK && el != T_ATTACK) f->elem = el;
                         }
                     } else if (slot >= 0) {
+                        /* A target button let go before it was told: a tap, lock on. */
+                        if (is_target_elem(g_fingers[slot].elem) && g_fingers[slot].dir == TGT_UNDECIDED)
+                            g_target_tap_until = SDL_GetTicks() + TARGET_TAP_MS;
                         g_fingers[slot].elem = T_NONE;
                     }
                     touch_update((float)ww, (float)wh);
@@ -2152,6 +2199,11 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
             } while (!quit && SDL_PollEvent(&e));
         }
         mhfu_gamepad_update();
+        if (g_window && target_pending()) {      /* the target button's hold and tap run on time */
+            int ww = 0, wh = 0;
+            SDL_GetWindowSizeInPixels(g_window, &ww, &wh);
+            touch_update((float)ww, (float)wh);
+        }
         const uint64_t now = SDL_GetTicks();
         if (now >= next_stats) {
             mhfu_stats_tick(now, g_fps_text, sizeof g_fps_text);
