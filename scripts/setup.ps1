@@ -286,13 +286,11 @@ if ($Region -ne "EU") {
         "/* Written by scripts/setup.ps1: this build is the $Region one. */`n#define MHFU_REGION_$Region 1`n")
 }
 # The 60 fps mode, behind a switch (tools/fps60_patch.py). Its patches are the
-# EU cheat's; --region US moves them to the US build's addresses. Not yet for JP.
+# EU cheat's; --region US / JP moves them to that build's addresses.
 $regionArgs = @()
 if ($Region -ne "EU") { $regionArgs = @("--region", $Region) }
-if ($Region -ne "JP") {
-    python (Join-Path $repo "tools\fps60_patch.py") $gen $ovlGen @regionArgs
-    if ($LASTEXITCODE) { throw "the 60 fps patch did not apply" }
-}
+python (Join-Path $repo "tools\fps60_patch.py") $gen $ovlGen @regionArgs
+if ($LASTEXITCODE) { throw "the 60 fps patch did not apply" }
 # Built-in mods (widescreen, mods\builtin or mods\builtin\us), behind switches
 # (tools/mods_patch.py); it also writes their data, gen_ovl\mods_builtin.c.
 python (Join-Path $repo "tools\mods_patch.py") $gen $ovlGen @regionArgs
