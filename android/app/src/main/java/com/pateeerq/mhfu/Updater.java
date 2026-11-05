@@ -94,9 +94,12 @@ final class Updater {
             JSONArray assets = j.optJSONArray("assets");
             for (int i = 0; assets != null && i < assets.length(); i++) {
                 JSONObject as = assets.getJSONObject(i);
-                // This region's APK: the USA one's name ends in -us.apk (scripts/release.ps1).
+                // This region's APK: the USA one's name ends in -us.apk, the Japanese
+                // one's in -jp.apk, the Europe one's in neither (scripts/release.ps1).
                 String an = as.optString("name").toLowerCase();
-                if (an.endsWith(".apk") && an.endsWith("-us.apk") == BuildConfig.REGION_TAG.equals("US")) {
+                String tag = BuildConfig.REGION_TAG.toLowerCase();
+                boolean other = an.endsWith("-us.apk") || an.endsWith("-jp.apk");
+                if (an.endsWith(".apk") && (tag.equals("eu") ? !other : an.endsWith("-" + tag + ".apk"))) {
                     r.apkUrl = as.optString("browser_download_url");
                     r.apkSize = as.optLong("size");
                     break;
