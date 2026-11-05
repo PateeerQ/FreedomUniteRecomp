@@ -98,9 +98,12 @@ OVERLAY = [
 # instructions around it (the way tools/region_seeds.py moves seeds, 2026-11-05):
 # the EBOOT ones at the same address, the overlay ones (lobby_task, game_task,
 # the other tasks that share their code) 0x100 higher, each with the same word.
-# The two data words it reads: .bss +0x120 and the heap +0x140 (host/region.h).
+# The two data words it reads are in objects that sit 0x140 higher (the heap
+# rule, host/region.h): the vblank flag is +0x14 of the object whose pointer
+# 0x0887F794 keeps at 0x08A62D84 (EU) / 0x08A62EA4 (US), 0x08B59900 / 0x08B59A40
+# in runs of both (not .bss +0x120: that one froze the title movie at 60 fps).
 US_OVERLAY_SHIFT = 0x100
-US_DATA = {"0x08B59914u": "0x08B59A34u", "0x090AF21Cu": "0x090AF35Cu"}
+US_DATA = {"0x08B59914u": "0x08B59A54u", "0x090AF21Cu": "0x090AF35Cu"}
 
 
 def to_us(p):
