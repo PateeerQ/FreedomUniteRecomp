@@ -38,7 +38,7 @@
    "0891F9FC: through the game's register, EU offset -0x7306",
    "0891FED8: the hooked instruction, EU form"
   ],
-  "overlay": "8B357D15"
+  "overlay": "BC8F22ED"
  },
  {
   "id": "damage",
