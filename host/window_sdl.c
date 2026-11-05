@@ -746,10 +746,40 @@ static const unsigned char k_icon_rgb[][3] = {
 };
 static uint32_t icon_col(int which, int a) { return va(k_icon_rgb[which][0], k_icon_rgb[which][1], k_icon_rgb[which][2], a); }
 
-/* The buttons' pictures at (cx, cy), half size k, in pixels: filled shapes
- * drawn here (none of the game's art); `cut` is the button's dark, for the
- * details cut into them. */
+/* The pictures from game-icons.net (tools/touch_icons.py), drawn over a
+ * square of 2k around (cx, cy), filtered; 0 when `which` has none. */
+#include "touch_icons.h"
+static int mask_icon(canvas *c, float cx, float cy, float k, int which, uint32_t col) {
+    for (size_t n = 0; n < sizeof k_touch_icons / sizeof k_touch_icons[0]; n++) {
+        if (k_touch_icons[n].icon != which) continue;
+        const unsigned char *m = k_touch_icons[n].a;
+        const int S = TOUCH_ICON_SIZE;
+        const float side = 2 * k, step = S / side;
+        for (int y = (int)(cy - k); y <= (int)(cy + k); y++)
+            for (int x = (int)(cx - k); x <= (int)(cx + k); x++) {
+                const float u = (x + 0.5f - (cx - k)) * step - 0.5f, v = (y + 0.5f - (cy - k)) * step - 0.5f;
+                if (u < -0.5f || v < -0.5f || u > S - 0.5f || v > S - 0.5f) continue;
+                const int i0 = (int)floorf(u), j0 = (int)floorf(v);
+                const float fu = u - i0, fv = v - j0;
+                float sum = 0;
+                for (int dj = 0; dj < 2; dj++)
+                    for (int di = 0; di < 2; di++) {
+                        const int i = i0 + di, j = j0 + dj;
+                        if (i < 0 || j < 0 || i >= S || j >= S) continue;
+                        sum += m[j * S + i] * (di ? fu : 1 - fu) * (dj ? fv : 1 - fv);
+                    }
+                if (sum >= 1) blend(c, x, y, col, (int)sum);
+            }
+        return 1;
+    }
+    return 0;
+}
+
+/* The buttons' pictures at (cx, cy), half size k, in pixels: game-icons.net's
+ * where there is one, else filled shapes drawn here (none of the game's art);
+ * `cut` is the button's dark, for the details cut into them. */
 static void icon(canvas *c, float cx, float cy, float k, int which, float t, uint32_t col) {
+    if (mask_icon(c, cx, cy, k * 1.08f, which, col)) return;
     const uint32_t cut = va(22, 16, 11, 235);
     switch (which) {
     case ICON_CROUCH: {                                /* down, onto the ground */
