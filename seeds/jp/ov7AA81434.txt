@@ -1,0 +1,2 @@
+# Written by tools/region_seeds.py from seeds/ov208A07B1.txt: the same functions in the US build.
+09A67230

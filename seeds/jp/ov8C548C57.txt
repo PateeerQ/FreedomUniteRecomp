@@ -1,0 +1,2 @@
+# Written by tools/region_seeds.py from seeds/ov837D4C24.txt: the same functions in the US build.
+09D5E1E0
