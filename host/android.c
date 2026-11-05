@@ -40,16 +40,17 @@ JNIEXPORT jstring FN(lobbyJoin)(JNIEnv *env, jclass cls, jstring code, jstring p
 
 JNIEXPORT void FN(lobbyLeave)(JNIEnv *env, jclass cls) { (void)env; (void)cls; mhfu_lobby_leave(); }
 
-/* One "code\tname\tplayers\tlocked\tinternet\tfps\tping_ms" per open room. */
+/* One "code\tname\tplayers\tlocked\tinternet\tfps\tping_ms\tgame" per open room
+ * (game: the release its maker plays, as mhfu_game_label names it, or ""). */
 JNIEXPORT jobjectArray FN(lobbyList)(JNIEnv *env, jclass cls) {
     (void)cls;
     static mhfu_room rooms[32];
     const int n = mhfu_lobby_list(rooms, 32);
     jobjectArray out = (*env)->NewObjectArray(env, n > 0 ? n : 0, (*env)->FindClass(env, "java/lang/String"), NULL);
     for (int i = 0; i < n; i++) {
-        char line[128];
-        snprintf(line, sizeof line, "%s\t%s\t%d\t%d\t%d\t%d\t%d", rooms[i].code, rooms[i].name, rooms[i].players,
-                 rooms[i].locked, rooms[i].internet, rooms[i].fps, rooms[i].ping_ms);
+        char line[192];
+        snprintf(line, sizeof line, "%s\t%s\t%d\t%d\t%d\t%d\t%d\t%s", rooms[i].code, rooms[i].name, rooms[i].players,
+                 rooms[i].locked, rooms[i].internet, rooms[i].fps, rooms[i].ping_ms, mhfu_game_label(rooms[i].game));
         jstring s = (*env)->NewStringUTF(env, line);
         (*env)->SetObjectArrayElement(env, out, i, s);
         (*env)->DeleteLocalRef(env, s);
