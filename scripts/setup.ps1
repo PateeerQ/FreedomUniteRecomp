@@ -13,6 +13,10 @@
     Everything lands in work\, which is gitignored. No game data or generated
     code is ever committed.
 
+    The region comes from the EBOOT: the Europe one (ULES01213) builds in
+    work\ and build\, the USA one (ULUS10391) in work\us\ and build-us\, so
+    the two can sit side by side (run.ps1 -Region US runs the second).
+
 .EXAMPLE
     .\scripts\setup.ps1 -Iso "..\Monster Hunter Freedom Unite (Europe) (PSP) (PSN).iso" `
                         -Eboot ..\mhfu\ULES01213_EBOOT.BIN
@@ -27,19 +31,39 @@ param(
     [switch]$KeepDisc,
     # A folder holding the PSP fonts (jpn0.pgf, ltn0.pgf ...). By default
     # they are taken from PPSSPP's install (assets\flash0\font).
-    [string]$Fonts
+    [string]$Fonts,
+    # EU or US; by default told from the EBOOT (its size).
+    [ValidateSet("", "EU", "US")] [string]$Region = ""
 )
 
 $ErrorActionPreference = 'Stop'
 $repo  = Split-Path -Parent $PSScriptRoot
-$work  = Join-Path $repo "work"
-$root  = Join-Path $work "root"
-$disc  = Join-Path $root "disc"
-$gen   = Join-Path $work "gen"
-$build = Join-Path $repo "build"
 
 $Iso   = (Resolve-Path $Iso).Path
 $Eboot = (Resolve-Path $Eboot).Path
+
+# The region: PPSSPP's dumps of the two decrypted EBOOTs differ in size (the
+# US .text is 0x120 longer; host/region.h).
+$sizes = @{ 1910384 = "EU"; 1910672 = "US" }
+$ebootSize = [int](Get-Item $Eboot).Length
+if (-not $Region) {
+    if (-not $sizes.ContainsKey($ebootSize)) {
+        throw "$Eboot ($ebootSize bytes) is neither the Europe (ULES01213) nor the USA (ULUS10391) EBOOT; pass -Region to try anyway"
+    }
+    $Region = $sizes[$ebootSize]
+}
+$gameId  = if ($Region -eq "US") { "ULUS10391" } else { "ULES01213" }
+$work    = if ($Region -eq "US") { Join-Path $repo "work\us" } else { Join-Path $repo "work" }
+$build   = if ($Region -eq "US") { Join-Path $repo "build-us" } else { Join-Path $repo "build" }
+$seedDir = if ($Region -eq "US") { Join-Path $repo "seeds\us" } else { Join-Path $repo "seeds" }
+$root   = Join-Path $work "root"
+$disc   = Join-Path $root "disc"
+$gen    = Join-Path $work "gen"
+$ovlGen = Join-Path $work "gen_ovl"
+New-Item -ItemType Directory -Force $work | Out-Null
+Set-Content -Path (Join-Path $work "region.txt") -Value $Region -Encoding ASCII
+# CMake takes the generated code from this work folder.
+$cmakeDirs = @("-DMHFU_GEN_DIR=$gen", "-DMHFU_OVL_DIR=$ovlGen")
 
 function Step($msg) { Write-Host "`n=== $msg ===" -ForegroundColor Cyan }
 
@@ -77,8 +101,8 @@ if ($patches.Count -and $head -ne $upstream) {
 }
 $ErrorActionPreference = 'Stop'
 
-Step "Building psprecomp"
-cmake -S $repo -B $build
+Step "Building psprecomp ($Region, $gameId, in $build)"
+cmake -S $repo -B $build @cmakeDirs
 if ($LASTEXITCODE) { throw "cmake configure failed" }
 cmake --build $build --config $Config --target allegrexrecomp
 if ($LASTEXITCODE) { throw "allegrexrecomp build failed" }
@@ -157,12 +181,13 @@ if ($fontSrc) {
 # own recompile, since nothing inside the EBOOT calls some of them.
 Step "Recompiling overlays"
 $ovlSrc = Join-Path $work "overlays"
-$ovlGen = Join-Path $work "gen_ovl"
 if (Test-Path $ovlGen) { Remove-Item -Recurse -Force $ovlGen }
 New-Item -ItemType Directory -Force $ovlGen, $ovlSrc | Out-Null
 $mainSeeds = Join-Path $work "main_seeds.txt"
 Set-Content -Path $mainSeeds -Value "# EBOOT seeds (written by setup.ps1)" -Encoding ASCII
-Get-Content (Join-Path $repo "seeds\eboot.txt") | Add-Content -Path $mainSeeds -Encoding ASCII
+$ebootSeeds = Join-Path $seedDir "eboot.txt"
+if (Test-Path $ebootSeeds) { Get-Content $ebootSeeds | Add-Content -Path $mainSeeds -Encoding ASCII }
+else { Write-Warning "no $ebootSeeds (tools/region_seeds.py makes the US ones from the EU's)" }
 
 Get-ChildItem (Join-Path $repo "tools") -File | ForEach-Object { $_.LastWriteTime = Get-Date }
 cmake --build $build --config $Config --target mhfu_ovl
@@ -175,8 +200,11 @@ $seen = @{}
 $table = @()
 # The built-in code mods (tools/mods_convert.py) are recompiled the same way
 # (an older conversion's copies out first: their hashes changed).
+# They are converted for the EU build only (their addresses are EU's).
 Get-ChildItem $ovlSrc -Filter "mod_*.bin" | Remove-Item -Force
-foreach ($mod in Get-ChildItem (Join-Path $repo "mods\builtin") -Filter *.bin -ErrorAction SilentlyContinue) {
+$builtinMods = @()
+if ($Region -eq "EU") { $builtinMods = @(Get-ChildItem (Join-Path $repo "mods\builtin") -Filter *.bin -ErrorAction SilentlyContinue) }
+foreach ($mod in $builtinMods) {
     Copy-Item -Force $mod.FullName (Join-Path $ovlSrc ("mod_" + $mod.Name))
 }
 foreach ($bin in Get-ChildItem $ovlSrc -Filter *.bin | Sort-Object Name) {
@@ -195,7 +223,7 @@ foreach ($bin in Get-ChildItem $ovlSrc -Filter *.bin | Sort-Object Name) {
     New-Item -ItemType Directory -Force $dir | Out-Null
     # Functions only reached through a pointer built at run time, found from
     # dispatch misses: seeds\ov<hash>.txt, one hex address per line.
-    $ovlSeeds = Join-Path $repo "seeds\$tag.txt"
+    $ovlSeeds = Join-Path $seedDir "$tag.txt"
     if (Test-Path $ovlSeeds) { & $tool emit $elf $dir $tag --seeds $ovlSeeds | Out-Null }
     else { & $tool emit $elf $dir $tag | Out-Null }
     if ($LASTEXITCODE) { throw "allegrexrecomp emit failed for $($bin.Name)" }
@@ -231,7 +259,7 @@ Write-Host "  $($table.Count) overlay(s) recompiled"
 # --- 4. recompile the EBOOT --------------------------------------------------
 
 Step "Recompiling the EBOOT"
-$localEboot = Join-Path $work "ULES01213_EBOOT.BIN"
+$localEboot = Join-Path $work "${gameId}_EBOOT.BIN"
 Copy-Item -Force $Eboot $localEboot
 & $tool info $localEboot | Tee-Object -FilePath (Join-Path $work "info.txt")
 # emit does not create its output directory; start it empty so no stale unit
@@ -240,12 +268,22 @@ if (Test-Path $gen) { Remove-Item -Recurse -Force $gen }
 New-Item -ItemType Directory -Force $gen | Out-Null
 & $tool emit $localEboot $gen mhfu --seeds $mainSeeds
 if ($LASTEXITCODE) { throw "allegrexrecomp emit failed" }
-# The 60 fps mode, behind a switch (tools/fps60_patch.py).
-python (Join-Path $repo "tools\fps60_patch.py") $gen $ovlGen
-if ($LASTEXITCODE) { throw "the 60 fps patch did not apply" }
+# What host/region.h builds for (no file: Europe).
+if ($Region -eq "US") {
+    [IO.File]::WriteAllText((Join-Path $gen "mhfu_region_gen.h"),
+        "/* Written by scripts/setup.ps1: this build is the USA one. */`n#define MHFU_REGION_US 1`n")
+}
+# The 60 fps mode, behind a switch (tools/fps60_patch.py). Its patches are the
+# EU cheat's, by address: the US build goes without it for now.
+if ($Region -eq "EU") {
+    python (Join-Path $repo "tools\fps60_patch.py") $gen $ovlGen
+    if ($LASTEXITCODE) { throw "the 60 fps patch did not apply" }
+}
 # Built-in mods (widescreen, mods\builtin), behind switches (tools/mods_patch.py);
 # it also writes their data, gen_ovl\mods_builtin.c.
-python (Join-Path $repo "tools\mods_patch.py") $gen $ovlGen
+$modsArgs = @()
+if ($Region -eq "US") { $modsArgs = @("--no-builtin") }
+python (Join-Path $repo "tools\mods_patch.py") $gen $ovlGen @modsArgs
 if ($LASTEXITCODE) { throw "the mods patch did not apply" }
 
 # --- 5. the host --------------------------------------------------------------
@@ -255,9 +293,11 @@ Step "Building mhfu_host"
 # (zip times have no time zone), and MSBuild then skips them. The host is two
 # small files: always mark them changed.
 Get-ChildItem (Join-Path $repo "host") -File | ForEach-Object { $_.LastWriteTime = Get-Date }
-cmake -S $repo -B $build
+cmake -S $repo -B $build @cmakeDirs
 if ($LASTEXITCODE) { throw "cmake configure failed" }
 cmake --build $build --config $Config --target mhfu_host
 if ($LASTEXITCODE) { throw "mhfu_host build failed" }
 
-Write-Host "`nDone. Run it with:  .\scripts\run.ps1" -ForegroundColor Green
+$runArgs = ""
+if ($Region -eq "US") { $runArgs = " -Region US" }
+Write-Host "`nDone ($Region). Run it with:  .\scripts\run.ps1$runArgs" -ForegroundColor Green
