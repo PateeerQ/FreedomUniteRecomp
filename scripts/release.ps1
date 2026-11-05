@@ -12,18 +12,20 @@
 # think before publishing them: see the README's notice.
 param(
     [switch]$NoBuild,
-    [ValidateSet("EU", "US")] [string]$Region = "EU"
+    [ValidateSet("EU", "US", "JP")] [string]$Region = "EU"
 )
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
 $version = (Select-String -Path "$repo\host\about.h" -Pattern '#define MHFU_VERSION\s+"([^"]+)"').Matches[0].Groups[1].Value
 $gradleVersion = (Select-String -Path "$repo\android\app\build.gradle" -Pattern "versionName '([^']+)'").Matches[0].Groups[1].Value
 if ($version -ne $gradleVersion) { throw "host/about.h says $version, android/app/build.gradle says ${gradleVersion}: make them the same" }
-$us = $Region -eq "US"
-$buildDir = if ($us) { "$repo\build-us" } else { "$repo\build" }
-$suffix = if ($us) { "-us" } else { "" }
-$workSub = if ($us) { "work\us" } else { "work" }
-if ($us -and -not (Test-Path "$repo\work\us\gen\mhfu_region_gen.h")) { throw "no USA build: run setup.ps1 with the ULUS10391 EBOOT first" }
+#   -Region JP: the Japanese Portable 2nd G (build-jp, work\jp): ...-jp.zip / -jp.apk
+$us = $Region -ne "EU"                     # a build in a region subfolder (USA or Japan)
+$sub = $Region.ToLower()
+$buildDir = if ($us) { "$repo\build-$sub" } else { "$repo\build" }
+$suffix = if ($us) { "-$sub" } else { "" }
+$workSub = if ($us) { "work\$sub" } else { "work" }
+if ($us -and -not (Test-Path "$repo\$workSub\gen\mhfu_region_gen.h")) { throw "no $Region build: run setup.ps1 with that region's EBOOT first" }
 
 if (-not $NoBuild) {
     cmake --build $buildDir --config Release --target mhfu_host mhfu_launcher
