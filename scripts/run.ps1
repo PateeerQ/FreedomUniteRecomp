@@ -70,16 +70,20 @@ param(
     # (-Root for short. Not named $Root: PowerShell names ignore case, and
     # the script's own $root is the device root.)
     [Alias("Root")] [string]$DeviceRoot,
-    [string]$Config = "Release"
+    [string]$Config = "Release",
+    # The USA build (setup.ps1 with the ULUS10391 EBOOT: work\us, build-us).
+    [ValidateSet("EU", "US")] [string]$Region = "EU"
 )
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
-$work = Join-Path $repo "work"
+$work = if ($Region -eq "US") { Join-Path $repo "work\us" } else { Join-Path $repo "work" }
+$buildDir = if ($Region -eq "US") { "build-us" } else { "build" }
+$gameId = if ($Region -eq "US") { "ULUS10391" } else { "ULES01213" }
 
 $exe = @(
-    "$repo\build\$Config\mhfu_host.exe",
-    "$repo\build\mhfu_host.exe"
+    "$repo\$buildDir\$Config\mhfu_host.exe",
+    "$repo\$buildDir\mhfu_host.exe"
 ) | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $exe) { throw "mhfu_host.exe not found -- run .\scripts\setup.ps1 first" }
 
@@ -90,7 +94,7 @@ New-Item -ItemType Directory -Force (Join-Path $work "overlays") | Out-Null
 # stderr into error records (fatal under 'Stop'), so let cmd merge the two
 # streams before PowerShell sees them.
 if (-not $NoTraceIo) { $env:PSPRECOMP_TRACE_IO = "1" }
-$eboot = Join-Path $work "ULES01213_EBOOT.BIN"
+$eboot = Join-Path $work "${gameId}_EBOOT.BIN"
 $root  = Join-Path $work "root"
 if ($DeviceRoot) {
     # A second device: its own memory stick and net.cfg, the same disc.
