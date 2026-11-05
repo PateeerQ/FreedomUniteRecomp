@@ -407,12 +407,13 @@ static float skill_r(const layout *L) { return 0.062f * L->h * L->k[G_SKILL]; }
 static float attack_r(const layout *L) { return 0.16f * L->h * L->k[G_ATTACK]; }
 static float small_r(const layout *L, int g) { return 0.068f * L->h * L->k[g]; }   /* Roll, Item */
 
-/* The weapon is out: 1 at 0x090B3A52 in the hunter's data (from F9 dumps in a
- * quest, sheathed and drawn twice; 0 in the village). In Auto the editor
+/* The weapon is out: the hunter's weapon state at 0x090B3A52 is not 0 (0
+ * sheathed, 1 out, 2 attacking, 3 Dual Blades' demon mode; from F9 dumps and a
+ * trace on the phone). In Auto the editor
  * shows the set that is on now, so drawing the weapon edits the mobile one. */
 #define MHFU_WEAPON_OUT 0x090B3A52u
 static int mobile_now(void) {
-    return g_style == STYLE_MOBILE || (g_style == STYLE_AUTO && psp_read8(MHFU_WEAPON_OUT) == 1);
+    return g_style == STYLE_MOBILE || (g_style == STYLE_AUTO && psp_read8(MHFU_WEAPON_OUT) != 0);
 }
 static int group_shown(int g) {
     if (g == G_RSTICK) return 0;                       /* the camera is a swipe now */
