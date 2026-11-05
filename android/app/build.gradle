@@ -6,7 +6,16 @@ plugins {
 // (the ULUS10391 EBOOT) as its own app (com.pateeerq.mhfu.us), which can sit
 // next to the Europe one; -Pmhfu.region=JP the Japanese Monster Hunter Portable
 // 2nd G (ULJM05500, work/jp, com.pateeerq.mhfu.jp). Without it: Europe, from work/.
-def mhfuRegion = (project.findProperty('mhfu.region') ?: 'EU').toString().toUpperCase()
+// -Pmhfu.region=ALL: the universal app (com.pateeerq.mhfu), every release set up
+// so far in one APK (libmain_eu.so, _us, _jp, _fuc), the disc deciding (Region.java).
+def mhfuAll = (project.findProperty('mhfu.region') ?: 'EU').toString().toUpperCase() == 'ALL'
+def mhfuRegion = mhfuAll ? 'EU' : (project.findProperty('mhfu.region') ?: 'EU').toString().toUpperCase()
+def mhfuWorkRoot = new File(rootDir, '../work').canonicalPath.replace('\\', '/')
+// The releases setup.ps1 has made code for: their hosts go into the universal app.
+def mhfuHosts = ['eu': '', 'us': '/us', 'jp': '/jp', 'fuc': '/fuc'].findAll { r, w ->
+    def gen = new File(mhfuWorkRoot + w + '/gen')
+    gen.isDirectory() && gen.listFiles().any { it.name.endsWith('.c') }
+}.collect { r, w -> 'mhfu_host_' + r }
 def mhfuUs = mhfuRegion == 'US'
 def mhfuFuc = mhfuRegion == 'FUC'                // FUComplete, the English MHP2G disc (work/fuc)
 def mhfuJp = mhfuRegion == 'JP' || mhfuFuc       // the same code as JP
@@ -41,17 +50,19 @@ android {
         buildConfigField 'String', 'GAME_TITLE', mhfuFuc ? '"Monster Hunter Portable 2nd G FUComplete"' : mhfuJp ? '"Monster Hunter Portable 2nd G"' : '"Monster Hunter Freedom Unite"'
         // FUComplete: the EBOOT is taken from the disc (SetupActivity.ebootFromDisc).
         buildConfigField 'boolean', 'EBOOT_ON_DISC', mhfuFuc ? 'true' : 'false'
-        resValue 'string', 'app_name', mhfuIds[4]
+        resValue 'string', 'app_name', mhfuAll ? 'Monster Hunter: Freedom Unite Recomp' : mhfuIds[4]
+        buildConfigField 'boolean', 'UNIVERSAL', mhfuAll ? 'true' : 'false'
         externalNativeBuild {
             cmake {
                 // The repository's CMakeLists.txt: SDL3 static inside libmain.so,
                 // no launcher (the Android one comes later), the SDL window.
                 arguments '-DANDROID_STL=c++_static', '-DMHFU_LAUNCHER=OFF', '-DMHFU_SDL_WINDOW=ON',
                           '-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON',
-                          "-DMHFU_GEN_DIR=${mhfuWork}/gen", "-DMHFU_OVL_DIR=${mhfuWork}/gen_ovl"
+                          "-DMHFU_GEN_DIR=${mhfuWork}/gen", "-DMHFU_OVL_DIR=${mhfuWork}/gen_ovl",
+                          "-DMHFU_UNIVERSAL=${mhfuAll ? 'ON' : 'OFF'}", "-DMHFU_WORK_ROOT=${mhfuWorkRoot}"
                 // Optimised even in debug builds: an unoptimised recompiled game is too slow to try.
                 cFlags '-O2'
-                targets 'mhfu_host'
+                if (mhfuAll) targets(*mhfuHosts) else targets 'mhfu_host'
             }
         }
         ndk {

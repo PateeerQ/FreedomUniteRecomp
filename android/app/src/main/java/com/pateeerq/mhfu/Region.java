@@ -57,6 +57,13 @@ final class Region {
         return r;
     }
 
+    /** The release in play, for code without a Context (Region.get ran by then: setup, the game's start). */
+    static Region now() {
+        if (current != null) return current;
+        Region r = byTag(BuildConfig.REGION_TAG);
+        return r != null ? r : ALL[0];
+    }
+
     /** The universal app: play `r` from now on (its disc was chosen). */
     static void set(Context ctx, Region r) {
         current = r;

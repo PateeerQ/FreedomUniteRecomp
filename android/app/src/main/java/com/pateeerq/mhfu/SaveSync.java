@@ -64,11 +64,11 @@ final class SaveSync {
         for (Map.Entry<String, String[]> e : top.entrySet())
             if (Document.MIME_TYPE_DIR.equals(e.getValue()[1]) && e.getKey().equalsIgnoreCase("PSP")) return new Where(ms, ALL);
         for (Map.Entry<String, String[]> e : top.entrySet())
-            if (Document.MIME_TYPE_DIR.equals(e.getValue()[1]) && e.getKey().toUpperCase().startsWith(BuildConfig.GAME_ID))
+            if (Document.MIME_TYPE_DIR.equals(e.getValue()[1]) && e.getKey().toUpperCase().startsWith(Region.now().gameId))
                 return new Where(new File(ms, "PSP/SAVEDATA"), DIRS);
         for (String k : top.keySet())
             if (k.equalsIgnoreCase("PARAM.SFO") || k.equalsIgnoreCase("MHP2NDG.BIN"))
-                return new Where(new File(ms, "PSP/SAVEDATA/" + BuildConfig.GAME_ID), FILES);
+                return new Where(new File(ms, "PSP/SAVEDATA/" + Region.now().gameId), FILES);
         return new Where(ms, ALL);
     }
 

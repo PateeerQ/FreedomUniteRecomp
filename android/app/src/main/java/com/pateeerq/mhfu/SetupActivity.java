@@ -71,7 +71,8 @@ public class SetupActivity extends Activity {
 
     // ---- what is there -----------------------------------------------------------------
 
-    private File eboot() { return new File(base, BuildConfig.GAME_ID + "_EBOOT.BIN"); }
+    private File eboot() { return eboot(Region.get(this)); }
+    private File eboot(Region r) { return new File(base, r.ebootFile); }
     private File fonts() { return new File(base, "root/flash0/font"); }
 
     private boolean haveEboot() { return eboot().length() > 100000 && elf(eboot()); }
@@ -100,17 +101,11 @@ public class SetupActivity extends Activity {
      * image (ISO 9660 directories, 2048-byte sectors). True when `out` then holds
      * a plain ELF of this build's size.
      */
-    static boolean ebootFromDisc(String isoPath, File out) {
+    static boolean ebootFromDisc(String isoPath, File out, Region r) {
         try (java.io.RandomAccessFile f = new java.io.RandomAccessFile(isoPath, "r")) {
-            byte[] pvd = new byte[2048];
-            f.seek(16L * 2048);
-            f.readFully(pvd);
-            long[] at = { le32(pvd, 156 + 2), le32(pvd, 156 + 10) };
-            for (String part : new String[] { "PSP_GAME", "SYSDIR", "EBOOT.BIN" }) {
-                at = isoFind(f, at[0], at[1], part);
-                if (at == null) return false;
-            }
-            if (at[1] != BuildConfig.EBOOT_SIZE) return false;
+            long[] at = isoPath(f, "PSP_GAME", "SYSDIR", "EBOOT.BIN");
+            if (at == null) return false;
+            if (at[1] != r.ebootSize) return false;
             byte[] buf = new byte[1 << 16];
             f.seek(at[0] * 2048);
             try (OutputStream o = new FileOutputStream(out)) {
@@ -126,6 +121,19 @@ public class SetupActivity extends Activity {
             android.util.Log.w("mhfu", "EBOOT from the disc: " + e);
             return false;
         }
+    }
+
+    /** {sector, size} of a file in the image, by its path's parts; null if it is not there. */
+    static long[] isoPath(java.io.RandomAccessFile f, String... parts) throws java.io.IOException {
+        byte[] pvd = new byte[2048];
+        f.seek(16L * 2048);
+        f.readFully(pvd);
+        long[] at = { le32(pvd, 156 + 2), le32(pvd, 156 + 10) };
+        for (String part : parts) {
+            at = isoFind(f, at[0], at[1], part);
+            if (at == null) return null;
+        }
+        return at;
     }
 
     private static long le32(byte[] b, int i) {
@@ -246,23 +254,29 @@ public class SetupActivity extends Activity {
     private void go() {
         if (!haveFonts()) fontsFromPpsspp();
         String problem = openDisc();
-        if (problem == null && !haveEboot() && BuildConfig.EBOOT_ON_DISC) {
+        String iso = null;
+        try {
+            iso = new String(java.nio.file.Files.readAllBytes(new File(base, "iso.txt").toPath()), "UTF-8").trim();
+        } catch (Exception ignored) { }
+        // The universal app: the disc says which release this is (its own libmain_<tag>.so).
+        if (problem == null && BuildConfig.UNIVERSAL && iso != null) {
+            Region r = Region.ofDisc(iso);
+            if (r == null) problem = "This disc is not Monster Hunter Freedom Unite (Europe, USA), Portable 2nd G (Japan) "
+                    + "or FUComplete. Choose the folder with one of those .iso files.";
+            else Region.set(this, r);
+        }
+        if (problem == null && !haveEboot() && Region.get(this).ebootOnDisc) {
             // FUComplete: the disc's own EBOOT is the one to use (plain, nothing to dump).
-            try {
-                String iso = new String(java.nio.file.Files.readAllBytes(new File(base, "iso.txt").toPath()), "UTF-8").trim();
-                if (!ebootFromDisc(iso, eboot())) eboot().delete();
-            } catch (Exception e) {
-                eboot().delete();
-            }
+            if (iso == null || !ebootFromDisc(iso, eboot(), Region.get(this))) eboot().delete();
             if (!haveEboot())
                 problem = "This disc is not FUComplete v1.4.0 (its PSP_GAME/SYSDIR/EBOOT.BIN is not the one this app "
                         + "was built from). Choose the folder with the right .iso.";
         }
         if (problem == null && !haveEboot())
-            problem = "The decrypted EBOOT is missing: put " + BuildConfig.GAME_ID + "_EBOOT.BIN (PPSSPP: Tools, Developer tools, "
-                    + "\"Dump decrypted EBOOT.BIN\", then start Monster Hunter Freedom Unite once) in the game's "
-                    + "folder and choose it. Only the " + BuildConfig.REGION_NAME + " version's (" + BuildConfig.GAME_ID
-                    + ") works in this app; other EBOOTs are ignored.";
+            problem = "The decrypted EBOOT is missing: put " + Region.get(this).gameId + "_EBOOT.BIN (PPSSPP: Tools, Developer tools, "
+                    + "\"Dump decrypted EBOOT.BIN\", then start " + Region.get(this).title + " once) in the game's "
+                    + "folder and choose it. The disc is the " + Region.get(this).name + " version (" + Region.get(this).gameId
+                    + "): its EBOOT is the one needed; other EBOOTs are ignored.";
         else if (problem == null && !haveFonts())
             problem = "The PSP fonts are missing. Install PPSSPP (from the Play Store): this app takes the fonts "
                     + "from it by itself. Or put the .pgf files (PPSSPP's assets/flash0/font) in the game's folder "
@@ -402,12 +416,11 @@ public class SetupActivity extends Activity {
     private final java.util.List<Uri> ebootCandidates = new java.util.ArrayList<>();
     private final java.util.List<String> ebootNames = new java.util.ArrayList<>();
 
-    /** This build's region's decrypted EBOOT, as PPSSPP dumps it: its size, and its module's name. */
-    private static final long EBOOT_SIZE = BuildConfig.EBOOT_SIZE;
+    /** A release's decrypted EBOOT, as PPSSPP dumps it: its size (Region), and its module's name. */
     private static final byte[] MODULE_NAME = "MonsterHunterPortable2ndG".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
 
     /** How well a copied candidate fits: -1 not MHFU's EBOOT at all, higher is better. */
-    private static int ebootScore(File f, String name) {
+    private static int ebootScore(File f, String name, Region r) {
         if (!elf(f) || f.length() < 100000 || f.length() > 64L << 20) return -1;
         byte[] all;
         try (InputStream in = new FileInputStream(f)) {
@@ -425,14 +438,18 @@ public class SetupActivity extends Activity {
             break;
         }
         if (!mhfu) return -1;                      // another game's EBOOT
-        if (f.length() != EBOOT_SIZE) return -1;   // another region's (the recompiled code is one region's)
-        return name.toLowerCase().contains(BuildConfig.GAME_ID.toLowerCase()) ? 1 : 0;
+        if (f.length() != r.ebootSize) return -1;  // another release's (the recompiled code is one release's)
+        return name.toLowerCase().contains(r.gameId.toLowerCase()) ? 1 : 0;
     }
 
     /** Of the candidates the walk found, the one that is this game's EBOOT, into the app's folder. */
     private void pickEboot(ContentResolver cr) {
-        File best = null;
-        int bestScore = -1;
+        // The universal app keeps every release's EBOOT it finds (each its own file);
+        // an app for one release only that one's.
+        Region[] wanted = BuildConfig.UNIVERSAL ? Region.ALL : new Region[] { Region.get(this) };
+        File[] best = new File[wanted.length];
+        int[] bestScore = new int[wanted.length];
+        java.util.Arrays.fill(bestScore, -1);
         for (int i = 0; i < ebootCandidates.size(); i++) {
             File tmp = new File(base, "eboot" + i + ".tmp");
             try {
@@ -441,19 +458,24 @@ public class SetupActivity extends Activity {
                 tmp.delete();
                 continue;
             }
-            int score = ebootScore(tmp, ebootNames.get(i));
-            if (score > bestScore) {
-                if (best != null) best.delete();
-                best = tmp;
-                bestScore = score;
-            } else {
-                tmp.delete();
+            boolean kept = false;
+            for (int k = 0; k < wanted.length && !kept; k++) {
+                if (wanted[k].ebootOnDisc) continue;            // FUComplete's comes from its disc
+                int score = ebootScore(tmp, ebootNames.get(i), wanted[k]);
+                if (score > bestScore[k]) {
+                    if (best[k] != null) best[k].delete();
+                    best[k] = tmp;
+                    bestScore[k] = score;
+                    kept = true;
+                }
             }
+            if (!kept) tmp.delete();
         }
         // Through a temporary file: a bad one never replaces a good one.
-        if (best != null) {
-            eboot().delete();
-            if (!best.renameTo(eboot())) best.delete();
+        for (int k = 0; k < wanted.length; k++) {
+            if (best[k] == null) continue;
+            eboot(wanted[k]).delete();
+            if (!best[k].renameTo(eboot(wanted[k]))) best[k].delete();
         }
     }
 
