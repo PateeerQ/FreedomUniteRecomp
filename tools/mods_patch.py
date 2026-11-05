@@ -193,12 +193,16 @@ def write_table(ovl_dir, mods):
 
 
 def main():
-    global MODS_DIR
+    global MODS_DIR, WIDESCREEN
     args = sys.argv[1:]
     if "--region" in args:                        # --region US: the USA build's mods (mods/builtin/us)
         k = args.index("--region")
         if args[k + 1].upper() != "EU":
             MODS_DIR = os.path.join(MODS_DIR, args[k + 1].lower())
+        if args[k + 1].upper() == "JP":
+            # The same two camera instructions in the Japanese build (found by the code
+            # around them; 0x0881397C is where the database's "Screen 16:10" codes write).
+            WIDESCREEN = [(a + 0xDC0,) + w[1:] for a, w in zip((0x08812AC8, 0x08812BC0), WIDESCREEN)]
         del args[k:k + 2]
     undo = "--revert" in args
     builtin = "--no-builtin" not in args
