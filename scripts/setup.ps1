@@ -15,7 +15,9 @@
 
     The region comes from the EBOOT: the Europe one (ULES01213) builds in
     work\ and build\, the USA one (ULUS10391) in work\us\ and build-us\, so
-    the two can sit side by side (run.ps1 -Region US runs the second).
+    the two can sit side by side (run.ps1 -Region US runs the second). The
+    Japanese Monster Hunter Portable 2nd G (ULJM05500) builds in work\jp\ and
+    build-jp\ (run.ps1 -Region JP).
 
 .EXAMPLE
     .\scripts\setup.ps1 -Iso "..\Monster Hunter Freedom Unite (Europe) (PSP) (PSN).iso" `
@@ -32,8 +34,8 @@ param(
     # A folder holding the PSP fonts (jpn0.pgf, ltn0.pgf ...). By default
     # they are taken from PPSSPP's install (assets\flash0\font).
     [string]$Fonts,
-    # EU or US; by default told from the EBOOT (its size).
-    [ValidateSet("", "EU", "US")] [string]$Region = ""
+    # EU, US or JP; by default told from the EBOOT (its size).
+    [ValidateSet("", "EU", "US", "JP")] [string]$Region = ""
 )
 
 $ErrorActionPreference = 'Stop'
@@ -44,18 +46,19 @@ $Eboot = (Resolve-Path $Eboot).Path
 
 # The region: PPSSPP's dumps of the two decrypted EBOOTs differ in size (the
 # US .text is 0x120 longer; host/region.h).
-$sizes = @{ 1910384 = "EU"; 1910672 = "US" }
+$sizes = @{ 1910384 = "EU"; 1910672 = "US"; 1890112 = "JP" }
 $ebootSize = [int](Get-Item $Eboot).Length
 if (-not $Region) {
     if (-not $sizes.ContainsKey($ebootSize)) {
-        throw "$Eboot ($ebootSize bytes) is neither the Europe (ULES01213) nor the USA (ULUS10391) EBOOT; pass -Region to try anyway"
+        throw "$Eboot ($ebootSize bytes) is not the Europe (ULES01213), USA (ULUS10391) or Japan (ULJM05500) EBOOT; pass -Region to try anyway"
     }
     $Region = $sizes[$ebootSize]
 }
-$gameId  = if ($Region -eq "US") { "ULUS10391" } else { "ULES01213" }
-$work    = if ($Region -eq "US") { Join-Path $repo "work\us" } else { Join-Path $repo "work" }
-$build   = if ($Region -eq "US") { Join-Path $repo "build-us" } else { Join-Path $repo "build" }
-$seedDir = if ($Region -eq "US") { Join-Path $repo "seeds\us" } else { Join-Path $repo "seeds" }
+$gameId  = @{ EU = "ULES01213"; US = "ULUS10391"; JP = "ULJM05500" }[$Region]
+$sub     = @{ EU = ""; US = "us"; JP = "jp" }[$Region]
+$work    = if ($sub) { Join-Path $repo "work\$sub" } else { Join-Path $repo "work" }
+$build   = if ($sub) { Join-Path $repo "build-$sub" } else { Join-Path $repo "build" }
+$seedDir = if ($sub) { Join-Path $repo "seeds\$sub" } else { Join-Path $repo "seeds" }
 $root   = Join-Path $work "root"
 $disc   = Join-Path $root "disc"
 $gen    = Join-Path $work "gen"
@@ -211,7 +214,7 @@ $table = @()
 # Each region has its own conversion: mods\builtin (EU), mods\builtin\us (USA,
 # the build they were written for: tools/mods_convert.py --region US).
 Get-ChildItem $ovlSrc -Filter "mod_*.bin" | Remove-Item -Force
-$modsDir = if ($Region -eq "US") { Join-Path $repo "mods\builtin\us" } else { Join-Path $repo "mods\builtin" }
+$modsDir = if ($sub) { Join-Path $repo "mods\builtin\$sub" } else { Join-Path $repo "mods\builtin" }
 $builtinMods = @(Get-ChildItem $modsDir -Filter *.bin -ErrorAction SilentlyContinue)
 foreach ($mod in $builtinMods) {
     Copy-Item -Force $mod.FullName (Join-Path $ovlSrc ("mod_" + $mod.Name))
@@ -278,16 +281,18 @@ New-Item -ItemType Directory -Force $gen | Out-Null
 & $tool emit $localEboot $gen mhfu --seeds $mainSeeds
 if ($LASTEXITCODE) { throw "allegrexrecomp emit failed" }
 # What host/region.h builds for (no file: Europe).
-if ($Region -eq "US") {
+if ($Region -ne "EU") {
     [IO.File]::WriteAllText((Join-Path $gen "mhfu_region_gen.h"),
-        "/* Written by scripts/setup.ps1: this build is the USA one. */`n#define MHFU_REGION_US 1`n")
+        "/* Written by scripts/setup.ps1: this build is the $Region one. */`n#define MHFU_REGION_$Region 1`n")
 }
 # The 60 fps mode, behind a switch (tools/fps60_patch.py). Its patches are the
-# EU cheat's; --region US moves them to the US build's addresses.
+# EU cheat's; --region US moves them to the US build's addresses. Not yet for JP.
 $regionArgs = @()
-if ($Region -eq "US") { $regionArgs = @("--region", "US") }
-python (Join-Path $repo "tools\fps60_patch.py") $gen $ovlGen @regionArgs
-if ($LASTEXITCODE) { throw "the 60 fps patch did not apply" }
+if ($Region -ne "EU") { $regionArgs = @("--region", $Region) }
+if ($Region -ne "JP") {
+    python (Join-Path $repo "tools\fps60_patch.py") $gen $ovlGen @regionArgs
+    if ($LASTEXITCODE) { throw "the 60 fps patch did not apply" }
+}
 # Built-in mods (widescreen, mods\builtin or mods\builtin\us), behind switches
 # (tools/mods_patch.py); it also writes their data, gen_ovl\mods_builtin.c.
 python (Join-Path $repo "tools\mods_patch.py") $gen $ovlGen @regionArgs
@@ -306,5 +311,5 @@ cmake --build $build --config $Config --target mhfu_host
 if ($LASTEXITCODE) { throw "mhfu_host build failed" }
 
 $runArgs = ""
-if ($Region -eq "US") { $runArgs = " -Region US" }
+if ($Region -ne "EU") { $runArgs = " -Region $Region" }
 Write-Host "`nDone ($Region). Run it with:  .\scripts\run.ps1$runArgs" -ForegroundColor Green
