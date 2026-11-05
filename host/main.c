@@ -27,6 +27,7 @@
  * disc is read from the image instead, which MHFU needs: it stats DATA.BIN
  * for its start sector and then opens sector ranges of it by number.
  */
+#include "region.h"
 #include "psprecomp/cpu.h"
 #include "psprecomp/mem.h"
 #include "psprecomp/dispatch.h"
@@ -211,7 +212,7 @@ static void report(void) {
     /* The save manager (pointer at 0x09A44C60): +0x0C state (jump table at
      * 0x089321DC, run by 0x088BA870), +0x34 savedata result, +0x970 savedata
      * dialog active, +0x971 message dialog active, +0x978 memory stick inserted. */
-    uint32_t sm = psp_read32(0x09A44C60);
+    uint32_t sm = psp_read32(MHFU_ADDR_SAVE_MANAGER);
     if (sm) {
         printf("save manager       0x%08X  state %u  result 0x%08X  +0x9AC %u  +0x960:", sm,
                psp_read32(sm + 0x0C), psp_read32(sm + 0x34), psp_read8(sm + 0x9AC));
@@ -477,7 +478,7 @@ static void android_args(int *argc, char ***argv) {
     crash_altstack();                    /* this is the game's thread */
     /* The GL renderer: there is nothing else to see with on the phone. */
     setenv("MHFU_RENDER", "gl", 0);
-    snprintf(eboot, sizeof eboot, "%s/ULES01213_EBOOT.BIN", base);
+    snprintf(eboot, sizeof eboot, "%s/" MHFU_EBOOT_FILE, base);
     snprintf(root, sizeof root, "%s/root", base);
     int n = 0;
     args[n++] = (*argv)[0];
@@ -612,7 +613,7 @@ int main(int argc, char **argv) {
     /* Multiplayer: the room the game's ad hoc play goes through. The window's
      * Multiplayer menu does the same as these two options. */
     mhfu_lobby_init(g_root, nick, mac, relay);
-    mhfu_cheats_init(g_root);     /* <root>/cheats/ULES01213.ini (mods.c) */
+    mhfu_cheats_init(g_root);     /* <root>/cheats/<game id>.ini (mods.c) */
     mhfu_mod_widescreen();        /* reads MHFU_WIDESCREEN */
     mhfu_adhoc_register();
     if (net_create || net_join) {
@@ -717,7 +718,7 @@ int main(int argc, char **argv) {
     /* MHFU_TEST_ATAN=1: MHFU's VFPU angle function (0x088147C8: the angle from
      * one point of an object to another, as a 16-bit turn) on eight known
      * directions, against the host's atan2. Then exit. */
-    if (getenv("MHFU_TEST_ATAN")) {
+    if (getenv("MHFU_TEST_ATAN") && MHFU_ADDR_VFPU_ATAN) {
         const uint32_t obj = psp_sysmem_alloc(0x1000, 0);
         static const float dir[8][2] = { { 1, 0 }, { 1, 1 }, { 0, 1 }, { -1, 1 },
                                          { -1, 0 }, { -1, -1 }, { 0, -1 }, { 1, -1 } };
@@ -728,7 +729,7 @@ int main(int argc, char **argv) {
             psp_write32(obj + 2904, psp_f32_to_bits(dir[i][1]));   /* z */
             psp_cpu.r[PSP_REG_A0] = obj;
             psp_cpu.r[PSP_REG_RA] = 0;
-            psp_call_from_host(0x088147C8u);
+            psp_call_from_host(MHFU_ADDR_VFPU_ATAN);
             const uint32_t got = psp_cpu.r[PSP_REG_V0] & 0xFFFF;
             /* The function takes atan2 of (-dz, dx), radians to 65536 a turn. */
             double want = atan2(-(double)dir[i][1], (double)dir[i][0]);
