@@ -181,6 +181,14 @@ if ($fontSrc) {
 # own recompile, since nothing inside the EBOOT calls some of them.
 Step "Recompiling overlays"
 $ovlSrc = Join-Path $work "overlays"
+# A new work folder (the first setup of a region) gets every overlay at once,
+# out of DATA.BIN (tools/re/databin.py), instead of one run at a time.
+$dataBin = Join-Path $disc "PSP_GAME\USRDIR\DATA.BIN"
+if (-not (Get-ChildItem $ovlSrc -Filter "slot*.bin" -ErrorAction SilentlyContinue) -and (Test-Path $dataBin)) {
+    New-Item -ItemType Directory -Force $ovlSrc | Out-Null
+    python (Join-Path $repo "tools\re\databin.py") $Eboot $dataBin overlays $ovlSrc | Select-Object -Last 1
+    if ($LASTEXITCODE) { throw "could not take the overlays out of DATA.BIN" }
+}
 if (Test-Path $ovlGen) { Remove-Item -Recurse -Force $ovlGen }
 New-Item -ItemType Directory -Force $ovlGen, $ovlSrc | Out-Null
 $mainSeeds = Join-Path $work "main_seeds.txt"
