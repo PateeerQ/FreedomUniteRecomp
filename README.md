@@ -56,7 +56,7 @@ anyone can join with a code, 60 FPS, widescreen, controllers, rearrangeable touc
 | Game | Region | ID | Status |
 |---|---|---|---|
 | Monster Hunter Freedom Unite | Europe | `ULES01213` | **Playable**: village, Gathering Hall, quests, online |
-| Monster Hunter Freedom Unite | North America | `ULUS10391` | **In progress**: boots to character creation on PC; no release yet |
+| Monster Hunter Freedom Unite | North America | `ULUS10391` | **In progress**: quests on Android, online together with EU players; no release yet |
 
 ## Download
 
@@ -100,7 +100,7 @@ PC and on Android (Poco X7 Pro).
 | Gameplay coverage | ![40%](https://img.shields.io/badge/40%25-yellow?style=flat-square) | village life, full quests, the Gathering Hall together; more maps and monsters untested |
 | PC release (launcher) | ![85%](https://img.shields.io/badge/85%25-brightgreen?style=flat-square) | launcher, profiles, keys, controllers, achievements, mods, 60 FPS, updates, log, crash report |
 | Android port | ![75%](https://img.shields.io/badge/75%25-yellow?style=flat-square) | 30 or 60 fps, touch buttons, layout editor, drawer menu, multiplayer, achievements, mods, save folder, crash log, updates |
-| USA release (`ULUS10391`) | ![30%](https://img.shields.io/badge/30%25-orange?style=flat-square) | builds with 60 FPS and the built-in mods, boots to character creation on PC; save, village, quests and Android not yet tested |
+| USA release (`ULUS10391`) | ![55%](https://img.shields.io/badge/55%25-yellow?style=flat-square) | 60 FPS and the built-in mods; a quest on Android with the mods and weapon buttons, in one room with an EU player |
 
 </details>
 
