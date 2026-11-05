@@ -619,6 +619,8 @@ void mhfu_hle_register(const char *overlay_dir) {
 
     psp_hle_register(0xB77905EA, "sceGe_user", "sceGeEdramSetAddrTranslation",
                      hle_GeEdramSetAddrTranslation);
+    psp_hle_register(0x342061E5, "SysMemUserForUser", "sceKernelSetCompiledSdkVersion370",  /* MHP2G (JP) */
+                     hle_SetCompiledSdkVersion);
     psp_hle_register(0x91DE343C, "SysMemUserForUser", "sceKernelSetCompiledSdkVersion500_505",
                      hle_SetCompiledSdkVersion);
 
