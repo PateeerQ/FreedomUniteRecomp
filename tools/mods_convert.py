@@ -61,6 +61,7 @@ TWEAKS = {
 }
 # Loads and stores through a register the game set before the hook: its value there.
 BASES = {0x0891F9FC: 0x08A60000}                  # target cam: v1 = lui 0x08A6 at 0x08869410
+BASE_LUI = {0x0891F9FC: 0x0886940C}               # that lui (US; the hook is the sh after it): the target's value is read there
 
 
 def load_elf(p):
@@ -80,10 +81,66 @@ SEED_DIR = os.path.join(REPO, "seeds")
 OVL_DIR = os.path.join(REPO, "work", "overlays")
 
 
+TARGET_JP = False
+JP = None                    # (the JP EBOOT, US and JP game_task/game_sub, EU and JP quest dumps), set by main
+_jp = {}
+JP_LOG = []
+
+
+def us2jp(a):
+    """A US address the mods use, in the Japanese build (Portable 2nd G).
+    Code is looked up by the instructions around it (the EBOOT's in the JP
+    EBOOT, an overlay's in the JP overlay of the same name); data by the bytes
+    around it, from the EU address (us2eu's rules) in an EU quest memory dump
+    to the one place they are in a JP dump of the same quest; failing both,
+    the rule the dumps showed for the heap (EU - 0x42C0)."""
+    if a in _jp:
+        return _jp[a]
+    import region_seeds as rs
+    b, how = None, ""
+    if a >= 0x09FC0000 or 0x04000000 <= a < 0x04800000:
+        b, how = a, "same"
+    elif 0x08804000 <= a < 0x0890DF58:
+        b = rs.translate(a, US, JP["eboot"], 0)
+        how = "EBOOT code"
+    else:
+        for name, (ub, ubody), (jb, jbody) in JP["ovl"]:
+            if ub + 0x40 <= a < ub + len(ubody):
+                b = rs.translate(a, (ub, ubody), (jb, jbody), jb - ub)
+                how = name + " code/data"
+                if b is not None:
+                    break
+        if b is None:
+            e = us2eu_rules(a)
+            eu, jpd = JP["dumps"]
+            for n in (64, 256, 1024):
+                lo = e - n // 2
+                blk = eu[lo - 0x08800000:lo - 0x08800000 + n]
+                if blk.count(0) > n * 3 // 4:
+                    continue
+                k = jpd.find(blk)
+                if k >= 0 and jpd.find(blk, k + 1) < 0:
+                    b, how = 0x08800000 + k + (e - lo), f"dump, {n} bytes"
+                    break
+            if b is None and 0x08B40000 <= e < 0x09A5F300:
+                b, how = e - 0x42C0, "heap rule"
+    if b is None:
+        raise ValueError(f"{a:08X}: not found in the JP build")
+    _jp[a] = b
+    JP_LOG.append(f"{a:08X} -> {b:08X} ({how})")
+    return b
+
+
 def us2eu(a):
     """A US address the mods use, in the EU build (the same in the US one)."""
     if TARGET_US:
         return a
+    if TARGET_JP:
+        return us2jp(a)
+    return us2eu_rules(a)
+
+
+def us2eu_rules(a):
     if a in OVERLAY_CODE:
         return OVERLAY_CODE[a]
     if 0x08804000 <= a < 0x0890DF58:
@@ -241,7 +298,12 @@ def convert(folder, mid, name, desc, delta):
             regs = {}
         if pc in BASES:
             imm = sext(w & 0xFFFF)
-            n = reloc((BASES[pc] + imm) & 0xFFFFFFFF) - BASES[pc]
+            base_t = BASES[pc]
+            if TARGET_JP:                            # the register's value in the JP game
+                lw = struct.unpack_from("<I", EU[1], us2eu(BASE_LUI[pc]) - EU[0])[0]
+                assert lw >> 26 == 0x0F, f"{BASE_LUI[pc]:08X}: not a lui in the JP build"
+                base_t = (lw & 0xFFFF) << 16
+            n = reloc((BASES[pc] + imm) & 0xFFFFFFFF) - base_t
             out[pc] = (w & 0xFFFF0000) | (n & 0xFFFF)
             notes.append(f"{pc:08X}: through the game's register, EU offset {n:#x}")
             continue
@@ -434,13 +496,42 @@ def write_ovl(path, mid, base, words):
 
 
 def main():
-    global EU, US, TARGET_US, OVL_LO, GAME_TASK_HI, OVL_HI, GAME_TASK_HASH, SEED_DIR, OVL_DIR
+    global EU, US, TARGET_US, TARGET_JP, JP, OVL_LO, GAME_TASK_HI, OVL_HI, GAME_TASK_HASH, SEED_DIR, OVL_DIR
     args = sys.argv[1:]
     if args[:2] == ["--region", "US"]:
         TARGET_US = True
         args = args[2:]
+    elif args[:2] == ["--region", "JP"]:
+        TARGET_JP = True
+        args = args[2:]
     src = args[0] if args else r"E:\Emulator Games\PSP"
-    if TARGET_US:
+    if TARGET_JP:
+        # --region JP SRC [US EBOOT] [EU quest dump] [JP quest dump]: the JP files from work\jp,
+        # the US ones from work\us (the mods' own overlays), both builds set up first.
+        sys.path.insert(0, os.path.join(HERE, "re"))
+        sys.path.insert(0, HERE)
+        import region_seeds as rs
+        us = args[1] if len(args) > 1 else os.path.join(src, "ULUS10391_EBOOT.BIN")
+        eu_dump = args[2] if len(args) > 2 else sorted(glob.glob(os.path.join(REPO, "work", "memdump", "*.bin")))[1]
+        jp_dump = args[3] if len(args) > 3 else sorted(glob.glob(os.path.join(REPO, "work", "jp", "memdump", "*.bin")))[-1]
+        jp_eboot = os.path.join(REPO, "work", "jp", "ULJM05500_EBOOT.BIN")
+        US = load_elf(us)
+        EU = load_elf(jp_eboot)                      # the target: the JP EBOOT
+        disc = lambda w: os.path.join(REPO, "work", w, "root", "disc", "PSP_GAME", "USRDIR", "DATA.BIN")
+        name = lambda body: body[0x20:0x40].split(b"\0")[0].decode()
+        uo = {name(b): (base, b) for _, base, b in rs.overlays(us, disc("us")).values()}
+        jo = {name(b): (base, b) for _, base, b in rs.overlays(jp_eboot, disc("jp")).values()}
+        JP = {"eboot": EU,
+              "ovl": [(n, uo[n], jo[n]) for n in ("game_task.ovl", "game_sub.ovl")],
+              "dumps": (open(eu_dump, "rb").read(), open(jp_dump, "rb").read())}
+        print(f"mods: data from {os.path.basename(eu_dump)} (EU) and {os.path.basename(jp_dump)} (JP)")
+        # JP overlay slots: 0x09A5A580 (1), 0x09C14280 (2), 0x09D5DF80 (4)
+        OVL_LO, GAME_TASK_HI, OVL_HI = 0x09A5A380, 0x09C14280, 0x09D5DF80
+        GAME_TASK_HASH = 0x6EF0CAAD
+        SEED_DIR = os.path.join(REPO, "seeds", "jp")
+        OVL_DIR = os.path.join(REPO, "work", "jp", "overlays")
+        outdir = os.path.join(REPO, "mods", "builtin", "jp")
+    elif TARGET_US:
         us = args[1] if len(args) > 1 else os.path.join(src, "ULUS10391_EBOOT.BIN")
         EU = US = load_elf(us)                       # the target is the build they were written for
         OVL_LO, GAME_TASK_HI, OVL_HI = OVL_LO + 0x100, GAME_TASK_HI + 0x100, OVL_HI + 0x100
@@ -499,6 +590,10 @@ def main():
         for n in m["notes"]:
             print("   " + n)
     json.dump(meta, open(os.path.join(outdir, "mods.json"), "w"), indent=1)
+    if TARGET_JP:
+        print("mods: US -> JP addresses:")
+        for l in JP_LOG:
+            print("   " + l)
 
 
 if __name__ == "__main__":
