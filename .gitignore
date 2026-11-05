@@ -2,6 +2,7 @@
 build/
 build-us/
 build-jp/
+build-fuc/
 out/
 *.obj
 *.exe
