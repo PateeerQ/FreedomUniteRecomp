@@ -96,7 +96,7 @@ def translate_anywhere(a, src, dst):
 def overlays(eboot, data):
     """DATA.BIN file index -> (hash, load address, bytes), the way databin does."""
     sbox, _ = databin.region_of(eboot)
-    c = databin.Cipher(databin.eboot_bytes(eboot, sbox, 256))
+    c = databin.Cipher(databin.eboot_bytes(eboot, sbox, 256) if sbox is not None else None)
     f = open(data, "rb")
     size = os.path.getsize(data)
     toc = struct.unpack("<%dI" % (databin.TOC_BYTES // 4), c.decrypt(f.read(databin.TOC_BYTES), 0))
