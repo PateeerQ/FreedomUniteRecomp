@@ -115,7 +115,7 @@ if (-not $Iso -and (Test-Path $isoTxt)) { $Iso = (Get-Content $isoTxt -TotalCoun
 $isoArg = ""
 if ($Iso) {
     if (-not (Test-Path -LiteralPath $Iso)) { throw "disc image not found: $Iso" }
-    $isoArg = "--iso `"$((Resolve-Path $Iso).Path)`""
+    $isoArg = "--iso `"$((Resolve-Path -LiteralPath $Iso).Path)`""
 } else {
     Write-Warning "No disc image (run setup.ps1 again, or pass -Iso); disc0: uses work\root\disc"
 }
