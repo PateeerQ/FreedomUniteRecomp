@@ -12,7 +12,7 @@
 # think before publishing them: see the README's notice.
 param(
     [switch]$NoBuild,
-    [ValidateSet("EU", "US", "JP")] [string]$Region = "EU"
+    [ValidateSet("EU", "US", "JP", "FUC")] [string]$Region = "EU"
 )
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
