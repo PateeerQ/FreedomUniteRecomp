@@ -1,5 +1,6 @@
 # Build output
 build/
+build-us/
 out/
 *.obj
 *.exe
