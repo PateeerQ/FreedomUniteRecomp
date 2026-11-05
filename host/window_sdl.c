@@ -444,27 +444,45 @@ static uint32_t attack_bits(float dx, float dy) {
     return PSP_CTRL_CIRCLE;
 }
 
+/* The pictures on the buttons (icon(), below the layout): no words on them. */
+enum { ICON_CROUCH, ICON_DODGE, ICON_RUN, ICON_SHEATHE, ICON_ITEM, ICON_SWORD, ICON_GUARD, ICON_AIM, ICON_TARGET,
+       ICON_DEMON, ICON_SPIRIT, ICON_DANCE, ICON_FADE, ICON_CHARGE };
+
 /* The weapon buttons: a column left of the face buttons whose buttons follow
  * the weapon the hunter carries, each holding a PSP combination (the game
  * sees the buttons pressed together). The class is the game's own id at
- * 0x090B3628 (CLAUDE.md), the same in the village and in a quest. With the
- * Target Camera mod on, every weapon also gets its target button (L + Up). */
+ * 0x090B3628 (CLAUDE.md), the same in the village and in a quest; they show
+ * only in a quest (before one, the class is whatever the save holds, even on
+ * the loading screens). With the Target Camera mod on, every weapon also gets
+ * its target button (L + Up). */
 #define MHFU_WEAPON_CLASS 0x090B3628u
 #define SKILLS 3
-typedef struct { const char *label; uint32_t bits; } skill;
+typedef struct { int pic; uint32_t bits; } skill;
+#define GUARD { ICON_GUARD, PSP_CTRL_RTRIGGER }
+#define AIM   { ICON_AIM, PSP_CTRL_RTRIGGER }
 static const skill k_skills[11][SKILLS] = {
-    [6] = { { "DEMON", PSP_CTRL_RTRIGGER }, { "DANCE", PSP_CTRL_TRIANGLE | PSP_CTRL_CIRCLE } },   /* Dual Blades */
-    [7] = { { "SPIRIT", PSP_CTRL_RTRIGGER }, { "FADE", PSP_CTRL_TRIANGLE | PSP_CTRL_CIRCLE } },   /* Long Sword */
+    [0] = { GUARD },                                   /* Great Sword */
+    [1] = { AIM },                                     /* Heavy Bowgun */
+    [2] = { { ICON_CHARGE, PSP_CTRL_RTRIGGER } },      /* Hammer */
+    [3] = { GUARD },                                   /* Lance */
+    [4] = { GUARD },                                   /* Sword and Shield */
+    [5] = { AIM },                                     /* Light Bowgun */
+    [6] = { { ICON_DEMON, PSP_CTRL_RTRIGGER }, { ICON_DANCE, PSP_CTRL_TRIANGLE | PSP_CTRL_CIRCLE } },  /* Dual Blades */
+    [7] = { { ICON_SPIRIT, PSP_CTRL_RTRIGGER }, { ICON_FADE, PSP_CTRL_TRIANGLE | PSP_CTRL_CIRCLE } },  /* Long Sword */
+    [9] = { GUARD },                                   /* Gunlance */
+    [10] = { AIM },                                    /* Bow */
 };
+#undef GUARD
+#undef AIM
 static int skills_now(skill out[SKILLS]) {
     int n = 0;
-    if (!g_skills_on) return 0;
+    if (!g_skills_on || !mhfu_in_quest()) return 0;
     const unsigned cls = psp_read8(MHFU_WEAPON_CLASS);
     if (cls < 11)
-        for (int i = 0; i < SKILLS && k_skills[cls][i].label; i++) out[n++] = k_skills[cls][i];
+        for (int i = 0; i < SKILLS && k_skills[cls][i].bits; i++) out[n++] = k_skills[cls][i];
     for (int i = 0; i < mhfu_mod_count() && n < SKILLS; i++)
         if (!strcmp(mhfu_mod_id(i), "targetcam") && mhfu_mod_on(i))
-            out[n++] = (skill){ "TARGET", PSP_CTRL_LTRIGGER | PSP_CTRL_UP };
+            out[n++] = (skill){ ICON_TARGET, PSP_CTRL_LTRIGGER | PSP_CTRL_UP };
     return n;
 }
 /* Where button i of n is: the column is centred on the group. */
@@ -656,39 +674,150 @@ static void face_shape(canvas *c, float cx, float cy, float k, int shape, float 
     }
 }
 
-/* The mobile buttons' pictures at (cx, cy), half size k, in pixels. */
-enum { ICON_CROUCH, ICON_DODGE, ICON_RUN, ICON_SHEATHE };
+/* The buttons' pictures at (cx, cy), half size k, in pixels: lines and rings
+ * only, drawn here (none of the game's art). */
+static void poly(canvas *c, float cx, float cy, float k, const float *pt, int n, int closed, float t, uint32_t col) {
+    for (int i = 0; i + 1 < n + closed; i++) {
+        const int j = (i + 1) % n;
+        segment(c, cx + pt[2 * i] * k, cy + pt[2 * i + 1] * k, cx + pt[2 * j] * k, cy + pt[2 * j + 1] * k, t, col);
+    }
+}
+/* An arc from angle a0 to a1 (radians, 0 = right, clockwise on the screen). */
+static void arc(canvas *c, float cx, float cy, float r, float a0, float a1, float t, uint32_t col) {
+    const int n = 12;
+    for (int i = 0; i < n; i++) {
+        const float u = a0 + (a1 - a0) * i / n, v = a0 + (a1 - a0) * (i + 1) / n;
+        segment(c, cx + r * cosf(u), cy + r * sinf(u), cx + r * cosf(v), cy + r * sinf(v), t, col);
+    }
+}
 static void icon(canvas *c, float cx, float cy, float k, int which, float t, uint32_t col) {
     switch (which) {
-    case ICON_CROUCH:                                  /* down, onto the ground */
-        segment(c, cx - k, cy - k * 0.7f, cx, cy + k * 0.1f, t, col); segment(c, cx, cy + k * 0.1f, cx + k, cy - k * 0.7f, t, col);
-        segment(c, cx - k * 1.1f, cy + k * 0.7f, cx + k * 1.1f, cy + k * 0.7f, t, col);
+    case ICON_CROUCH: {                                /* down, onto the ground */
+        static const float a[] = { -1, -0.7f, 0, 0.1f, 1, -0.7f }, g[] = { -1.1f, 0.7f, 1.1f, 0.7f };
+        poly(c, cx, cy, k, a, 3, 0, t, col);
+        poly(c, cx, cy, k, g, 2, 0, t, col);
         break;
+    }
     case ICON_DODGE: {                                 /* a turning arrow */
-        float px = cx + k * cosf(2.6f), py = cy - k * sinf(2.6f);
-        for (int i = 1; i <= 10; i++) {
-            const float a = 2.6f - i * 0.47f, x = cx + k * cosf(a), y = cy - k * sinf(a);
-            segment(c, px, py, x, y, t, col);
-            px = x; py = y;
-        }
-        const float a = 2.6f - 10 * 0.47f, tx = sinf(a), ty = cosf(a);     /* along the arc, clockwise */
-        segment(c, px, py, px - tx * k * 0.5f + ty * k * 0.35f, py - ty * k * 0.5f - tx * k * 0.35f, t, col);
-        segment(c, px, py, px - tx * k * 0.5f - ty * k * 0.35f, py - ty * k * 0.5f + tx * k * 0.35f, t, col);
+        const float a0 = 3.7f, a1 = 3.7f + 4.7f;
+        arc(c, cx, cy, k, a0, a1, t, col);
+        const float ex = cx + k * cosf(a1), ey = cy + k * sinf(a1), tx = -sinf(a1), ty = cosf(a1);
+        segment(c, ex, ey, ex - tx * k * 0.5f + ty * k * 0.35f, ey - ty * k * 0.5f - tx * k * 0.35f, t, col);
+        segment(c, ex, ey, ex - tx * k * 0.5f - ty * k * 0.35f, ey - ty * k * 0.5f + tx * k * 0.35f, t, col);
         break;
     }
-    case ICON_RUN:                                     /* two chevrons forward */
-        for (int i = 0; i < 2; i++) {
-            const float x = cx - k * 0.7f + i * k * 0.8f;
-            segment(c, x, cy - k * 0.7f, x + k * 0.6f, cy, t, col); segment(c, x + k * 0.6f, cy, x, cy + k * 0.7f, t, col);
-        }
-        break;
-    default:                                           /* a sword down into its sheath */
-        segment(c, cx, cy - k * 1.1f, cx, cy + k * 0.6f, t, col);
-        segment(c, cx - k * 0.6f, cy - k * 0.55f, cx + k * 0.6f, cy - k * 0.55f, t, col);
-        segment(c, cx - k * 0.4f, cy - k * 0.1f, cx - k * 0.4f, cy + k, t, col); segment(c, cx - k * 0.4f, cy + k, cx + k * 0.4f, cy + k, t, col);
-        segment(c, cx + k * 0.4f, cy + k, cx + k * 0.4f, cy - k * 0.1f, t, col);
+    case ICON_RUN: {                                   /* two chevrons forward */
+        static const float a[] = { -0.7f, -0.7f, -0.1f, 0, -0.7f, 0.7f }, b[] = { 0.1f, -0.7f, 0.7f, 0, 0.1f, 0.7f };
+        poly(c, cx, cy, k, a, 3, 0, t, col);
+        poly(c, cx, cy, k, b, 3, 0, t, col);
         break;
     }
+    case ICON_SHEATHE: {                               /* a sword down into its sheath */
+        static const float blade[] = { 0, -1.1f, 0, 0.6f }, guard[] = { -0.6f, -0.55f, 0.6f, -0.55f },
+                           sheath[] = { -0.4f, -0.1f, -0.4f, 1, 0.4f, 1, 0.4f, -0.1f };
+        poly(c, cx, cy, k, blade, 2, 0, t, col);
+        poly(c, cx, cy, k, guard, 2, 0, t, col);
+        poly(c, cx, cy, k, sheath, 4, 0, t, col);
+        break;
+    }
+    case ICON_ITEM: {                                  /* a potion */
+        static const float body[] = { -0.22f, -0.55f, -0.22f, -0.2f, -0.6f, 0.15f, -0.6f, 0.95f, 0.6f, 0.95f,
+                                      0.6f, 0.15f, 0.22f, -0.2f, 0.22f, -0.55f },
+                           cork[] = { -0.32f, -0.8f, 0.32f, -0.8f }, fill[] = { -0.6f, 0.45f, 0.6f, 0.45f };
+        poly(c, cx, cy, k, body, 8, 0, t, col);
+        poly(c, cx, cy, k, cork, 2, 0, t, col);
+        poly(c, cx, cy, k, fill, 2, 0, t, col);
+        break;
+    }
+    case ICON_GUARD: {                                 /* a shield */
+        static const float a[] = { -0.8f, -0.85f, 0.8f, -0.85f, 0.8f, 0.05f, 0, 0.95f, -0.8f, 0.05f },
+                           m[] = { 0, -0.85f, 0, 0.95f }, b[] = { -0.8f, -0.1f, 0.8f, -0.1f };
+        poly(c, cx, cy, k, a, 5, 1, t, col);
+        poly(c, cx, cy, k, m, 2, 0, t * 0.7f, col);
+        poly(c, cx, cy, k, b, 2, 0, t * 0.7f, col);
+        break;
+    }
+    case ICON_AIM:                                     /* cross hairs */
+        ring(c, cx, cy, k * 0.7f, t, col);
+        segment(c, cx - k * 1.05f, cy, cx - k * 0.3f, cy, t, col); segment(c, cx + k * 0.3f, cy, cx + k * 1.05f, cy, t, col);
+        segment(c, cx, cy - k * 1.05f, cx, cy - k * 0.3f, t, col); segment(c, cx, cy + k * 0.3f, cx, cy + k * 1.05f, t, col);
+        disc(c, cx, cy, k * 0.12f, col);
+        break;
+    case ICON_TARGET:                                  /* a lock-on frame */
+        ring(c, cx, cy, k * 0.4f, t, col);
+        disc(c, cx, cy, k * 0.13f, col);
+        for (int i = 0; i < 4; i++) {
+            const float sx = i & 1 ? 1.f : -1.f, sy = i & 2 ? 1.f : -1.f;
+            segment(c, cx + sx * k * 0.95f, cy + sy * k * 0.95f, cx + sx * k * 0.45f, cy + sy * k * 0.95f, t, col);
+            segment(c, cx + sx * k * 0.95f, cy + sy * k * 0.95f, cx + sx * k * 0.95f, cy + sy * k * 0.45f, t, col);
+        }
+        break;
+    case ICON_DEMON: {                                 /* a flame */
+        static const float a[] = { 0, -1.05f, 0.3f, -0.4f, 0.65f, -0.7f, 0.75f, 0.25f, 0.45f, 0.9f, -0.45f, 0.9f,
+                                   -0.75f, 0.25f, -0.65f, -0.7f, -0.3f, -0.4f },
+                           b[] = { 0, -0.1f, 0.25f, 0.35f, 0.15f, 0.8f, -0.15f, 0.8f, -0.25f, 0.35f };
+        poly(c, cx, cy, k, a, 9, 1, t, col);
+        poly(c, cx, cy, k, b, 5, 1, t * 0.8f, col);
+        break;
+    }
+    case ICON_SPIRIT: {                                /* a blade with its glow */
+        static const float blade[] = { 0, -1.05f, 0, 0.45f }, guard[] = { -0.4f, 0.45f, 0.4f, 0.45f },
+                           grip[] = { 0, 0.45f, 0, 0.95f };
+        poly(c, cx, cy, k, blade, 2, 0, t, col);
+        poly(c, cx, cy, k, guard, 2, 0, t, col);
+        poly(c, cx, cy, k, grip, 2, 0, t, col);
+        for (int i = -1; i <= 1; i += 2) {
+            segment(c, cx + i * k * 0.35f, cy - k * 0.75f, cx + i * k * 0.8f, cy - k * 0.95f, t * 0.8f, col);
+            segment(c, cx + i * k * 0.35f, cy - k * 0.3f, cx + i * k * 0.9f, cy - k * 0.3f, t * 0.8f, col);
+            segment(c, cx + i * k * 0.35f, cy + k * 0.15f, cx + i * k * 0.8f, cy + k * 0.35f, t * 0.8f, col);
+        }
+        break;
+    }
+    case ICON_DANCE:                                   /* two blades crossed */
+        for (int i = -1; i <= 1; i += 2) {
+            segment(c, cx - i * k * 0.95f, cy - k * 0.95f, cx + i * k * 0.55f, cy + k * 0.55f, t, col);
+            segment(c, cx + i * k * 0.3f, cy + k * 0.8f, cx + i * k * 0.8f, cy + k * 0.3f, t, col);
+        }
+        arc(c, cx, cy, k * 1.05f, 2.4f, 3.9f, t * 0.8f, col);
+        arc(c, cx, cy, k * 1.05f, -0.75f, 0.75f, t * 0.8f, col);
+        break;
+    case ICON_FADE: {                                  /* a slash, stepping back */
+        static const float blade[] = { -0.45f, 0.15f, 0.95f, -1.0f }, guard[] = { -0.7f, -0.15f, -0.2f, 0.45f },
+                           grip[] = { -0.45f, 0.15f, -0.75f, 0.45f }, back[] = { 0.85f, 0.8f, -0.75f, 0.8f },
+                           head[] = { -0.4f, 0.5f, -0.75f, 0.8f, -0.4f, 1.1f };
+        poly(c, cx, cy, k, blade, 2, 0, t, col);
+        poly(c, cx, cy, k, guard, 2, 0, t, col);
+        poly(c, cx, cy, k, grip, 2, 0, t, col);
+        poly(c, cx, cy, k, back, 2, 0, t, col);
+        poly(c, cx, cy, k, head, 3, 0, t, col);
+        break;
+    }
+    case ICON_CHARGE: {                                /* a hammer, charging */
+        static const float head[] = { -0.75f, -0.85f, 0.45f, -0.85f, 0.45f, -0.25f, -0.75f, -0.25f },
+                           handle[] = { -0.15f, -0.25f, -0.15f, 1.0f };
+        poly(c, cx, cy, k, head, 4, 1, t, col);
+        poly(c, cx, cy, k, handle, 2, 0, t, col);
+        arc(c, cx + k * 0.3f, cy + k * 0.2f, k * 0.45f, -0.9f, 0.9f, t * 0.8f, col);
+        arc(c, cx + k * 0.3f, cy + k * 0.2f, k * 0.8f, -0.7f, 0.7f, t * 0.8f, col);
+        break;
+    }
+    default: {                                         /* ICON_SWORD: a blade in a slash */
+        static const float blade[] = { -0.4f, 0.4f, 0.95f, -0.95f }, guard[] = { -0.7f, 0.1f, -0.1f, 0.7f },
+                           grip[] = { -0.4f, 0.4f, -0.85f, 0.85f };
+        poly(c, cx, cy, k, blade, 2, 0, t * 1.2f, col);
+        poly(c, cx, cy, k, guard, 2, 0, t, col);
+        poly(c, cx, cy, k, grip, 2, 0, t, col);
+        arc(c, cx, cy, k * 1.1f, -0.2f, 1.5f, t * 0.8f, col);
+        break;
+    }
+    }
+}
+
+/* A chevron pointing (dx, dy) at (cx, cy), half size k. */
+static void chevron(canvas *c, float cx, float cy, float dx, float dy, float k, float t, uint32_t col) {
+    const float px = -dy, py = dx;
+    segment(c, cx + dx * k * 0.5f, cy + dy * k * 0.5f, cx - dx * k * 0.3f + px * k, cy - dy * k * 0.3f + py * k, t, col);
+    segment(c, cx + dx * k * 0.5f, cy + dy * k * 0.5f, cx - dx * k * 0.3f - px * k, cy - dy * k * 0.3f - py * k, t, col);
 }
 
 static void draw_vpad(canvas *c, float s) {
@@ -747,32 +876,29 @@ static void draw_vpad(canvas *c, float s) {
         ring(c, S(x), S(y), S(ar), t, line);
         ring(c, S(x), S(y), S(ar * 0.40f), t * 0.7f, va(236, 194, 104, 90));
         const uint32_t held = g_attack_held ? attack_bits(g_attack_kx, g_attack_ky) : 0;
-        const uint32_t dim = va(250, 245, 235, 110);
+        const uint32_t dim = va(250, 245, 235, 110), lit = va(255, 214, 120, 255);
         const uint32_t up = PSP_CTRL_TRIANGLE | PSP_CTRL_CIRCLE;
-        face_shape(c, S(x - sk * 1.3f), S(y - ar * 0.72f), S(sk), 3, t * 1.2f, held == up ? face[3].tint : dim);
-        face_shape(c, S(x + sk * 1.3f), S(y - ar * 0.72f), S(sk), 1, t * 1.2f, held == up ? face[1].tint : dim);
-        face_shape(c, S(x - ar * 0.72f), S(y), S(sk), 1, t * 1.2f, held == PSP_CTRL_CIRCLE ? face[1].tint : dim);
-        face_shape(c, S(x + ar * 0.72f), S(y), S(sk), 1, t * 1.2f, held == PSP_CTRL_CIRCLE ? face[1].tint : dim);
-        text_centered(c, S(x), S(y + ar * 0.72f), (int)(ar * 0.20f * s), held == PSP_CTRL_RTRIGGER ? white : dim, "R");
+        chevron(c, S(x), S(y - ar * 0.74f), 0, -1, S(sk * 1.6f), t * 1.4f, held == up ? lit : dim);
+        chevron(c, S(x), S(y + ar * 0.74f), 0, 1, S(sk * 1.6f), t * 1.4f, held == PSP_CTRL_RTRIGGER ? lit : dim);
+        chevron(c, S(x - ar * 0.76f), S(y), -1, 0, S(sk * 1.1f), t * 1.2f, held == PSP_CTRL_CIRCLE ? lit : dim);
+        chevron(c, S(x + ar * 0.76f), S(y), 1, 0, S(sk * 1.1f), t * 1.2f, held == PSP_CTRL_CIRCLE ? lit : dim);
         const float kx = x + (g_attack_held ? g_attack_kx * ar : 0), ky = y + (g_attack_held ? g_attack_ky * ar : 0);
-        disc(c, S(kx), S(ky), S(ar * 0.34f), g_attack_held ? on : va(236, 194, 104, 90));
-        ring(c, S(kx), S(ky), S(ar * 0.34f), t, line);
-        face_shape(c, S(kx), S(ky), S(ar * 0.13f), 3, t * 1.4f, held == PSP_CTRL_TRIANGLE ? white : face[3].tint);
+        disc(c, S(kx), S(ky), S(ar * 0.36f), g_attack_held ? on : va(30, 23, 17, 150));
+        ring(c, S(kx), S(ky), S(ar * 0.36f), t * 1.3f, line);
+        icon(c, S(kx), S(ky), S(ar * 0.20f), ICON_SWORD, t * 1.3f, held == PSP_CTRL_TRIANGLE ? lit : white);
         /* Cross (Crouch, or Dodge with the weapon out), Square (Item, or
          * Sheathe) and Run (R, sheathed) */
         const int out = !g_edit && hunt_ctx() == CTX_DRAWN;
-        const struct { int g; uint32_t bit; int pic; const char *label; } sm[3] = {
-            { G_ROLL, PSP_CTRL_CROSS, out ? ICON_DODGE : ICON_CROUCH, out ? "DODGE" : g_edit ? "CROUCH/DODGE" : "CROUCH" },
-            { G_ITEM, PSP_CTRL_SQUARE, out ? ICON_SHEATHE : -1, out ? "SHEATHE" : g_edit ? "ITEM/SHEATHE" : "ITEM" },
-            { G_RUN, PSP_CTRL_RTRIGGER, ICON_RUN, "RUN" } };
+        const struct { int g; uint32_t bit; int pic; } sm[3] = {
+            { G_ROLL, PSP_CTRL_CROSS, out ? ICON_DODGE : ICON_CROUCH },
+            { G_ITEM, PSP_CTRL_SQUARE, out ? ICON_SHEATHE : ICON_ITEM },
+            { G_RUN, PSP_CTRL_RTRIGGER, ICON_RUN } };
         for (int i = 0; i < 3; i++) {
             if (!group_shown(sm[i].g)) continue;
             const float rr = small_r(&L, sm[i].g), cx = L.x[sm[i].g], cy = L.y[sm[i].g];
             disc(c, S(cx), S(cy), S(rr), g_touch_buttons & sm[i].bit ? on : fillc);
-            ring(c, S(cx), S(cy), S(rr), t, line);
-            if (sm[i].pic < 0) face_shape(c, S(cx), S(cy - rr * 0.18f), S(rr * 0.30f), 2, t * 1.3f, face[2].tint);
-            else icon(c, S(cx), S(cy - rr * 0.18f), S(rr * 0.36f), sm[i].pic, t * 1.3f, white);
-            text_centered(c, S(cx), S(cy + rr * 0.55f), (int)(rr * (strlen(sm[i].label) > 7 ? 0.22f : 0.28f) * s), white, sm[i].label);
+            ring(c, S(cx), S(cy), S(rr), t * 1.2f, line);
+            icon(c, S(cx), S(cy), S(rr * 0.48f), sm[i].pic, t * 1.3f, white);
         }
     }
     /* the weapon buttons; in the editor, an empty column shows where they go */
@@ -783,8 +909,8 @@ static void draw_vpad(canvas *c, float s) {
         float cx, cy;
         skill_pos(&L, i, shown, &cx, &cy);
         disc(c, S(cx), S(cy), S(kr), g_skill_down & 1 << i ? on : fillc);
-        ring(c, S(cx), S(cy), S(kr), t, line);
-        text_centered(c, S(cx), S(cy), (int)(kr * 0.48f * s), white, ns ? sk[i].label : "WEAPON");
+        ring(c, S(cx), S(cy), S(kr), t * 1.2f, line);
+        icon(c, S(cx), S(cy), S(kr * 0.50f), ns ? sk[i].pic : ICON_SWORD, t * 1.2f, white);
     }
 #undef S
 }
