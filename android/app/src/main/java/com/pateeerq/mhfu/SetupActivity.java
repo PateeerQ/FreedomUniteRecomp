@@ -94,6 +94,62 @@ public class SetupActivity extends Activity {
         }
     }
 
+    /**
+     * FUComplete (the English MHP2G) keeps its EBOOT decrypted on the disc, so
+     * PPSSPP has nothing to dump: take PSP_GAME/SYSDIR/EBOOT.BIN out of the
+     * image (ISO 9660 directories, 2048-byte sectors). True when `out` then holds
+     * a plain ELF of this build's size.
+     */
+    static boolean ebootFromDisc(String isoPath, File out) {
+        try (java.io.RandomAccessFile f = new java.io.RandomAccessFile(isoPath, "r")) {
+            byte[] pvd = new byte[2048];
+            f.seek(16L * 2048);
+            f.readFully(pvd);
+            long[] at = { le32(pvd, 156 + 2), le32(pvd, 156 + 10) };
+            for (String part : new String[] { "PSP_GAME", "SYSDIR", "EBOOT.BIN" }) {
+                at = isoFind(f, at[0], at[1], part);
+                if (at == null) return false;
+            }
+            if (at[1] != BuildConfig.EBOOT_SIZE) return false;
+            byte[] buf = new byte[1 << 16];
+            f.seek(at[0] * 2048);
+            try (OutputStream o = new FileOutputStream(out)) {
+                for (long left = at[1]; left > 0;) {
+                    int n = f.read(buf, 0, (int) Math.min(buf.length, left));
+                    if (n <= 0) return false;
+                    o.write(buf, 0, n);
+                    left -= n;
+                }
+            }
+            return elf(out);
+        } catch (Exception e) {
+            android.util.Log.w("mhfu", "EBOOT from the disc: " + e);
+            return false;
+        }
+    }
+
+    private static long le32(byte[] b, int i) {
+        return (b[i] & 0xFFL) | (b[i + 1] & 0xFFL) << 8 | (b[i + 2] & 0xFFL) << 16 | (b[i + 3] & 0xFFL) << 24;
+    }
+
+    /** {sector, size} of `name` in the directory at `lba` (`size` bytes), or null. */
+    private static long[] isoFind(java.io.RandomAccessFile f, long lba, long size, String name) throws java.io.IOException {
+        byte[] dir = new byte[(int) size];
+        f.seek(lba * 2048);
+        f.readFully(dir);
+        for (int i = 0; i < dir.length;) {
+            int n = dir[i] & 0xFF;
+            if (n == 0) { i = (i / 2048 + 1) * 2048; continue; }
+            int nl = dir[i + 32] & 0xFF;
+            String s = new String(dir, i + 33, nl, "US-ASCII");
+            int semi = s.indexOf(';');
+            if (semi >= 0) s = s.substring(0, semi);
+            if (s.equalsIgnoreCase(name)) return new long[] { le32(dir, i + 2), le32(dir, i + 10) };
+            i += n;
+        }
+        return null;
+    }
+
     private static boolean elf(File f) {
         try (InputStream in = new FileInputStream(f)) {
             byte[] h = new byte[4];
@@ -190,6 +246,18 @@ public class SetupActivity extends Activity {
     private void go() {
         if (!haveFonts()) fontsFromPpsspp();
         String problem = openDisc();
+        if (problem == null && !haveEboot() && BuildConfig.EBOOT_ON_DISC) {
+            // FUComplete: the disc's own EBOOT is the one to use (plain, nothing to dump).
+            try {
+                String iso = new String(java.nio.file.Files.readAllBytes(new File(base, "iso.txt").toPath()), "UTF-8").trim();
+                if (!ebootFromDisc(iso, eboot())) eboot().delete();
+            } catch (Exception e) {
+                eboot().delete();
+            }
+            if (!haveEboot())
+                problem = "This disc is not FUComplete v1.4.0 (its PSP_GAME/SYSDIR/EBOOT.BIN is not the one this app "
+                        + "was built from). Choose the folder with the right .iso.";
+        }
         if (problem == null && !haveEboot())
             problem = "The decrypted EBOOT is missing: put " + BuildConfig.GAME_ID + "_EBOOT.BIN (PPSSPP: Tools, Developer tools, "
                     + "\"Dump decrypted EBOOT.BIN\", then start Monster Hunter Freedom Unite once) in the game's "
