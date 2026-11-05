@@ -12,6 +12,7 @@
 #define MHFU_MODS_H
 
 #include <stdint.h>
+#include "region.h"
 
 /* Widescreen: the camera takes the window's aspect and the picture is
  * stretched over it. MHFU_WIDESCREEN=1 at start, or the settings. */
@@ -47,9 +48,10 @@ int  mhfu_cheats_active(void);
  * for working out where things are (F9 in the Win32 window). 0 when saved. */
 int  mhfu_mods_dump(char *path_out, int cap);
 
-/* A cheat line that writes the EBOOT's code (CWCheat offsets 0x4000-0x10E6B8):
- * those cannot work here. For the launcher's and the app's own lists too. */
+/* A cheat line that writes the EBOOT's code (CWCheat offsets 0x4000-0x10E6B8
+ * in the EU build; region.h): those cannot work here. For the launcher's and
+ * the app's own lists too. */
 #define MHFU_CHEAT_CODE_LO 0x00004000u
-#define MHFU_CHEAT_CODE_HI 0x0010E6B8u
+#define MHFU_CHEAT_CODE_HI MHFU_EBOOT_CODE_END
 
 #endif

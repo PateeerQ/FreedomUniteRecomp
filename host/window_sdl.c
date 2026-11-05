@@ -1240,7 +1240,7 @@ static const char *menu_value(int id) {
     case M_FPS: return g_show_fps ? "On" : "Off";
     case M_SKILLS: return g_skills_on ? "On" : "Off";
     case M_STYLE: return g_style == STYLE_MOBILE ? "Mobile" : "Legacy PSP";
-    case M_SMOOTH: return !g_fps60 ? "Off" : mhfu_fps_target() >= 60 ? "On" : "On (room at 30)";
+    case M_SMOOTH: return !MHFU_HAS_FPS60 ? "Not in this build" : !g_fps60 ? "Off" : mhfu_fps_target() >= 60 ? "On" : "On (room at 30)";
     case M_WIDE: return mhfu_mod_widescreen() ? "On" : "Off";
     case M_MOD0: case M_MOD1: case M_MOD2:
         return id - M_MOD0 >= mhfu_mod_count() ? "Not built in" : mhfu_mod_on(id - M_MOD0) ? "On" : "Off";

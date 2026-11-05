@@ -213,7 +213,8 @@ void mhfu_lobby_status(char *out, size_t cap) {
 static int g_fps_pref = -1;          /* -1: not read yet */
 
 void mhfu_fps_set_preferred(int fps) {
-    g_fps_pref = fps >= 60 ? 60 : 30;
+    /* A build without the 60 fps patches (the USA one, for now) stays at 30. */
+    g_fps_pref = fps >= 60 && MHFU_HAS_FPS60 ? 60 : 30;
     mhn_client_set_fps(g_fps_pref);
 }
 
