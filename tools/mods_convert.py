@@ -124,11 +124,15 @@ def us2jp(a):
                 if k >= 0 and jpd.find(blk, k + 1) < 0:
                     b, how = 0x08800000 + k + (e - lo), f"dump, {n} bytes"
                     break
+            # The heap moved as one block (every dump comparison agrees); a nearby
+            # address the code loads can be another object that moved otherwise
+            # (US 0x09A45038 next to the save manager's pointer: 4 bytes off,
+            # the target camera's lock-on mark did not show).
+            if b is None and 0x08B40000 <= e < 0x09A5F300:
+                b, how = e - 0x42C0, "heap rule"
             if b is None:
                 b = by_code_refs(a)
                 how = "code that loads it"
-            if b is None and 0x08B40000 <= e < 0x09A5F300:
-                b, how = e - 0x42C0, "heap rule"
     if b is None:
         raise ValueError(f"{a:08X}: not found in the JP build")
     _jp[a] = b
