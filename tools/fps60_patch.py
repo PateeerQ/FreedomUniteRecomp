@@ -144,6 +144,8 @@ JP_OVERLAY = {
 JP_OVERLAY[0x5588B454] = JP_OVERLAY[0x7AA81434]
 # ... and as it runs, after MODLOAD.BIN patched it on loading (110 words, none of these).
 JP_OVERLAY[0xF98AD556] = JP_OVERLAY[0x7AA81434]
+# Its game_task as it runs: the JP one (also on its disc) with 4 words patched by MODLOAD.
+JP_OVERLAY[0xE8E323D5] = JP_OVERLAY[0x6EF0CAAD]
 JP_DATA = {"0x08B59914u": "0x08B55654u", "0x090AF21Cu": "0x090AAF5Cu"}
 
 
