@@ -277,13 +277,15 @@ static const char *const k_group_name[G_COUNT] = { "stick", "dpad", "face", "l",
                                                    "attack", "roll", "item" };
 /* The button styles, chosen in the drawer: the PSP's face buttons and d-pad,
  * or the mobile one (an attack pad that is dragged like a stick, Roll and
- * Item); the stick, L, R, Select, Start and the weapon buttons in both. */
-enum { STYLE_PSP, STYLE_MOBILE };
+ * Item), or Auto: the mobile one while the weapon is out, the PSP's while it is
+ * sheathed (menus, the village, gathering). The stick, L, R, Select, Start and
+ * the weapon buttons in all. */
+enum { STYLE_PSP, STYLE_MOBILE, STYLE_AUTO };
 
 static int     g_vpad_mode = VPAD_AUTO;
 static int     g_vpad_alpha = 100;                    /* percent */
 static int     g_skills_on = 1;                        /* the weapon buttons */
-static int     g_style = STYLE_PSP;                     /* the button style */
+static int     g_style = STYLE_AUTO;                    /* the button style */
 static float   g_attack_kx, g_attack_ky;                /* the attack pad's knob, -1..1 */
 static int     g_attack_held;
 static int     g_menu_open;
@@ -344,7 +346,7 @@ static void settings_load(void) {
         if (sscanf(line, "show_fps=%d", &v) == 1) g_show_fps_init = v;
         if (sscanf(line, "button_opacity=%d", &v) == 1 && v >= 10 && v <= 100) g_vpad_alpha = v;
         if (sscanf(line, "weapon_buttons=%d", &v) == 1) g_skills_on = v != 0;
-        if (sscanf(line, "button_style=%d", &v) == 1 && v >= 0 && v <= 1) g_style = v;
+        if (sscanf(line, "button_style=%d", &v) == 1 && v >= 0 && v <= 2) g_style = v;
         if (sscanf(line, "resolution=%d", &v) == 1 && v >= 1 && v <= 4) g_res_setting = v;
         if (sscanf(line, "fps60=%d", &v) == 1) g_fps60 = v != 0;
         if (sscanf(line, "widescreen=%d", &v) == 1) g_wide = v != 0;
@@ -405,7 +407,13 @@ static float skill_r(const layout *L) { return 0.062f * L->h * L->k[G_SKILL]; }
 static float attack_r(const layout *L) { return 0.16f * L->h * L->k[G_ATTACK]; }
 static float small_r(const layout *L, int g) { return 0.068f * L->h * L->k[g]; }   /* Roll, Item */
 
-static int mobile_now(void) { return g_style == STYLE_MOBILE; }
+/* The weapon is out: 1 at 0x090B3A52 in the hunter's data (from F9 dumps in a
+ * quest, sheathed and drawn twice; 0 in the village). In Auto the editor
+ * shows the set that is on now, so drawing the weapon edits the mobile one. */
+#define MHFU_WEAPON_OUT 0x090B3A52u
+static int mobile_now(void) {
+    return g_style == STYLE_MOBILE || (g_style == STYLE_AUTO && psp_read8(MHFU_WEAPON_OUT) == 1);
+}
 static int group_shown(int g) {
     if (g == G_RSTICK) return 0;                       /* the camera is a swipe now */
     const int m = mobile_now();
@@ -946,7 +954,7 @@ static const char *menu_value(int id) {
     case M_VPAD: return vp[g_vpad_mode];
     case M_FPS: return g_show_fps ? "On" : "Off";
     case M_SKILLS: return g_skills_on ? "On" : "Off";
-    case M_STYLE: return g_style == STYLE_MOBILE ? "Mobile" : "Legacy PSP";
+    case M_STYLE: return g_style == STYLE_AUTO ? "Auto" : g_style == STYLE_MOBILE ? "Mobile" : "Legacy PSP";
     case M_SMOOTH: return !g_fps60 ? "Off" : mhfu_fps_target() >= 60 ? "On" : "On (room at 30)";
     case M_WIDE: return mhfu_mod_widescreen() ? "On" : "Off";
     case M_MOD0: case M_MOD1: case M_MOD2:
@@ -1069,7 +1077,7 @@ static void menu_tap(float px, float py, float w, float h) {
             switch (r->id) {
             case M_RESUME: menu_set(0); break;
             case M_VPAD: g_vpad_mode = (g_vpad_mode + 1) % 3; settings_save(); break;
-            case M_STYLE: g_style = !g_style; touch_release_all(); settings_save(); break;
+            case M_STYLE: g_style = (g_style + 1) % 3; touch_release_all(); settings_save(); break;
             case M_SKILLS: g_skills_on = !g_skills_on; touch_release_all(); settings_save(); break;
             case M_FPS: g_show_fps = !g_show_fps; g_show_fps_init = g_show_fps; settings_save(); break;
             case M_SMOOTH: g_fps60 = !g_fps60; mhfu_fps_set_preferred(g_fps60 ? 60 : 30); settings_save(); break;
