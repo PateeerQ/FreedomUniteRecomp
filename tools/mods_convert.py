@@ -100,6 +100,8 @@ def us2jp(a):
     b, how = None, ""
     if a >= 0x09FC0000 or 0x04000000 <= a < 0x04800000:
         b, how = a, "same"
+    elif a in JP["stubs"]:
+        b, how = JP["stubs"][a], "the firmware stub of the same NID"
     elif 0x08804000 <= a < 0x0890DF58:
         b = rs.translate(a, US, JP["eboot"], 0)
         how = "EBOOT code"
@@ -122,6 +124,9 @@ def us2jp(a):
                 if k >= 0 and jpd.find(blk, k + 1) < 0:
                     b, how = 0x08800000 + k + (e - lo), f"dump, {n} bytes"
                     break
+            if b is None:
+                b = by_code_refs(a)
+                how = "code that loads it"
             if b is None and 0x08B40000 <= e < 0x09A5F300:
                 b, how = e - 0x42C0, "heap rule"
     if b is None:
@@ -129,6 +134,50 @@ def us2jp(a):
     _jp[a] = b
     JP_LOG.append(f"{a:08X} -> {b:08X} ({how})")
     return b
+
+
+_refs = None
+
+
+def by_code_refs(a):
+    """The JP address of a US data address that the US EBOOT builds itself
+    (lui + an offset): the same instructions in the JP EBOOT build the JP one.
+    The most common answer, or None."""
+    global _refs
+    import collections
+    import region_seeds as rs
+    if _refs is None:
+        _refs = collections.defaultdict(list)
+        va, m = US
+        for x in range(0, 0x0890DF58 - va - 32, 4):
+            i = struct.unpack_from("<I", m, x)[0]
+            if i >> 26 != 0x0F:
+                continue
+            r, h = (i >> 16) & 31, (i & 0xFFFF) << 16
+            for k in range(1, 8):
+                j = struct.unpack_from("<I", m, x + 4 * k)[0]
+                if j >> 26 in (0x09, 0x23, 0x2B, 0x20, 0x24, 0x21, 0x25, 0x28, 0x29, 0x0D) and (j >> 21) & 31 == r:
+                    v = (h | (j & 0xFFFF)) if j >> 26 == 0x0D else (h + sext(j & 0xFFFF)) & 0xFFFFFFFF
+                    _refs[v].append((va + x, va + x + 4 * k))
+                    break
+    # The address itself, else the nearest one the code builds (the same object, mostly).
+    for near in sorted((v for v in _refs if abs(v - a) <= 0x2000), key=lambda v: abs(v - a))[:16]:
+        votes = collections.Counter()
+        for lu, use in _refs[near][:24]:
+            jl, ju = rs.translate(lu, US, EU, 0), rs.translate(use, US, EU, 0)
+            if jl is None or ju is None or ju - jl != use - lu:
+                continue
+            i = struct.unpack_from("<I", EU[1], jl - EU[0])[0]
+            j = struct.unpack_from("<I", EU[1], ju - EU[0])[0]
+            if i >> 26 != 0x0F:
+                continue
+            h = (i & 0xFFFF) << 16
+            votes[(h | (j & 0xFFFF)) if j >> 26 == 0x0D else (h + sext(j & 0xFFFF)) & 0xFFFFFFFF] += 1
+        if votes:
+            v = votes.most_common(1)[0][0]
+            JP_LOG.append(f"   ({a:08X}: by the code that loads {near:08X} -> {v:08X}, {v - near:+#x})")
+            return v + (a - near)
+    return None
 
 
 def us2eu(a):
@@ -521,7 +570,15 @@ def main():
         name = lambda body: body[0x20:0x40].split(b"\0")[0].decode()
         uo = {name(b): (base, b) for _, base, b in rs.overlays(us, disc("us")).values()}
         jo = {name(b): (base, b) for _, base, b in rs.overlays(jp_eboot, disc("jp")).values()}
+        def stubs(sub):
+            """NID -> stub address, from setup's generated imports (work\\<sub>\\gen\\mhfu_imports.c)."""
+            import re as _re
+            t = open(os.path.join(REPO, "work", sub, "gen", "mhfu_imports.c"), encoding="utf-8").read()
+            return {int(n, 16): int(s, 16) for n, s in
+                    _re.findall(r"NID 0x([0-9A-F]{8}) \*/\s*void psp_import_([0-9A-F]{8})", t)}
+        us_st, jp_st = stubs("us"), stubs("jp")
         JP = {"eboot": EU,
+              "stubs": {s: jp_st[n] for n, s in us_st.items() if n in jp_st},
               "ovl": [(n, uo[n], jo[n]) for n in ("game_task.ovl", "game_sub.ovl")],
               "dumps": (open(eu_dump, "rb").read(), open(jp_dump, "rb").read())}
         print(f"mods: data from {os.path.basename(eu_dump)} (EU) and {os.path.basename(jp_dump)} (JP)")
