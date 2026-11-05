@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * The drawer's Cheats: root/cheats/ULES01213.ini (CWCheat, as PPSSPP reads it;
+ * The drawer's Cheats: root/cheats/<game id>.ini (CWCheat, as PPSSPP reads it;
  * host/mods.c reads it again when it changes, so a tick applies at once). The
  * list can come from the CWCheat Database Plus (the one PPSSPP uses). Cheats
  * that write the game's code cannot work on the recompiled game and are greyed
@@ -41,7 +41,7 @@ final class CheatsDialog {
 
     private CheatsDialog() { }
 
-    static File file(Activity a) { return new File(a.getExternalFilesDir(null), "root/cheats/ULES01213.ini"); }
+    static File file(Activity a) { return new File(a.getExternalFilesDir(null), "root/cheats/" + BuildConfig.GAME_ID + ".ini"); }
 
     static List<String> lines(File f) {
         List<String> out = new ArrayList<>();
@@ -61,7 +61,7 @@ final class CheatsDialog {
         try (FileOutputStream o = new FileOutputStream(f)) { o.write(b.toString().getBytes(StandardCharsets.UTF_8)); }
     }
 
-    private static boolean ours(String l) { return l.contains("ULES-01213") || l.contains("ULES01213"); }
+    private static boolean ours(String l) { return l.contains(BuildConfig.GAME_ID_DASH) || l.contains(BuildConfig.GAME_ID); }
 
     static List<Cheat> load(File f) {
         List<Cheat> out = new ArrayList<>();
@@ -90,7 +90,7 @@ final class CheatsDialog {
                     if (a != 0 || v != 0) nonZero = true;
                     long t = a >>> 28, off = a & 0x0FFFFFFF;
                     // types 0-2, 4 and 8 write where they say: the EBOOT's code (host/mods.h) is recompiled
-                    if ((t <= 2 || t == 4 || t == 8) && off >= 0x4000 && off < 0x10E6B8) cur.writesCode = true;
+                    if ((t <= 2 || t == 4 || t == 8) && off >= 0x4000 && off < (BuildConfig.REGION_TAG.equals("US") ? 0x10E7D8 : 0x10E6B8)) cur.writesCode = true;
                 } catch (NumberFormatException ignored) { }
             }
         }
@@ -98,13 +98,13 @@ final class CheatsDialog {
         return out;
     }
 
-    /** ULES-01213's block of a database into the file; what was on stays on. How many cheats. */
+    /** Our game's block of a database into the file; what was on stays on. How many cheats. */
     static int importText(File f, String text) throws Exception {
         Set<String> on = new HashSet<>();
         for (Cheat c : load(f)) if (c.on) on.add(c.name);
         List<String> out = new ArrayList<>();
-        out.add("_S ULES-01213");
-        out.add("_G Monster Hunter Freedom Unite [EU]");
+        out.add("_S " + BuildConfig.GAME_ID_DASH);
+        out.add("_G Monster Hunter Freedom Unite [" + BuildConfig.REGION_TAG + "]");
         boolean games = false, in = false;
         int n = 0;
         for (String raw : text.split("\n")) {
@@ -117,7 +117,7 @@ final class CheatsDialog {
                 n++;
             } else if (l.startsWith("_L")) out.add(l);
         }
-        if (n == 0) throw new Exception("no cheats for ULES-01213 in it");
+        if (n == 0) throw new Exception("no cheats for " + BuildConfig.GAME_ID_DASH + " in it");
         write(f, out);
         return n;
     }
@@ -194,7 +194,7 @@ final class CheatsDialog {
                         for (int k; (k = in.read(b)) > 0;) buf.write(b, 0, k);
                     }
                     int n = importText(f, buf.toString("UTF-8"));
-                    msg = n + " cheats for ULES-01213";
+                    msg = n + " cheats for " + BuildConfig.GAME_ID_DASH;
                 } catch (Exception e) {
                     msg = "Could not get the list: " + e.getMessage();
                 }
