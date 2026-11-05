@@ -1,6 +1,11 @@
 """Turn the US (ULUS-10391) code mods into built-in mods for the EU build.
 
     python tools/mods_convert.py <folder with the mods> [EU EBOOT] [US EBOOT]
+    python tools/mods_convert.py --region US <folder with the mods> [US EBOOT]
+
+With --region US the mods are made for the USA build, which they were written
+for: no address moves but each mod's own (to its 64 KB place, as below), and
+the output goes to mods/builtin/us/ and seeds/us/.
 
 The folder holds one subfolder per mod with its ULUS-10391.TXT (CWCheat). Writes
 mods/builtin/<id>.bin (the mod's code and data, as an "MWo3" overlay that setup
@@ -67,8 +72,18 @@ def load_elf(p):
     return va, mem
 
 
+# The build the mods are made for (main sets these for --region US).
+TARGET_US = False
+OVL_LO, GAME_TASK_HI, OVL_HI = 0x09A5F000, 0x09C19000, 0x09D63000   # overlay code in the target build
+GAME_TASK_HASH = 0xC5DF3522
+SEED_DIR = os.path.join(REPO, "seeds")
+OVL_DIR = os.path.join(REPO, "work", "overlays")
+
+
 def us2eu(a):
-    """A US address the mods use, in the EU build."""
+    """A US address the mods use, in the EU build (the same in the US one)."""
+    if TARGET_US:
+        return a
     if a in OVERLAY_CODE:
         return OVERLAY_CODE[a]
     if 0x08804000 <= a < 0x0890DF58:
@@ -337,8 +352,8 @@ def convert(folder, mid, name, desc, delta):
             # the four instructions before build t0 and t1 (already rewritten)
             t0 = (((out[a - 16] & 0xFFFF) << 16) + sext(out[a - 12] & 0xFFFF)) & 0xFFFFFFFF
             t1 = (((out[a - 8] & 0xFFFF) << 16) + sext(out[a - 4] & 0xFFFF)) & 0xFFFFFFFF
-            if 0x09A5F000 <= t0 < 0x09D63000:
-                unit = "game_task" if t0 < 0x09C19000 else "game_sub"
+            if OVL_LO <= t0 < OVL_HI:
+                unit = "game_task" if t0 < GAME_TASK_HI else "game_sub"
                 kind = "j" if t1 >> 26 == 2 else "word"
                 e = {"addr": t0, "unit": unit, "orig": None, "word": t1, "kind": kind}
                 if kind == "j":
@@ -363,8 +378,8 @@ def convert(folder, mid, name, desc, delta):
 
 
 def overlay_word(unit, a):
-    """The EU word at `a` in the named overlay (work/overlays, as the host saved it)."""
-    for f in sorted(glob.glob(os.path.join(REPO, "work", "overlays", "*.bin"))):
+    """The target build's word at `a` in the named overlay (work/overlays, as the host saved it)."""
+    for f in sorted(glob.glob(os.path.join(OVL_DIR, "*.bin"))):
         d = open(f, "rb").read()
         if d[:4] != b"MWo3" or not d[0x20:0x40].startswith(unit.encode() + b".ovl"):
             continue
@@ -419,12 +434,25 @@ def write_ovl(path, mid, base, words):
 
 
 def main():
-    global EU, US
-    src = sys.argv[1] if len(sys.argv) > 1 else r"E:\Emulator Games\PSP"
-    eu = sys.argv[2] if len(sys.argv) > 2 else os.path.join(REPO, "work", "ULES01213_EBOOT.BIN")
-    us = sys.argv[3] if len(sys.argv) > 3 else os.path.join(src, "ULUS10391_EBOOT.BIN")
-    EU, US = load_elf(eu), load_elf(us)
-    outdir = os.path.join(REPO, "mods", "builtin")
+    global EU, US, TARGET_US, OVL_LO, GAME_TASK_HI, OVL_HI, GAME_TASK_HASH, SEED_DIR, OVL_DIR
+    args = sys.argv[1:]
+    if args[:2] == ["--region", "US"]:
+        TARGET_US = True
+        args = args[2:]
+    src = args[0] if args else r"E:\Emulator Games\PSP"
+    if TARGET_US:
+        us = args[1] if len(args) > 1 else os.path.join(src, "ULUS10391_EBOOT.BIN")
+        EU = US = load_elf(us)                       # the target is the build they were written for
+        OVL_LO, GAME_TASK_HI, OVL_HI = OVL_LO + 0x100, GAME_TASK_HI + 0x100, OVL_HI + 0x100
+        GAME_TASK_HASH = 0x6642AB57
+        SEED_DIR = os.path.join(REPO, "seeds", "us")
+        OVL_DIR = os.path.join(REPO, "work", "us", "overlays")
+        outdir = os.path.join(REPO, "mods", "builtin", "us")
+    else:
+        eu = args[1] if len(args) > 1 else os.path.join(REPO, "work", "ULES01213_EBOOT.BIN")
+        us = args[2] if len(args) > 2 else os.path.join(src, "ULUS10391_EBOOT.BIN")
+        EU, US = load_elf(eu), load_elf(us)
+        outdir = os.path.join(REPO, "mods", "builtin")
     os.makedirs(outdir, exist_ok=True)
     meta = []
     for prefix, mid, name, desc, delta in MODS:
@@ -453,13 +481,13 @@ def main():
                 addrs[k["addr"] - 4]["delay"] = k["word"]
                 k["companion"] = True
         # seeds: the mod's entry points, and where it jumps back into the game
-        add_seeds(os.path.join(REPO, "seeds", f"ov{h:08X}.txt"),
+        add_seeds(os.path.join(SEED_DIR, f"ov{h:08X}.txt"),
                   f"# {name} (built-in mod, tools/mods_convert.py): where the game's hooks jump.\n",
                   m["entries"], "hook targets")
-        add_seeds(os.path.join(REPO, "seeds", "eboot.txt"), "", [r for r in m["returns"] if r < 0x08A00000],
+        add_seeds(os.path.join(SEED_DIR, "eboot.txt"), "", [r for r in m["returns"] if r < 0x08A00000],
                   f"where the built-in mod {name} jumps back (tools/mods_convert.py)")
-        add_seeds(os.path.join(REPO, "seeds", "ovC5DF3522.txt"), "",
-                  [r for r in m["returns"] if 0x09A5F200 <= r < 0x09C19000],
+        add_seeds(os.path.join(SEED_DIR, f"ov{GAME_TASK_HASH:08X}.txt"), "",
+                  [r for r in m["returns"] if OVL_LO + 0x200 <= r < GAME_TASK_HI],
                   f"where the built-in mod {name} jumps back (tools/mods_convert.py)")
         meta.append(m)
         print(f"mods: {name}: {len(words)} words at {m['base']:08X}, {len(m['hooks'])} hook(s), "
