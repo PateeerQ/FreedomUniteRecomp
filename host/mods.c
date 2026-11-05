@@ -1,6 +1,7 @@
 /* MHFU-Android -- see mods.h. The cheat engine follows PPSSPP's CWCheat one
  * (Core/CwCheat.cpp): the same code types and the same meaning. */
 #include "mods.h"
+#include "region.h"
 #include "mods_builtin.h"
 #include "overlays.h"
 
@@ -181,7 +182,7 @@ static void load(void) {
         while (*s == ' ' || *s == '\t' || (unsigned char)*s == 0xEF || (unsigned char)*s == 0xBB || (unsigned char)*s == 0xBF) s++;
         if (s[0] != '_' || !s[1]) continue;
         if (s[1] == 'S') {                   /* a game: only ours (a file of one game counts as ours) */
-            game_ok = strstr(s, "ULES-01213") || strstr(s, "ULES01213");
+            game_ok = strstr(s, MHFU_GAME_ID_DASH) || strstr(s, MHFU_GAME_ID);
             cur = NULL;
         } else if (s[1] == 'C' && game_ok) {
             cur = NULL;
@@ -221,7 +222,7 @@ static void load(void) {
 }
 
 void mhfu_cheats_init(const char *root) {
-    snprintf(g_path, sizeof g_path, "%s/cheats/ULES01213.ini", root);
+    snprintf(g_path, sizeof g_path, "%s/cheats/" MHFU_GAME_ID ".ini", root);
     snprintf(g_root, sizeof g_root, "%s", root);
     g_mtime = file_mtime();
     load();
