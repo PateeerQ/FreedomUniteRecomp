@@ -33,7 +33,7 @@ import java.util.Map;
  *
  * The folder can be any of a memory stick's levels, told by what is in it: a
  * memory stick (it has PSP/, or is empty: PSP/SAVEDATA/... is made there), a
- * SAVEDATA folder (it has ULES01213... folders: only those are used), or one
+ * SAVEDATA folder (it has ULES01213... / ULUS10391... folders: only those are used), or one
  * save itself (PARAM.SFO, MHP2NDG.BIN: only its files). The disc image, the
  * EBOOT and fonts kept in the same folder are never copied.
  */
@@ -64,11 +64,11 @@ final class SaveSync {
         for (Map.Entry<String, String[]> e : top.entrySet())
             if (Document.MIME_TYPE_DIR.equals(e.getValue()[1]) && e.getKey().equalsIgnoreCase("PSP")) return new Where(ms, ALL);
         for (Map.Entry<String, String[]> e : top.entrySet())
-            if (Document.MIME_TYPE_DIR.equals(e.getValue()[1]) && e.getKey().toUpperCase().startsWith("ULES01213"))
+            if (Document.MIME_TYPE_DIR.equals(e.getValue()[1]) && e.getKey().toUpperCase().startsWith(BuildConfig.GAME_ID))
                 return new Where(new File(ms, "PSP/SAVEDATA"), DIRS);
         for (String k : top.keySet())
             if (k.equalsIgnoreCase("PARAM.SFO") || k.equalsIgnoreCase("MHP2NDG.BIN"))
-                return new Where(new File(ms, "PSP/SAVEDATA/ULES01213"), FILES);
+                return new Where(new File(ms, "PSP/SAVEDATA/" + BuildConfig.GAME_ID), FILES);
         return new Where(ms, ALL);
     }
 
