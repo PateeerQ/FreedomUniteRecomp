@@ -34,28 +34,33 @@ param(
     # A folder holding the PSP fonts (jpn0.pgf, ltn0.pgf ...). By default
     # they are taken from PPSSPP's install (assets\flash0\font).
     [string]$Fonts,
-    # EU, US or JP; by default told from the EBOOT (its size).
-    [ValidateSet("", "EU", "US", "JP")] [string]$Region = ""
+    # EU, US or JP; by default told from the EBOOT (its size). FUC is the
+    # English FUComplete disc of MHP2G: -Iso that disc, -Eboot the same .iso
+    # (its EBOOT is taken from it by tools\fuc_prepare.py).
+    [ValidateSet("", "EU", "US", "JP", "FUC")] [string]$Region = ""
 )
 
 $ErrorActionPreference = 'Stop'
 $repo  = Split-Path -Parent $PSScriptRoot
 
-$Iso   = (Resolve-Path $Iso).Path
-$Eboot = (Resolve-Path $Eboot).Path
+# -LiteralPath: disc names carry brackets ("[FUComplete]"), which -Path takes as a wildcard.
+$Iso   = (Resolve-Path -LiteralPath $Iso).Path
+$Eboot = (Resolve-Path -LiteralPath $Eboot).Path
 
 # The region: PPSSPP's dumps of the two decrypted EBOOTs differ in size (the
 # US .text is 0x120 longer; host/region.h).
 $sizes = @{ 1910384 = "EU"; 1910672 = "US"; 1890112 = "JP" }
-$ebootSize = [int](Get-Item $Eboot).Length
+$ebootSize = [int](Get-Item -LiteralPath $Eboot).Length
 if (-not $Region) {
     if (-not $sizes.ContainsKey($ebootSize)) {
         throw "$Eboot ($ebootSize bytes) is not the Europe (ULES01213), USA (ULUS10391) or Japan (ULJM05500) EBOOT; pass -Region to try anyway"
     }
     $Region = $sizes[$ebootSize]
 }
-$gameId  = @{ EU = "ULES01213"; US = "ULUS10391"; JP = "ULJM05500" }[$Region]
-$sub     = @{ EU = ""; US = "us"; JP = "jp" }[$Region]
+$gameId  = @{ EU = "ULES01213"; US = "ULUS10391"; JP = "ULJM05500"; FUC = "ULJM05500" }[$Region]
+$sub     = @{ EU = ""; US = "us"; JP = "jp"; FUC = "fuc" }[$Region]
+# FUComplete is the JP game's code (same layout): its 60 fps and mods are the JP ones.
+$codeRegion = if ($Region -eq "FUC") { "JP" } else { $Region }
 $work    = if ($sub) { Join-Path $repo "work\$sub" } else { Join-Path $repo "work" }
 $build   = if ($sub) { Join-Path $repo "build-$sub" } else { Join-Path $repo "build" }
 $seedDir = if ($sub) { Join-Path $repo "seeds\$sub" } else { Join-Path $repo "seeds" }
@@ -65,6 +70,16 @@ $gen    = Join-Path $work "gen"
 $ovlGen = Join-Path $work "gen_ovl"
 New-Item -ItemType Directory -Force $work | Out-Null
 Set-Content -Path (Join-Path $work "region.txt") -Value $Region -Encoding ASCII
+if ($Region -eq "FUC") {
+    # FUComplete: its EBOOT, with the code it loads at run time and the words it
+    # writes into the game's code then (seeds\fuc\codepatch.txt), made recompilable.
+    $Eboot = Join-Path $work "fuc_prepared_EBOOT.BIN"
+    $patchArgs = @()
+    $codePatch = Join-Path $repo "seeds\fuc\codepatch.txt"
+    if (Test-Path $codePatch) { $patchArgs = @($codePatch) }
+    python (Join-Path $repo "tools\fuc_prepare.py") $Iso $Eboot @patchArgs
+    if ($LASTEXITCODE) { throw "could not prepare FUComplete's EBOOT" }
+}
 # CMake takes the generated code from this work folder.
 $cmakeDirs = @("-DMHFU_GEN_DIR=$gen", "-DMHFU_OVL_DIR=$ovlGen")
 
@@ -214,7 +229,8 @@ $table = @()
 # Each region has its own conversion: mods\builtin (EU), mods\builtin\us (USA,
 # the build they were written for: tools/mods_convert.py --region US).
 Get-ChildItem $ovlSrc -Filter "mod_*.bin" | Remove-Item -Force
-$modsDir = if ($sub) { Join-Path $repo "mods\builtin\$sub" } else { Join-Path $repo "mods\builtin" }
+$modsSub = @{ EU = ""; US = "us"; JP = "jp" }[$codeRegion]
+$modsDir = if ($modsSub) { Join-Path $repo "mods\builtin\$modsSub" } else { Join-Path $repo "mods\builtin" }
 $builtinMods = @(Get-ChildItem $modsDir -Filter *.bin -ErrorAction SilentlyContinue)
 foreach ($mod in $builtinMods) {
     Copy-Item -Force $mod.FullName (Join-Path $ovlSrc ("mod_" + $mod.Name))
@@ -272,7 +288,7 @@ Write-Host "  $($table.Count) overlay(s) recompiled"
 
 Step "Recompiling the EBOOT"
 $localEboot = Join-Path $work "${gameId}_EBOOT.BIN"
-Copy-Item -Force $Eboot $localEboot
+Copy-Item -Force -LiteralPath $Eboot -Destination $localEboot
 & $tool info $localEboot | Tee-Object -FilePath (Join-Path $work "info.txt")
 # emit does not create its output directory; start it empty so no stale unit
 # from an earlier run gets linked in.
@@ -288,7 +304,7 @@ if ($Region -ne "EU") {
 # The 60 fps mode, behind a switch (tools/fps60_patch.py). Its patches are the
 # EU cheat's; --region US / JP moves them to that build's addresses.
 $regionArgs = @()
-if ($Region -ne "EU") { $regionArgs = @("--region", $Region) }
+if ($codeRegion -ne "EU") { $regionArgs = @("--region", $codeRegion) }
 python (Join-Path $repo "tools\fps60_patch.py") $gen $ovlGen @regionArgs
 if ($LASTEXITCODE) { throw "the 60 fps patch did not apply" }
 # Built-in mods (widescreen, mods\builtin or mods\builtin\us), behind switches
