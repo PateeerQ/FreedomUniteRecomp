@@ -71,15 +71,17 @@ param(
     # the script's own $root is the device root.)
     [Alias("Root")] [string]$DeviceRoot,
     [string]$Config = "Release",
-    # The USA build (setup.ps1 with the ULUS10391 EBOOT: work\us, build-us).
-    [ValidateSet("EU", "US")] [string]$Region = "EU"
+    # The USA build (setup.ps1 with the ULUS10391 EBOOT: work\us, build-us), or
+    # the Japanese Portable 2nd G (ULJM05500: work\jp, build-jp).
+    [ValidateSet("EU", "US", "JP")] [string]$Region = "EU"
 )
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
-$work = if ($Region -eq "US") { Join-Path $repo "work\us" } else { Join-Path $repo "work" }
-$buildDir = if ($Region -eq "US") { "build-us" } else { "build" }
-$gameId = if ($Region -eq "US") { "ULUS10391" } else { "ULES01213" }
+$sub = @{ EU = ""; US = "us"; JP = "jp" }[$Region]
+$work = if ($sub) { Join-Path $repo "work\$sub" } else { Join-Path $repo "work" }
+$buildDir = if ($sub) { "build-$sub" } else { "build" }
+$gameId = @{ EU = "ULES01213"; US = "ULUS10391"; JP = "ULJM05500" }[$Region]
 
 $exe = @(
     "$repo\$buildDir\$Config\mhfu_host.exe",
