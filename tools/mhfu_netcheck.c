@@ -37,6 +37,7 @@ static int host(const char *relay) {
     char code[MHN_CODE_LEN];
     mhn_hub *hub = NULL;
     uint8_t mac[6] = { 0x02, 0x00, 0x00, 0x00, 0x00, 0x01 };
+    mhn_client_set_game("FUC");                       /* the host plays FUComplete ... */
     if (relay) {
         mhn_client_set_fps(60);                       /* the host could play at 60 ... */
         CHECK(mhn_client_start(relay, MHN_PORT, 1, NULL, mac, "Host", g_pass) == MHN_OK, "room created on the relay");
@@ -122,12 +123,20 @@ static int join(const char *code, const char *relay) {
     CHECK((rooms[seen].fps == 30 || rooms[seen].fps == 60) && rooms[seen].ping_ms >= 0,
           "the list says the room's frame rate and the ping");
     printf("     (%d fps, %d ms)\n", rooms[seen].fps, rooms[seen].ping_ms);
+    CHECK(!strcmp(rooms[seen].game, "FUC"), "the list says the release its maker plays");
     if (g_pass[0])
         CHECK(mhn_client_start(host, port, 0, code, mac, "Guest", "0000") == MHN_BAD_PASSCODE,
               "a wrong passcode is refused");
 
     mhn_client_set_fps(30);                           /* ... the guest only at 30 */
+    mhn_client_set_game("EU");                        /* ... and Europe's */
     CHECK(mhn_client_start(host, port, 0, code, mac, "Guest", g_pass) == MHN_OK, "joined the room");
+    {
+        mhn_peer m[MHN_MAX_MEMBERS];
+        int got = 0;
+        for (int i = 0; i < 100 && !got; i++) { got = mhn_client_members(m, MHN_MAX_MEMBERS); if (!got) net_sleep_ms(10); }
+        CHECK(got == 1 && !strcmp(m[0].game, "FUC"), "the host is in the room, with its release");
+    }
     for (int i = 0; i < 100 && mhn_client_room_fps() != 30; i++) net_sleep_ms(10);
     CHECK(mhn_client_room_fps() == 30, "the room plays at 30 fps, the slowest player's");
 

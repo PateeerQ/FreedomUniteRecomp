@@ -28,6 +28,9 @@ int  mhn_client_online(void);
  * at every room joined; and the room's, the slowest member's (0 before the
  * hub said, or with a hub too old to: treat as 30). */
 void mhn_client_set_fps(int fps);
+/* This player's release (MHFU_REGION_TAG: "EU", "US", "JP", "FUC"), told in every
+ * HELLO; the room's notices and lists show it beside the name. */
+void mhn_client_set_game(const char *tag);
 int  mhn_client_room_fps(void);
 /* The round trip to the hub (the relay, or the LAN host), in ms, smoothed;
  * -1 before the first answer or with a hub too old to answer. */
@@ -39,6 +42,7 @@ void mhn_client_mac(uint8_t mac[6]);
 typedef struct {
     uint8_t mac[6];
     char nick[MHN_NICK_LEN];
+    char game[MHN_GAME_LEN];    /* their release ("EU", "FUC" ...), "" when their game does not say */
     uint64_t last_ms;
 } mhn_peer;
 
@@ -60,6 +64,7 @@ typedef struct {
     int  relay;             /* on a relay (internet), not the LAN */
     int  fps;               /* the room's frame rate (its slowest member's); 0 from a hub that does not say */
     int  ping_ms;           /* the round trip to its hub, as the list came back; -1 not known */
+    char game[MHN_GAME_LEN];/* the release its maker plays; "" from a hub that does not say */
 } mhn_room_info;
 
 /* The rooms hubs on this network hold, from a broadcast and whatever answers
@@ -75,7 +80,7 @@ int  mhn_hub_list(const char *host, uint16_t port, mhn_room_info *out, int max, 
 int  mhn_chat_send(const char *text);
 /* The oldest line that came in: 1 and its sender, 0 when none is waiting.
  * `*joined` is 0 for a chat line; 1 or -1 when `nick` came into the room or
- * left it (text empty); 2 when the room's frame rate changed (text "30" or
+ * left it (text: their release, MHN_GAME_LEN, or empty); 2 when the room's frame rate changed (text "30" or
  * "60", `nick` the slowest player). Those already in the room when this player came in
  * are not news: see mhn_client_members. */
 int  mhn_chat_next(char *nick, int nick_cap, char *text, int text_cap, int *joined);

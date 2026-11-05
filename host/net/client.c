@@ -57,6 +57,7 @@ static struct {
     volatile int online, stop, reader_running;
     char code[MHN_CODE_LEN];
     uint8_t mac[6];
+    char game[MHN_GAME_LEN];     /* this player's release (mhn_client_set_game), told in HELLO */
 
     mhn_peer members[MAX_PEERS];
     int nmembers;
@@ -129,10 +130,14 @@ static void send_addr(int type, uint16_t sport, const uint8_t dmac[6], uint16_t 
 
 /* ---- incoming ---- */
 
-static void peer_update(mhn_peer *list, int *n, int joined, const uint8_t *mac, const char *nick) {
+static void peer_update(mhn_peer *list, int *n, int joined, const uint8_t *mac, const char *nick, const char *game) {
     for (int i = 0; i < *n; i++) {
         if (memcmp(list[i].mac, mac, 6) != 0) continue;
-        if (joined) { memcpy(list[i].nick, nick, MHN_NICK_LEN); list[i].last_ms = net_now_ms(); }
+        if (joined) {
+            memcpy(list[i].nick, nick, MHN_NICK_LEN);
+            if (game) { memcpy(list[i].game, game, MHN_GAME_LEN); list[i].game[MHN_GAME_LEN - 1] = 0; }
+            list[i].last_ms = net_now_ms();
+        }
         else list[i] = list[--*n];
         return;
     }
@@ -140,6 +145,8 @@ static void peer_update(mhn_peer *list, int *n, int joined, const uint8_t *mac, 
         memcpy(list[*n].mac, mac, 6);
         memcpy(list[*n].nick, nick, MHN_NICK_LEN);
         list[*n].nick[MHN_NICK_LEN - 1] = 0;
+        memset(list[*n].game, 0, MHN_GAME_LEN);
+        if (game) { memcpy(list[*n].game, game, MHN_GAME_LEN); list[*n].game[MHN_GAME_LEN - 1] = 0; }
         list[*n].last_ms = net_now_ms();
         (*n)++;
     }
@@ -273,8 +280,17 @@ static void on_frame(int type, const uint8_t *b, uint32_t len) {
     switch (type) {
     case MHN_MEMBER:
         if (len < 7 + MHN_NICK_LEN) break;
-        peer_update(g.members, &g.nmembers, b[0], b + 1, (const char *)b + 7);
-        if (net_now_ms() - g.online_ms > MEMBERS_SETTLE_MS) chat_push(b + 7, NULL, 0, b[0] ? 1 : -1);
+        {
+            /* Its release, from a hub that says (else ""): the notice names it. */
+            char game[MHN_GAME_LEN] = "";
+            if (len >= 7 + MHN_NICK_LEN + MHN_GAME_LEN) {
+                memcpy(game, b + 7 + MHN_NICK_LEN, MHN_GAME_LEN);
+                game[MHN_GAME_LEN - 1] = 0;
+            }
+            peer_update(g.members, &g.nmembers, b[0], b + 1, (const char *)b + 7, game);
+            if (net_now_ms() - g.online_ms > MEMBERS_SETTLE_MS)
+                chat_push(b + 7, (const uint8_t *)game, (uint32_t)strlen(game), b[0] ? 1 : -1);
+        }
         break;
     case MHN_CTL_CONNECTED:
         if (len < MHN_GROUP_LEN + 6) break;
@@ -285,7 +301,7 @@ static void on_frame(int type, const uint8_t *b, uint32_t len) {
         push_event(MHN_EV_CONNECT, 0);
         break;
     case MHN_CTL_PEER:
-        if (len >= 7 + MHN_NICK_LEN) peer_update(g.peers, &g.npeers, b[0], b + 1, (const char *)b + 7);
+        if (len >= 7 + MHN_NICK_LEN) peer_update(g.peers, &g.npeers, b[0], b + 1, (const char *)b + 7, NULL);
         break;
     case MHN_CTL_SCAN_RESULT: {
         if (len < 4) break;
@@ -386,7 +402,7 @@ int mhn_client_start(const char *host, uint16_t port, int create, const char *co
     net_sock s = net_tcp_connect(host, port, 4000);
     if (s == NET_BAD_SOCK) return -1;
 
-    uint8_t h[4 + 1 + MHN_CODE_LEN + 6 + MHN_NICK_LEN + MHN_PASS_LEN];
+    uint8_t h[4 + 1 + MHN_CODE_LEN + 6 + MHN_NICK_LEN + MHN_PASS_LEN + MHN_GAME_LEN];
     memset(h, 0, sizeof h);
     mhn_put32(h, MHN_MAGIC);
     h[4] = (uint8_t)(create ? 1 : 0);
@@ -394,6 +410,7 @@ int mhn_client_start(const char *host, uint16_t port, int create, const char *co
     memcpy(h + 5 + MHN_CODE_LEN, mac, 6);
     if (nick) strncpy((char *)h + 5 + MHN_CODE_LEN + 6, nick, MHN_NICK_LEN - 1);
     if (pass) strncpy((char *)h + 5 + MHN_CODE_LEN + 6 + MHN_NICK_LEN, pass, MHN_PASS_LEN - 1);
+    memcpy(h + 5 + MHN_CODE_LEN + 6 + MHN_NICK_LEN + MHN_PASS_LEN, g.game, MHN_GAME_LEN);
     g.s = s;
     memcpy(g.mac, mac, 6);
     if (send_frame(MHN_HELLO, h, sizeof h) != 0) { net_close(s); return -1; }
@@ -447,6 +464,11 @@ void mhn_client_stop(void) {
 int mhn_client_online(void) { return g.online; }
 
 int mhn_client_ping_ms(void) { return g.online ? g.rtt_ms : -1; }
+
+void mhn_client_set_game(const char *tag) {
+    memset(g.game, 0, sizeof g.game);
+    if (tag) strncpy(g.game, tag, MHN_GAME_LEN - 1);
+}
 
 void mhn_client_set_fps(int fps) {
     g.fps = fps >= 60 ? 60 : 30;
@@ -509,7 +531,7 @@ int mhn_lan_find(const char *code, char *host, int host_cap, uint16_t *port, int
 /* ---- room lists ---- */
 
 static int add_entry(mhn_room_info *out, int n, int max, const uint8_t *e, const char *host, uint16_t port,
-                     int relay, int fps, int ping_ms) {
+                     int relay, int fps, int ping_ms, const uint8_t *game) {
     char code[MHN_CODE_LEN];
     memcpy(code, e, MHN_CODE_LEN);
     code[MHN_CODE_LEN - 1] = 0;
@@ -527,6 +549,7 @@ static int add_entry(mhn_room_info *out, int n, int max, const uint8_t *e, const
     r->relay = relay;
     r->fps = fps;
     r->ping_ms = ping_ms;
+    if (game) { memcpy(r->game, game, MHN_GAME_LEN); r->game[MHN_GAME_LEN - 1] = 0; }
     return n + 1;
 }
 
@@ -546,7 +569,7 @@ int mhn_lan_list(mhn_room_info *out, int max, int timeout_ms) {
         }
         uint8_t ready;
         if (net_poll(&u, 1, &ready, 100) <= 0) continue;
-        uint8_t r[7 + 16 * (MHN_ENTRY_LEN + 1)];
+        uint8_t r[7 + 16 * (MHN_ENTRY_LEN + 1 + MHN_GAME_LEN)];
         uint32_t ip;
         const int got = net_udp_recvfrom(u, r, sizeof r, &ip, NULL);
         if (got < 7 || memcmp(r, "MHNR", 4) != 0) continue;
@@ -555,10 +578,12 @@ int mhn_lan_list(mhn_room_info *out, int max, int timeout_ms) {
         const uint16_t port = mhn_get16(r + 4);
         const int k_all = r[6];
         const int with_fps = got >= 7 + k_all * (MHN_ENTRY_LEN + 1);   /* a hub that says the frame rates */
+        const int with_game = got >= 7 + k_all * (MHN_ENTRY_LEN + 1 + MHN_GAME_LEN);   /* ... and the releases */
         const int ping = (int)(net_now_ms() - sent);
         for (int k = 0; k < k_all && 7 + (k + 1) * MHN_ENTRY_LEN <= got; k++)
             n = add_entry(out, n, max, r + 7 + k * MHN_ENTRY_LEN, host, port, 0,
-                          with_fps ? r[7 + k_all * MHN_ENTRY_LEN + k] : 0, ping);
+                          with_fps ? r[7 + k_all * MHN_ENTRY_LEN + k] : 0, ping,
+                          with_game ? r + 7 + k_all * (MHN_ENTRY_LEN + 1) + k * MHN_GAME_LEN : NULL);
     }
     net_close(u);
     return n;
@@ -571,7 +596,7 @@ int mhn_hub_list(const char *host, uint16_t port, mhn_room_info *out, int max, i
     const uint8_t ask[5] = { 1, 0, 0, 0, MHN_LIST };              /* length 1: just the type */
     const uint64_t asked = net_now_ms();
     if (net_send_all(s, ask, sizeof ask) != 0) { net_close(s); return -1; }
-    static uint8_t b[5 + 4 + MHN_LIST_MAX * (MHN_ENTRY_LEN + 1)];
+    static uint8_t b[5 + 4 + MHN_LIST_MAX * (MHN_ENTRY_LEN + 1 + MHN_GAME_LEN)];
     int ping = -1;
     uint32_t got = 0, want = 5;
     const uint64_t until = net_now_ms() + (uint64_t)timeout_ms;
@@ -592,10 +617,12 @@ int mhn_hub_list(const char *host, uint16_t port, mhn_room_info *out, int max, i
     if (got < want || want < 9) return -1;
     const uint32_t count = mhn_get32(b + 5);
     const int with_fps = got >= 9 + count * (MHN_ENTRY_LEN + 1);
+    const int with_game = got >= 9 + count * (MHN_ENTRY_LEN + 1 + MHN_GAME_LEN);
     int n = 0;
     for (uint32_t k = 0; k < count && 9 + (k + 1) * MHN_ENTRY_LEN <= got; k++)
         n = add_entry(out, n, max, b + 9 + k * MHN_ENTRY_LEN, host, port, 1,
-                      with_fps ? b[9 + count * MHN_ENTRY_LEN + k] : 0, ping);
+                      with_fps ? b[9 + count * MHN_ENTRY_LEN + k] : 0, ping,
+                      with_game ? b + 9 + count * (MHN_ENTRY_LEN + 1) + k * MHN_GAME_LEN : NULL);
     return n;
 }
 

@@ -42,7 +42,12 @@ typedef struct {
     int  internet;          /* on the relay, rather than this network */
     int  fps;               /* the room's frame rate (30 or 60; 0 when its hub does not say) */
     int  ping_ms;           /* the round trip to its hub; -1 not known */
+    char game[16];          /* the release its maker plays ("EU" ...), "" when not said */
 } mhfu_room;
+
+/* A release's name for the room's notices and lists: "MHFU: Europe", ...,
+ * "MHFU: Complete Edition"; "" for "" (a game too old to say). */
+const char *mhfu_game_label(const char *tag);
 
 /* The rooms on this network and on the relay (if one is set); how many were
  * written. Takes about a second: it waits for hubs on the LAN to answer. */

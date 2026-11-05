@@ -33,6 +33,7 @@ typedef struct {
     uint64_t win_ms, win_bytes;  /* what it sent in the current second */
     uint64_t chat_ms[MHN_CHAT_BURST];   /* when its last few chat lines came */
     int fps;                     /* what it can play at (MHN_FPS); 30 until it says */
+    char game[MHN_GAME_LEN];     /* its release (HELLO's trailer); "" from an older game */
     int dead;
     char ip[48];
 } client;
@@ -42,6 +43,7 @@ typedef struct {
     char code[MHN_CODE_LEN];
     char pass[MHN_PASS_LEN];     /* "" when anyone may join */
     char name[MHN_NAME_LEN];     /* for the list: whose room it is */
+    char game[MHN_GAME_LEN];     /* for the list: the release its maker plays */
     char by_ip[48];              /* who made it (rooms_per_ip) */
     uint64_t empty_since;        /* 0 while anyone is in it */
 } room;
@@ -141,8 +143,8 @@ static int room_members(mhn_hub *h, int r) {
 static int room_fps_of(mhn_hub *h, int r, const client **slow);
 
 /* The rooms anyone is in, as list entries, and each one's frame rate into
- * `fps` (the list's trailer); returns how many were written. */
-static int list_entries(mhn_hub *h, uint8_t *out, uint8_t *fps, int max) {
+ * `fps` and its maker's release into `games` (the list's trailers); returns how many were written. */
+static int list_entries(mhn_hub *h, uint8_t *out, uint8_t *fps, uint8_t *games, int max) {
     int n = 0;
     for (int r = 0; r < MAX_ROOMS && n < max; r++) {
         if (!h->rooms[r].used) continue;
@@ -154,6 +156,7 @@ static int list_entries(mhn_hub *h, uint8_t *out, uint8_t *fps, int max) {
         e[MHN_CODE_LEN + MHN_NAME_LEN] = (uint8_t)members;
         e[MHN_CODE_LEN + MHN_NAME_LEN + 1] = h->rooms[r].pass[0] ? 1 : 0;
         fps[n] = (uint8_t)room_fps_of(h, r, NULL);
+        memcpy(games + n * MHN_GAME_LEN, h->rooms[r].game, MHN_GAME_LEN);
         n++;
     }
     return n;
@@ -174,10 +177,11 @@ static void send_frame(client *c, int type, const void *body, uint32_t len) {
 }
 
 static void send_member(client *to, int type, int joined, const client *who) {
-    uint8_t b[1 + 6 + MHN_NICK_LEN];
+    uint8_t b[1 + 6 + MHN_NICK_LEN + MHN_GAME_LEN];
     b[0] = (uint8_t)joined;
     memcpy(b + 1, who->mac, 6);
     memcpy(b + 7, who->nick, MHN_NICK_LEN);
+    memcpy(b + 7 + MHN_NICK_LEN, who->game, MHN_GAME_LEN);
     send_frame(to, type, b, sizeof b);
 }
 
@@ -346,6 +350,11 @@ static void hello(mhn_hub *h, client *c, const uint8_t *b, uint32_t len) {
     memcpy(c->mac, b + 5 + MHN_CODE_LEN, 6);
     memcpy(c->nick, b + 5 + MHN_CODE_LEN + 6, MHN_NICK_LEN);
     c->nick[MHN_NICK_LEN - 1] = 0;
+    memset(c->game, 0, sizeof c->game);
+    if (len >= pass_at + MHN_PASS_LEN + MHN_GAME_LEN) {
+        memcpy(c->game, b + pass_at + MHN_PASS_LEN, MHN_GAME_LEN);
+        c->game[MHN_GAME_LEN - 1] = 0;
+    }
 
     int r = -1;
     if (create && h->open_rooms) {
@@ -360,6 +369,7 @@ static void hello(mhn_hub *h, client *c, const uint8_t *b, uint32_t len) {
         if (r >= 0) {
             room_label(&h->rooms[r], pass, c->nick);
             snprintf(h->rooms[r].by_ip, sizeof h->rooms[r].by_ip, "%s", c->ip);
+            memcpy(h->rooms[r].game, c->game, MHN_GAME_LEN);
         }
     } else {
         r = find_room(h, code);
@@ -387,6 +397,8 @@ static void hello(mhn_hub *h, client *c, const uint8_t *b, uint32_t len) {
 
     c->room = r;
     h->rooms[r].empty_since = 0;
+    /* A room the in-app hub made (mhn_hub_make_room) has no maker yet: the first in is. */
+    if (!h->rooms[r].game[0]) memcpy(h->rooms[r].game, c->game, MHN_GAME_LEN);
     mhn_put32(w, MHN_OK);
     memcpy(w + 4, h->rooms[r].code, MHN_CODE_LEN);
     send_frame(c, MHN_WELCOME, w, sizeof w);
@@ -403,12 +415,13 @@ static void hello(mhn_hub *h, client *c, const uint8_t *b, uint32_t len) {
 }
 
 static void send_list(mhn_hub *h, client *c) {
-    static uint8_t b[4 + MHN_LIST_MAX * (MHN_ENTRY_LEN + 1)];
-    uint8_t fps[MHN_LIST_MAX];
-    const int n = list_entries(h, b + 4, fps, MHN_LIST_MAX);
+    static uint8_t b[4 + MHN_LIST_MAX * (MHN_ENTRY_LEN + 1 + MHN_GAME_LEN)];
+    uint8_t fps[MHN_LIST_MAX], games[MHN_LIST_MAX * MHN_GAME_LEN];
+    const int n = list_entries(h, b + 4, fps, games, MHN_LIST_MAX);
     mhn_put32(b, (uint32_t)n);
     memcpy(b + 4 + n * MHN_ENTRY_LEN, fps, (size_t)n);              /* the frame rates, after the entries */
-    send_frame(c, MHN_ROOM_LIST, b, 4 + (uint32_t)n * (MHN_ENTRY_LEN + 1));
+    memcpy(b + 4 + n * (MHN_ENTRY_LEN + 1), games, (size_t)n * MHN_GAME_LEN);   /* then the releases */
+    send_frame(c, MHN_ROOM_LIST, b, 4 + (uint32_t)n * (MHN_ENTRY_LEN + 1 + MHN_GAME_LEN));
 }
 
 static void handle(mhn_hub *h, client *c, int type, uint8_t *b, uint32_t len) {
@@ -488,14 +501,15 @@ static void lan_query(mhn_hub *h) {
     uint16_t port;
     int n = net_udp_recvfrom(h->usock, b, sizeof b, &ip, &port);
     if (n >= 4 && memcmp(b, "MHNL", 4) == 0) {             /* who has rooms here? */
-        static uint8_t r[4 + 2 + 1 + 16 * (MHN_ENTRY_LEN + 1)];
-        uint8_t fps[16];
+        static uint8_t r[4 + 2 + 1 + 16 * (MHN_ENTRY_LEN + 1 + MHN_GAME_LEN)];
+        uint8_t fps[16], games[16 * MHN_GAME_LEN];
         memcpy(r, "MHNR", 4);
         mhn_put16(r + 4, h->port);
-        const int k = list_entries(h, r + 7, fps, 16);
+        const int k = list_entries(h, r + 7, fps, games, 16);
         r[6] = (uint8_t)k;
         memcpy(r + 7 + k * MHN_ENTRY_LEN, fps, (size_t)k);           /* the frame rates, after the entries */
-        if (k) net_udp_sendto(h->usock, ip, port, r, 7 + (size_t)k * (MHN_ENTRY_LEN + 1));
+        memcpy(r + 7 + k * (MHN_ENTRY_LEN + 1), games, (size_t)k * MHN_GAME_LEN);   /* then the releases */
+        if (k) net_udp_sendto(h->usock, ip, port, r, 7 + (size_t)k * (MHN_ENTRY_LEN + 1 + MHN_GAME_LEN));
         return;
     }
     if (n < 4 + MHN_CODE_LEN || memcmp(b, "MHN?", 4) != 0) return;

@@ -74,6 +74,7 @@ void mhfu_lobby_init(const char *dir, const char *nick, const char *mac, const c
     }
     if (!f || !have_mac) save_cfg();
     mhfu_fps_target();                   /* reads MHFU_FPS and tells the client what to say in rooms */
+    mhn_client_set_game(MHFU_REGION_TAG);   /* the rooms show everyone's release */
     /* net.cfg's relay, else the build's (never saved: a newer build may move it). */
     set_relay(g_cfg_relay[0] ? g_cfg_relay : MHFU_DEFAULT_RELAY);
     if (nick && nick[0]) snprintf(g_nick, sizeof g_nick, "%s", nick);
@@ -160,6 +161,7 @@ int mhfu_lobby_list(mhfu_room *out, int max) {
         out[w].internet = found[i].relay;
         out[w].fps = found[i].fps;
         out[w].ping_ms = found[i].ping_ms;
+        snprintf(out[w].game, sizeof out[w].game, "%s", found[i].game);
         w++;
     }
     return w;
@@ -196,6 +198,15 @@ int mhfu_lobby_join(const char *code_in, const char *pass, char *err, size_t cap
 }
 
 void mhfu_lobby_code(char code[8]) { mhn_client_code(code); }
+
+const char *mhfu_game_label(const char *tag) {
+    if (!tag || !tag[0]) return "";
+    if (!strcmp(tag, "EU")) return "MHFU: Europe";
+    if (!strcmp(tag, "US")) return "MHFU: USA";
+    if (!strcmp(tag, "JP")) return "MHP2G: Japan";
+    if (!strcmp(tag, "FUC")) return "MHFU: Complete Edition";
+    return tag;                          /* a release newer than this build */
+}
 
 void mhfu_lobby_status(char *out, size_t cap) {
     char code[MHN_CODE_LEN];

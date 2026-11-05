@@ -40,14 +40,14 @@ final class RoomPicker {
             BAD = Color.rgb(230, 110, 90);
 
     static final class Room {
-        String code = "", name = "";
+        String code = "", name = "", game = "";   // game: its maker's release ("MHFU: Complete Edition"), or ""
         int players, fps, ping = -1;
         boolean locked, internet;
     }
 
     private RoomPicker() { }
 
-    /** "code\tname\tplayers\tlocked\tinternet\tfps\tping" lines, nearest first. */
+    /** "code\tname\tplayers\tlocked\tinternet\tfps\tping\tgame" lines, nearest first. */
     static List<Room> parse(String[] lines) {
         List<Room> out = new ArrayList<>();
         if (lines == null) return out;
@@ -63,6 +63,7 @@ final class RoomPicker {
                 if (f.length > 5) r.fps = Integer.parseInt(f[5]);
                 if (f.length > 6) r.ping = Integer.parseInt(f[6]);
             } catch (NumberFormatException ignored) { }
+            if (f.length > 7) r.game = f[7];
             out.add(r);
         }
         Collections.sort(out, (a, b) -> Integer.compare(a.ping < 0 ? Integer.MAX_VALUE : a.ping, b.ping < 0 ? Integer.MAX_VALUE : b.ping));
@@ -116,6 +117,7 @@ final class RoomPicker {
         String info = r.players + (r.players == 1 ? " player" : " players") + "  ·  " + (r.internet ? "Internet" : "LAN")
                 + (r.locked ? "  ·  🔒 passcode" : "");
         left.addView(text(a, info, DIM, 11, false));
+        if (!r.game.isEmpty()) left.addView(text(a, r.game, GOLD, 11, false));   // the release its maker plays
         row.addView(left, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
 
         LinearLayout right = new LinearLayout(a);

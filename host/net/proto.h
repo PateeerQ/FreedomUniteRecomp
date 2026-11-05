@@ -30,14 +30,19 @@
 #define MHN_GROUP_LEN    8             /* SceNetAdhocctlGroupName */
 #define MHN_MAX_FRAME    (70 * 1024)   /* PDP's largest datagram is 65523 */
 #define MHN_MAX_MEMBERS  16
+/* Which release of the game a player runs ("EU", "US", "JP", "FUC": the
+ * builds' MHFU_REGION_TAG), NUL-padded. A trailer on HELLO, MEMBER and the
+ * room lists (2026-11-06): hubs and clients before it send none and skip it,
+ * as with the frame rates; "" when not known. */
+#define MHN_GAME_LEN     16
 
 enum {
     /* client -> hub */
-    MHN_HELLO = 1,          /* u32 magic, u8 create, char code[8], u8 mac[6], char nick[128], char pass[8]:
-                             * a create sets the room's passcode, a join must match it */
+    MHN_HELLO = 1,          /* u32 magic, u8 create, char code[8], u8 mac[6], char nick[128], char pass[8],
+                             * char game[16]: a create sets the room's passcode, a join must match it */
     /* hub -> client */
     MHN_WELCOME = 2,        /* u32 status, char code[8] */
-    MHN_MEMBER = 3,         /* u8 joined, u8 mac[6], char nick[128]: someone entered or left the room */
+    MHN_MEMBER = 3,         /* u8 joined, u8 mac[6], char nick[128], char game[16]: someone entered or left the room */
     /* the room list: instead of a HELLO, then the hub answers and the client hangs up */
     MHN_LIST = 4,           /* c->h, no body */
     MHN_ROOM_LIST = 5,      /* h->c: u32 n, n x room entry (below) */
@@ -93,7 +98,8 @@ enum {
  * its TCP port, u8 n, then n of these. Both lists (that one and MHN_ROOM_LIST)
  * then carry n bytes more: each room's frame rate (30 or 60, its slowest
  * member's). Hubs before it send none, and clients before it read only the n
- * entries. */
+ * entries. After those, n x char game[16]: the release its maker plays
+ * (MHN_GAME_LEN), likewise skipped by older ones. */
 #define MHN_ENTRY_LEN (MHN_CODE_LEN + MHN_NAME_LEN + 2)
 #define MHN_LIST_MAX  64
 

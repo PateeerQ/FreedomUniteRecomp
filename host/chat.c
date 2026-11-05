@@ -62,8 +62,11 @@ static void show_incoming(void) {
             else snprintf(notice, sizeof notice, "Room runs at 30 FPS");
             mhfu_window_chat("", notice, 2);
         } else if (joined) {
-            char notice[MHN_NICK_LEN + 32];
-            snprintf(notice, sizeof notice, "%s %s the server", nick[0] ? nick : "Hunter", joined > 0 ? "joined" : "left");
+            /* "Pateeer joined the server (MHFU: Complete Edition)": their release, when their game says. */
+            char notice[MHN_NICK_LEN + 80];
+            const char *game = mhfu_game_label(text);
+            snprintf(notice, sizeof notice, "%s %s the server%s%s%s", nick[0] ? nick : "Hunter",
+                     joined > 0 ? "joined" : "left", game[0] ? " (" : "", game, game[0] ? ")" : "");
             mhfu_window_chat("", notice, 2);
         } else if (text[0]) {
             mhfu_window_chat(nick[0] ? nick : "Hunter", text, 0);
@@ -75,12 +78,14 @@ static void show_incoming(void) {
 static void roll_call(void) {
     mhn_peer m[MHN_MAX_MEMBERS];
     const int n = mhn_client_members(m, MHN_MAX_MEMBERS);
-    char line[256] = "Nobody else is here yet";
+    char line[512] = "Nobody else is here yet";
     if (n) {
         size_t k = (size_t)snprintf(line, sizeof line, "In the room:");
         for (int i = 0; i < n && k < sizeof line; i++) {
             tidy(m[i].nick);
-            k += (size_t)snprintf(line + k, sizeof line - k, "%s %s", i ? "," : "", m[i].nick[0] ? m[i].nick : "Hunter");
+            const char *game = mhfu_game_label(m[i].game);   /* "Fathir (MHFU: Europe)" */
+            k += (size_t)snprintf(line + k, sizeof line - k, "%s %s%s%s%s", i ? "," : "", m[i].nick[0] ? m[i].nick : "Hunter",
+                                  game[0] ? " (" : "", game, game[0] ? ")" : "");
         }
     }
     mhfu_window_chat("", line, 2);

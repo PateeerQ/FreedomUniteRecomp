@@ -334,12 +334,13 @@ static void show_rooms(HWND d, const mhfu_room *found, int n) {
     g_nrooms = n < 32 ? n : 32;
     memcpy(g_rooms, found, (size_t)g_nrooms * sizeof *g_rooms);
     for (int i = 0; i < g_nrooms; i++) {
-        char line[128];
-        char fps[12] = "", ping[16] = "";
+        char line[192];
+        char fps[12] = "", ping[16] = "", game[40] = "";
         if (g_rooms[i].fps) snprintf(fps, sizeof fps, "%d FPS  ", g_rooms[i].fps);
         if (g_rooms[i].ping_ms >= 0) snprintf(ping, sizeof ping, "%d ms  ", g_rooms[i].ping_ms);
-        snprintf(line, sizeof line, "%-24s %d/4   %s%s%s%s", g_rooms[i].name, g_rooms[i].players, fps, ping,
-                 g_rooms[i].locked ? "[passcode]  " : "", g_rooms[i].internet ? "(internet)" : "(LAN)");
+        if (g_rooms[i].game[0]) snprintf(game, sizeof game, "  %s", mhfu_game_label(g_rooms[i].game));
+        snprintf(line, sizeof line, "%-24s %d/4   %s%s%s%s%s", g_rooms[i].name, g_rooms[i].players, fps, ping,
+                 g_rooms[i].locked ? "[passcode]  " : "", g_rooms[i].internet ? "(internet)" : "(LAN)", game);
         SendMessageA(list, LB_ADDSTRING, 0, (LPARAM)line);
     }
     if (!g_nrooms) SendMessageA(list, LB_ADDSTRING, 0, (LPARAM)"No rooms found. Refresh, or type a code below.");
