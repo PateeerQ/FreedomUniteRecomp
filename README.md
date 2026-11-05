@@ -57,6 +57,7 @@ anyone can join with a code, 60 FPS, widescreen, controllers, rearrangeable touc
 |---|---|---|---|
 | Monster Hunter Freedom Unite | Europe | `ULES01213` | **Playable**: village, Gathering Hall, quests, online |
 | Monster Hunter Freedom Unite | North America | `ULUS10391` | **In progress**: quests on Android, online together with EU players; no release yet |
+| Monster Hunter Portable 2nd G | Japan | `ULJM05500` | **In progress**: quests on PC and Android, 60 FPS and the built-in mods; no release yet |
 
 ## Download
 
