@@ -432,6 +432,10 @@ int mhfu_overlay_slot(uint32_t addr) {
 
 int mhfu_overlays_missing(void) { return g_ovl_missing; }
 
+/* game_task.ovl is in slot 1 during a quest (lobby_task.ovl in the village
+ * and the halls); its hash is taken without the mods' hooks. */
+int mhfu_in_quest(void) { return g_ovl_hash[1] == 0xC5DF3522u; }
+
 static uint32_t fnv1a(const uint8_t *p, size_t n) {
     uint32_t h = 2166136261u;
     for (size_t i = 0; i < n; i++) h = (h ^ p[i]) * 16777619u;
