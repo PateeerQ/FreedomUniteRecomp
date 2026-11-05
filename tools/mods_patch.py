@@ -61,8 +61,11 @@ def write(path, s):
     open(path, "w", encoding="utf-8", errors="surrogateescape", newline="").write(s)
 
 
+MODS_DIR = os.path.join(REPO, "mods", "builtin")     # mods/builtin/us for the USA build (--region US)
+
+
 def load_mods():
-    p = os.path.join(REPO, "mods", "builtin", "mods.json")
+    p = os.path.join(MODS_DIR, "mods.json")
     return json.load(open(p)) if os.path.exists(p) else []
 
 
@@ -167,7 +170,7 @@ def write_table(ovl_dir, mods):
            '#include "mods_builtin.h"', ""]
     rows = []
     for m in mods:
-        d = open(os.path.join(REPO, "mods", "builtin", m["id"] + ".bin"), "rb").read()[0x40:]
+        d = open(os.path.join(MODS_DIR, m["id"] + ".bin"), "rb").read()[0x40:]
         words = struct.unpack("<%dI" % (len(d) // 4), d)
         out.append(f"static const uint32_t words_{m['id']}[] = {{")
         for k in range(0, len(words), 8):
@@ -190,9 +193,15 @@ def write_table(ovl_dir, mods):
 
 
 def main():
+    global MODS_DIR
     args = sys.argv[1:]
+    if "--region" in args:                        # --region US: the USA build's mods (mods/builtin/us)
+        k = args.index("--region")
+        if args[k + 1].upper() == "US":
+            MODS_DIR = os.path.join(MODS_DIR, "us")
+        del args[k:k + 2]
     undo = "--revert" in args
-    builtin = "--no-builtin" not in args          # the US build: no built-in mods (their addresses are EU's)
+    builtin = "--no-builtin" not in args
     dirs = [a for a in args if not a.startswith("--")] or [os.path.join("work", "gen"), os.path.join("work", "gen_ovl")]
     mods = load_mods() if builtin else []
     hooks = [h for m in mods for h in m["hooks"]]
