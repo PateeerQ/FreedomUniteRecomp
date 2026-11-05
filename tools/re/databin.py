@@ -1,4 +1,4 @@
-"""Decrypt MHFU's DATA.BIN (ULES01213, or ULUS10391), the way the game does it.
+"""Decrypt MHFU's DATA.BIN (ULES01213, ULUS10391, or MHP2G's ULJM05500), the way the game does it.
 
     python tools/re/databin.py EBOOT DATA.BIN toc
     python tools/re/databin.py EBOOT DATA.BIN overlays OUT_DIR
@@ -24,6 +24,19 @@ TOC_BYTES = 26632
 SECTOR = 2048
 SLOTS = {0x09A5F200: 1, 0x09C19000: 2, 0x09D1A180: 3, 0x09D63000: 4}   # load address -> slot
 US_EBOOT_SIZE = 1910672                          # ULUS10391: S-box +0x120, slots +0x100
+JP_EBOOT_SIZE = 1890112                          # ULJM05500 (Portable 2nd G): its own places
+JP_SBOX_ADDR = 0x089970C8                        # the same 256 bytes, found in the JP EBOOT
+JP_SLOTS = {0x09A5A580: 1, 0x09C14280: 2, 0x09D15100: 3, 0x09D5DF80: 4}   # its slot table, 0x089C6B40
+
+
+def region_of(eboot):
+    """(S-box address, slots) for the EBOOT given, told by its size."""
+    n = os.path.getsize(eboot)
+    if n == US_EBOOT_SIZE:
+        return SBOX_ADDR + 0x120, {a + 0x100: s for a, s in SLOTS.items()}
+    if n == JP_EBOOT_SIZE:
+        return JP_SBOX_ADDR, JP_SLOTS
+    return SBOX_ADDR, SLOTS
 
 
 def eboot_bytes(path, addr, n):
@@ -71,9 +84,8 @@ def main():
     if len(sys.argv) < 4:
         raise SystemExit(__doc__)
     eboot, data, cmd = sys.argv[1:4]
-    us = os.path.getsize(eboot) == US_EBOOT_SIZE
-    slots = {a + 0x100: s for a, s in SLOTS.items()} if us else SLOTS
-    c = Cipher(eboot_bytes(eboot, SBOX_ADDR + (0x120 if us else 0), 256))
+    sbox, slots = region_of(eboot)
+    c = Cipher(eboot_bytes(eboot, sbox, 256))
     f = open(data, 'rb')
     size = os.path.getsize(data)
     toc = struct.unpack('<%dI' % (TOC_BYTES // 4), c.decrypt(f.read(TOC_BYTES), 0))
