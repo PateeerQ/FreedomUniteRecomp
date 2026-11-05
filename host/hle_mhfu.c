@@ -411,7 +411,7 @@ static void hle_SetCompiledSdkVersion(void) { psp_ret(0); }
  * overlay with no recompiled version yet is saved to <overlay_dir>/slot<N>_<hash>.bin
  * -- setup.ps1 recompiles every file there on its next run. */
 
-#define OVL_TABLE 0x089CBA70u
+#define OVL_TABLE MHFU_ADDR_OVL_TABLE
 #define OVL_SLOTS 6
 #define OVL_MAGIC 0x336F574Du
 #define OVL_HDR   0x40u
