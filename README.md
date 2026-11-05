@@ -100,7 +100,7 @@ PC and on Android (Poco X7 Pro).
 | Gameplay coverage | ![40%](https://img.shields.io/badge/40%25-yellow?style=flat-square) | village life, full quests, the Gathering Hall together; more maps and monsters untested |
 | PC release (launcher) | ![85%](https://img.shields.io/badge/85%25-brightgreen?style=flat-square) | launcher, profiles, keys, controllers, achievements, mods, 60 FPS, updates, log, crash report |
 | Android port | ![75%](https://img.shields.io/badge/75%25-yellow?style=flat-square) | 30 or 60 fps, touch buttons, layout editor, drawer menu, multiplayer, achievements, mods, save folder, crash log, updates |
-| USA release (`ULUS10391`) | ![25%](https://img.shields.io/badge/25%25-orange?style=flat-square) | builds and boots to character creation on PC; save, village, quests, Android, 60 FPS and mods not yet |
+| USA release (`ULUS10391`) | ![30%](https://img.shields.io/badge/30%25-orange?style=flat-square) | builds with 60 FPS and the built-in mods, boots to character creation on PC; save, village, quests and Android not yet tested |
 
 </details>
 
