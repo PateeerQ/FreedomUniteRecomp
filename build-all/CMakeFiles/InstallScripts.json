@@ -1,0 +1,12 @@
+{
+	"InstallScripts" : 
+	[
+		"E:/Project/MHFU-Android/build-all/cmake_install.cmake",
+		"E:/Project/MHFU-Android/build-all/psprecomp/cmake_install.cmake",
+		"E:/Project/MHFU-Android/build-all/psprecomp/tools/allegrexrecomp/cmake_install.cmake",
+		"E:/Project/MHFU-Android/build-all/_deps/sdl3-build/cmake_install.cmake",
+		"E:/Project/MHFU-Android/build-all/launcher/cmake_install.cmake",
+		"E:/Project/MHFU-Android/build-all/_deps/json-build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

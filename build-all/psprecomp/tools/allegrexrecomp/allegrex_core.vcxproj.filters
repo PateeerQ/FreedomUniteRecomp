@@ -1,0 +1,40 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="E:\Project\MHFU-Android\psprecomp\tools\allegrexrecomp\decode.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\psprecomp\tools\allegrexrecomp\container.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\psprecomp\tools\allegrexrecomp\analyze.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\psprecomp\tools\allegrexrecomp\emit.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\psprecomp\tools\allegrexrecomp\keys.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\psprecomp\tools\allegrexrecomp\crypto\aes.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\psprecomp\tools\allegrexrecomp\crypto\cmac.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\psprecomp\tools\allegrexrecomp\crypto\sha1.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\psprecomp\tools\allegrexrecomp\crypto\kirk.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="E:\Project\MHFU-Android\psprecomp\tools\allegrexrecomp\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{6537A87A-29F1-3E7E-9BAD-DB70724316F2}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

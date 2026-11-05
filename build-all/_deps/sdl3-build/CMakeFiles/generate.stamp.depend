@@ -1,0 +1,52 @@
+# CMake generation dependency list for this directory.
+C:/Program Files/CMake/share/cmake-4.5/Modules/BasicConfigVersion-AnyNewerVersion.cmake.in
+C:/Program Files/CMake/share/cmake-4.5/Modules/CMakeCheckCompilerFlagCommonPatterns.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/CMakeDependentOption.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/CMakePackageConfigHelpers.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/CMakeParseArguments.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/CMakePushCheckState.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/CheckCCompilerFlag.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/CheckCSourceCompiles.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/CheckCSourceRuns.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/CheckCXXCompilerFlag.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/CheckCXXSourceCompiles.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/CheckIncludeFile.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/CheckLanguage.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/CheckLibraryExists.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/CheckLinkerFlag.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/CheckSourceCompiles.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/CheckStructHasMember.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/CheckSymbolExists.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/FindGit.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/FindPackageHandleStandardArgs.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/FindPackageMessage.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/FindPkgConfig.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/GNUInstallDirs.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/Internal/CheckCommon.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/Internal/CheckCompilerFlag.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/Internal/CheckFlagCommonConfig.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/Internal/CheckLinkerFlag.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/Internal/CheckSourceCompiles.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/Internal/CheckSourceRuns.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/WriteBasicConfigVersionFile.cmake
+E:/Project/MHFU-Android/build-all/CMakeFiles/cmake.verify_globs
+E:/Project/MHFU-Android/build-all/_deps/sdl3-build/CMakeFiles/SDL_build_config.h.intermediate
+E:/Project/MHFU-Android/build-all/_deps/sdl3-build/CMakeFiles/git-data/grabRef.cmake
+E:/Project/MHFU-Android/build-all/_deps/sdl3-src/.git/HEAD
+E:/Project/MHFU-Android/build-all/_deps/sdl3-src/CMakeLists.txt
+E:/Project/MHFU-Android/build-all/_deps/sdl3-src/cmake/3rdparty.cmake
+E:/Project/MHFU-Android/build-all/_deps/sdl3-src/cmake/FindLibUSB.cmake
+E:/Project/MHFU-Android/build-all/_deps/sdl3-src/cmake/GetGitRevisionDescription.cmake
+E:/Project/MHFU-Android/build-all/_deps/sdl3-src/cmake/GetGitRevisionDescription.cmake.in
+E:/Project/MHFU-Android/build-all/_deps/sdl3-src/cmake/PreseedEmscriptenCache.cmake
+E:/Project/MHFU-Android/build-all/_deps/sdl3-src/cmake/PreseedMSVCCache.cmake
+E:/Project/MHFU-Android/build-all/_deps/sdl3-src/cmake/SDL3Config.cmake.in
+E:/Project/MHFU-Android/build-all/_deps/sdl3-src/cmake/macros.cmake
+E:/Project/MHFU-Android/build-all/_deps/sdl3-src/cmake/sdlchecks.cmake
+E:/Project/MHFU-Android/build-all/_deps/sdl3-src/cmake/sdlcompilers.cmake
+E:/Project/MHFU-Android/build-all/_deps/sdl3-src/cmake/sdlcpu.cmake
+E:/Project/MHFU-Android/build-all/_deps/sdl3-src/cmake/sdlmanpages.cmake
+E:/Project/MHFU-Android/build-all/_deps/sdl3-src/cmake/sdlplatform.cmake
+E:/Project/MHFU-Android/build-all/_deps/sdl3-src/cmake/sdltargets.cmake
+E:/Project/MHFU-Android/build-all/_deps/sdl3-src/include/build_config/SDL_build_config.h.cmake
+E:/Project/MHFU-Android/build-all/_deps/sdl3-src/include/build_config/SDL_revision.h.cmake

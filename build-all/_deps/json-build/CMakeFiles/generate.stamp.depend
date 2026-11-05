@@ -1,0 +1,11 @@
+# CMake generation dependency list for this directory.
+C:/Program Files/CMake/share/cmake-4.5/Modules/CMakePackageConfigHelpers.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/ExternalProject.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/ExternalProject/shared_internal_commands.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/GNUInstallDirs.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/WriteBasicConfigVersionFile.cmake
+E:/Project/MHFU-Android/build-all/CMakeFiles/cmake.verify_globs
+E:/Project/MHFU-Android/build-all/_deps/json-src/CMakeLists.txt
+E:/Project/MHFU-Android/build-all/_deps/json-src/cmake/config.cmake.in
+E:/Project/MHFU-Android/build-all/_deps/json-src/cmake/nlohmann_jsonConfigVersion.cmake.in
+E:/Project/MHFU-Android/build-all/_deps/json-src/cmake/pkg-config.pc.in

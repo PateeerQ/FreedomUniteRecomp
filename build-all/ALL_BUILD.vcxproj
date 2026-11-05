@@ -1,0 +1,241 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ResolveNugetPackages>false</ResolveNugetPackages>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MinSizeRel|x64">
+      <Configuration>MinSizeRel</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebInfo|x64">
+      <Configuration>RelWithDebInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{2EEC715D-6555-3444-95AD-A06A8CF49C80}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>ALL_BUILD</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="E:\Project\MHFU-Android\CMakeLists.txt">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule E:/Project/MHFU-Android/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SE:/Project/MHFU-Android -BE:/Project/MHFU-Android/build-all --check-stamp-file E:/Project/MHFU-Android/build-all/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCCompiler.cmake.in;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCCompilerABI.c;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCommonLanguageInclude.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCompilerIdDetection.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCompilerABI.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCompilerId.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCompilerSupport.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineRCCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineSystem.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeFindBinUtils.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeGenericSystem.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeInitializeConfigs.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeLanguageInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeParseImplicitIncludeInfo.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeParseImplicitLinkInfo.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeParseLibraryArchitecture.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeRCCompiler.cmake.in;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeRCInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeSystem.cmake.in;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeSystemSpecificInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeSystemSpecificInitialize.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeTestCCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeTestCompilerCommon.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeTestRCCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\ADSP-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\ARMCC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\ARMClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\AdaptiveCpp-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\AppleClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Borland-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Bruce-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\CMakeCommonCompilerMacros.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Clang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Clang-DetermineCompilerInternal.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Compaq-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Cray-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\CrayClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\DPClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Diab-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Embarcadero-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Fujitsu-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\FujitsuClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\GHS-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\GNU-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\HP-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\IAR-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\IBMCPP-C-DetermineVersionInternal.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\IBMClang-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Intel-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\IntelLLVM-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\LCC-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\MSVC-C.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\MSVC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\MSVC.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\NVHPC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\NVIDIA-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\OpenWatcom-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\OrangeC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\PGI-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\PathScale-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\PellesC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Renesas-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\SCO-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\SDCC-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\SunPro-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\TI-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\TIClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Tasking-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\TinyCC-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\VisualAge-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Watcom-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\XL-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\XLClang-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\zOS-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CompilerId\VS-10.vcxproj.in;C:\Program Files\CMake\share\cmake-4.5\Modules\ExternalProject\shared_internal_commands.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\FetchContent.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\FetchContent\CMakeLists.cmake.in;C:\Program Files\CMake\share\cmake-4.5\Modules\FindGit.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\FindPackageHandleStandardArgs.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\FindPackageMessage.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\CMakeCLinkerInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\CMakeCommonLinkerInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\CMakeDetermineLinkerId.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\CMakeInspectCLinker.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\FeatureTesting.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Linker\MSVC-C.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Linker\MSVC.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Linker\Windows-MSVC-C.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Linker\Windows-MSVC.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Windows-Initialize.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Windows-MSVC-C.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Windows-MSVC.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Windows.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\WindowsPaths.cmake;E:\Project\MHFU-Android\build-all\CMakeFiles\4.5.0-rc1\CMakeCCompiler.cmake;E:\Project\MHFU-Android\build-all\CMakeFiles\4.5.0-rc1\CMakeRCCompiler.cmake;E:\Project\MHFU-Android\build-all\CMakeFiles\4.5.0-rc1\CMakeSystem.cmake;E:\Project\MHFU-Android\build-all\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">E:\Project\MHFU-Android\build-all\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule E:/Project/MHFU-Android/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SE:/Project/MHFU-Android -BE:/Project/MHFU-Android/build-all --check-stamp-file E:/Project/MHFU-Android/build-all/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCCompiler.cmake.in;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCCompilerABI.c;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCommonLanguageInclude.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCompilerIdDetection.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCompilerABI.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCompilerId.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCompilerSupport.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineRCCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineSystem.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeFindBinUtils.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeGenericSystem.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeInitializeConfigs.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeLanguageInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeParseImplicitIncludeInfo.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeParseImplicitLinkInfo.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeParseLibraryArchitecture.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeRCCompiler.cmake.in;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeRCInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeSystem.cmake.in;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeSystemSpecificInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeSystemSpecificInitialize.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeTestCCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeTestCompilerCommon.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeTestRCCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\ADSP-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\ARMCC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\ARMClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\AdaptiveCpp-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\AppleClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Borland-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Bruce-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\CMakeCommonCompilerMacros.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Clang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Clang-DetermineCompilerInternal.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Compaq-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Cray-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\CrayClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\DPClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Diab-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Embarcadero-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Fujitsu-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\FujitsuClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\GHS-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\GNU-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\HP-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\IAR-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\IBMCPP-C-DetermineVersionInternal.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\IBMClang-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Intel-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\IntelLLVM-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\LCC-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\MSVC-C.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\MSVC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\MSVC.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\NVHPC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\NVIDIA-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\OpenWatcom-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\OrangeC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\PGI-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\PathScale-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\PellesC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Renesas-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\SCO-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\SDCC-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\SunPro-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\TI-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\TIClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Tasking-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\TinyCC-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\VisualAge-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Watcom-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\XL-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\XLClang-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\zOS-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CompilerId\VS-10.vcxproj.in;C:\Program Files\CMake\share\cmake-4.5\Modules\ExternalProject\shared_internal_commands.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\FetchContent.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\FetchContent\CMakeLists.cmake.in;C:\Program Files\CMake\share\cmake-4.5\Modules\FindGit.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\FindPackageHandleStandardArgs.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\FindPackageMessage.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\CMakeCLinkerInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\CMakeCommonLinkerInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\CMakeDetermineLinkerId.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\CMakeInspectCLinker.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\FeatureTesting.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Linker\MSVC-C.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Linker\MSVC.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Linker\Windows-MSVC-C.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Linker\Windows-MSVC.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Windows-Initialize.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Windows-MSVC-C.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Windows-MSVC.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Windows.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\WindowsPaths.cmake;E:\Project\MHFU-Android\build-all\CMakeFiles\4.5.0-rc1\CMakeCCompiler.cmake;E:\Project\MHFU-Android\build-all\CMakeFiles\4.5.0-rc1\CMakeRCCompiler.cmake;E:\Project\MHFU-Android\build-all\CMakeFiles\4.5.0-rc1\CMakeSystem.cmake;E:\Project\MHFU-Android\build-all\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">E:\Project\MHFU-Android\build-all\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Building Custom Rule E:/Project/MHFU-Android/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SE:/Project/MHFU-Android -BE:/Project/MHFU-Android/build-all --check-stamp-file E:/Project/MHFU-Android/build-all/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCCompiler.cmake.in;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCCompilerABI.c;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCommonLanguageInclude.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCompilerIdDetection.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCompilerABI.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCompilerId.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCompilerSupport.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineRCCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineSystem.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeFindBinUtils.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeGenericSystem.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeInitializeConfigs.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeLanguageInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeParseImplicitIncludeInfo.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeParseImplicitLinkInfo.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeParseLibraryArchitecture.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeRCCompiler.cmake.in;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeRCInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeSystem.cmake.in;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeSystemSpecificInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeSystemSpecificInitialize.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeTestCCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeTestCompilerCommon.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeTestRCCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\ADSP-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\ARMCC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\ARMClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\AdaptiveCpp-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\AppleClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Borland-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Bruce-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\CMakeCommonCompilerMacros.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Clang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Clang-DetermineCompilerInternal.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Compaq-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Cray-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\CrayClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\DPClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Diab-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Embarcadero-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Fujitsu-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\FujitsuClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\GHS-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\GNU-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\HP-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\IAR-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\IBMCPP-C-DetermineVersionInternal.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\IBMClang-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Intel-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\IntelLLVM-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\LCC-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\MSVC-C.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\MSVC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\MSVC.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\NVHPC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\NVIDIA-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\OpenWatcom-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\OrangeC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\PGI-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\PathScale-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\PellesC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Renesas-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\SCO-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\SDCC-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\SunPro-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\TI-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\TIClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Tasking-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\TinyCC-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\VisualAge-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Watcom-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\XL-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\XLClang-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\zOS-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CompilerId\VS-10.vcxproj.in;C:\Program Files\CMake\share\cmake-4.5\Modules\ExternalProject\shared_internal_commands.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\FetchContent.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\FetchContent\CMakeLists.cmake.in;C:\Program Files\CMake\share\cmake-4.5\Modules\FindGit.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\FindPackageHandleStandardArgs.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\FindPackageMessage.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\CMakeCLinkerInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\CMakeCommonLinkerInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\CMakeDetermineLinkerId.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\CMakeInspectCLinker.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\FeatureTesting.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Linker\MSVC-C.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Linker\MSVC.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Linker\Windows-MSVC-C.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Linker\Windows-MSVC.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Windows-Initialize.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Windows-MSVC-C.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Windows-MSVC.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Windows.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\WindowsPaths.cmake;E:\Project\MHFU-Android\build-all\CMakeFiles\4.5.0-rc1\CMakeCCompiler.cmake;E:\Project\MHFU-Android\build-all\CMakeFiles\4.5.0-rc1\CMakeRCCompiler.cmake;E:\Project\MHFU-Android\build-all\CMakeFiles\4.5.0-rc1\CMakeSystem.cmake;E:\Project\MHFU-Android\build-all\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">E:\Project\MHFU-Android\build-all\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Building Custom Rule E:/Project/MHFU-Android/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SE:/Project/MHFU-Android -BE:/Project/MHFU-Android/build-all --check-stamp-file E:/Project/MHFU-Android/build-all/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCCompiler.cmake.in;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCCompilerABI.c;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCommonLanguageInclude.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeCompilerIdDetection.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCompilerABI.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCompilerId.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineCompilerSupport.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineRCCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeDetermineSystem.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeFindBinUtils.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeGenericSystem.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeInitializeConfigs.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeLanguageInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeParseImplicitIncludeInfo.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeParseImplicitLinkInfo.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeParseLibraryArchitecture.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeRCCompiler.cmake.in;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeRCInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeSystem.cmake.in;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeSystemSpecificInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeSystemSpecificInitialize.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeTestCCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeTestCompilerCommon.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CMakeTestRCCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\ADSP-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\ARMCC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\ARMClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\AdaptiveCpp-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\AppleClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Borland-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Bruce-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\CMakeCommonCompilerMacros.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Clang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Clang-DetermineCompilerInternal.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Compaq-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Cray-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\CrayClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\DPClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Diab-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Embarcadero-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Fujitsu-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\FujitsuClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\GHS-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\GNU-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\HP-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\IAR-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\IBMCPP-C-DetermineVersionInternal.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\IBMClang-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Intel-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\IntelLLVM-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\LCC-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\MSVC-C.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\MSVC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\MSVC.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\NVHPC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\NVIDIA-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\OpenWatcom-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\OrangeC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\PGI-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\PathScale-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\PellesC-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Renesas-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\SCO-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\SDCC-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\SunPro-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\TI-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\TIClang-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Tasking-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\TinyCC-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\VisualAge-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\Watcom-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\XL-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\XLClang-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Compiler\zOS-C-DetermineCompiler.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\CompilerId\VS-10.vcxproj.in;C:\Program Files\CMake\share\cmake-4.5\Modules\ExternalProject\shared_internal_commands.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\FetchContent.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\FetchContent\CMakeLists.cmake.in;C:\Program Files\CMake\share\cmake-4.5\Modules\FindGit.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\FindPackageHandleStandardArgs.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\FindPackageMessage.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\CMakeCLinkerInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\CMakeCommonLinkerInformation.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\CMakeDetermineLinkerId.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\CMakeInspectCLinker.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Internal\FeatureTesting.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Linker\MSVC-C.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Linker\MSVC.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Linker\Windows-MSVC-C.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Linker\Windows-MSVC.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Windows-Initialize.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Windows-MSVC-C.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Windows-MSVC.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\Windows.cmake;C:\Program Files\CMake\share\cmake-4.5\Modules\Platform\WindowsPaths.cmake;E:\Project\MHFU-Android\build-all\CMakeFiles\4.5.0-rc1\CMakeCCompiler.cmake;E:\Project\MHFU-Android\build-all\CMakeFiles\4.5.0-rc1\CMakeRCCompiler.cmake;E:\Project\MHFU-Android\build-all\CMakeFiles\4.5.0-rc1\CMakeSystem.cmake;E:\Project\MHFU-Android\build-all\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">E:\Project\MHFU-Android\build-all\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="E:\Project\MHFU-Android\build-all\ZERO_CHECK.vcxproj">
+      <Project>{E3E14C74-AC31-32E6-81AA-F5CF749DAE8B}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="E:\Project\MHFU-Android\build-all\_deps\sdl3-build\SDL3-static.vcxproj">
+      <Project>{764D6426-C4BF-3CE6-9523-97457E2FD6BF}</Project>
+      <Name>SDL3-static</Name>
+    </ProjectReference>
+    <ProjectReference Include="E:\Project\MHFU-Android\build-all\_deps\sdl3-build\SDL_uclibc.vcxproj">
+      <Project>{86B5DB73-F58C-3C87-86CA-510343DBBA06}</Project>
+      <Name>SDL_uclibc</Name>
+    </ProjectReference>
+    <ProjectReference Include="E:\Project\MHFU-Android\build-all\psprecomp\tools\allegrexrecomp\allegrex_core.vcxproj">
+      <Project>{72506AFF-FC75-3BF6-B651-784A702051AF}</Project>
+      <Name>allegrex_core</Name>
+    </ProjectReference>
+    <ProjectReference Include="E:\Project\MHFU-Android\build-all\psprecomp\tools\allegrexrecomp\allegrexrecomp.vcxproj">
+      <Project>{85D4FD4C-67B9-3E4E-969C-2C3C7B610511}</Project>
+      <Name>allegrexrecomp</Name>
+    </ProjectReference>
+    <ProjectReference Include="E:\Project\MHFU-Android\build-all\mhfu_host_eu.vcxproj">
+      <Project>{DE597EA7-90EB-3145-9741-1418C186FFF6}</Project>
+      <Name>mhfu_host_eu</Name>
+    </ProjectReference>
+    <ProjectReference Include="E:\Project\MHFU-Android\build-all\mhfu_host_fuc.vcxproj">
+      <Project>{067838B7-B6ED-3FF1-94DE-4C9D0222044F}</Project>
+      <Name>mhfu_host_fuc</Name>
+    </ProjectReference>
+    <ProjectReference Include="E:\Project\MHFU-Android\build-all\mhfu_host_jp.vcxproj">
+      <Project>{F25460B3-CCED-3C9E-9BFD-C476ECA25711}</Project>
+      <Name>mhfu_host_jp</Name>
+    </ProjectReference>
+    <ProjectReference Include="E:\Project\MHFU-Android\build-all\mhfu_host_us.vcxproj">
+      <Project>{C2BF973B-2290-349D-9FDF-B925B6EE9975}</Project>
+      <Name>mhfu_host_us</Name>
+    </ProjectReference>
+    <ProjectReference Include="E:\Project\MHFU-Android\build-all\mhfu_hub.vcxproj">
+      <Project>{A2354E34-D4B1-37E9-A05B-F90D7F1BB4AC}</Project>
+      <Name>mhfu_hub</Name>
+    </ProjectReference>
+    <ProjectReference Include="E:\Project\MHFU-Android\build-all\launcher\mhfu_launcher.vcxproj">
+      <Project>{DB48F489-02CD-350D-B6BF-B56468A07E68}</Project>
+      <Name>mhfu_launcher</Name>
+    </ProjectReference>
+    <ProjectReference Include="E:\Project\MHFU-Android\build-all\mhfu_net.vcxproj">
+      <Project>{CF25427A-D71E-3E42-BC28-AB667615E7ED}</Project>
+      <Name>mhfu_net</Name>
+    </ProjectReference>
+    <ProjectReference Include="E:\Project\MHFU-Android\build-all\mhfu_netcheck.vcxproj">
+      <Project>{0D9FB890-49AD-345E-86F3-A128E745841C}</Project>
+      <Name>mhfu_netcheck</Name>
+    </ProjectReference>
+    <ProjectReference Include="E:\Project\MHFU-Android\build-all\mhfu_ovl.vcxproj">
+      <Project>{70346D86-530F-3968-AD36-E7CD7E036B73}</Project>
+      <Name>mhfu_ovl</Name>
+    </ProjectReference>
+    <ProjectReference Include="E:\Project\MHFU-Android\build-all\psprecomp\psprecomp.vcxproj">
+      <Project>{BD7EB60E-954E-3D90-91FF-E1436851587D}</Project>
+      <Name>psprecomp</Name>
+    </ProjectReference>
+    <ProjectReference Include="E:\Project\MHFU-Android\build-all\rcheevos.vcxproj">
+      <Project>{EBEBCC6F-8CAE-32FB-9ED2-E4E8124C028A}</Project>
+      <Name>rcheevos</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

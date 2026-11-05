@@ -1,0 +1,94 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rapi\rc_api_common.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rapi\rc_api_editor.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rapi\rc_api_info.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rapi\rc_api_runtime.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rapi\rc_api_user.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rc_client.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rc_compat.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rc_util.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rc_version.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rcheevos\alloc.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rcheevos\condition.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rcheevos\condset.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rcheevos\consoleinfo.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rcheevos\format.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rcheevos\lboard.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rcheevos\memref.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rcheevos\operand.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rcheevos\rc_validate.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rcheevos\richpresence.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rcheevos\runtime.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rcheevos\runtime_progress.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rcheevos\trigger.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rcheevos\value.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rhash\aes.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rhash\cdreader.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rhash\hash.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\src\rhash\md5.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="E:\Project\MHFU-Android\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{6537A87A-29F1-3E7E-9BAD-DB70724316F2}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

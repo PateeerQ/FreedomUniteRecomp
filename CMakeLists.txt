@@ -179,7 +179,6 @@ function(mhfu_add_host target gen_dir ovl_dir)
     endif()
     list(LENGTH gen_sources gen_count)
     message(STATUS "${target}: ${gen_count} generated source files from ${gen_dir}")
-    mhfu_host_deps()
 
     # Overlays: one directory per recompiled overlay, plus the table that names
     # them. Before any exist, an empty table. Then the built-in mods' data.
@@ -276,6 +275,8 @@ function(mhfu_add_host target gen_dir ovl_dir)
         set_source_files_properties(${gen_sources} PROPERTIES COMPILE_OPTIONS "-w")
     endif()
 endfunction()
+
+mhfu_host_deps()     # once, here: FetchContent's variables stay in this scope
 
 if(MHFU_UNIVERSAL)
     # Every region set up so far (scripts/setup.ps1's folders), each a host of its own.
