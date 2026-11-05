@@ -418,7 +418,7 @@ static float small_r(const layout *L, int g) { return 0.068f * L->h * L->k[g]; }
  * and a trace on the phone). */
 #define MHFU_WEAPON_OUT MHFU_ADDR_WEAPON_OUT
 static int hunt_ctx(void) {
-    if (!mhfu_in_quest()) return CTX_FREE;
+    if (!mhfu_in_quest() || !MHFU_WEAPON_OUT) return CTX_FREE;   /* 0: not known in this build */
     return psp_read8(MHFU_WEAPON_OUT) ? CTX_DRAWN : CTX_SHEATHED;
 }
 /* The mobile buttons are on; the editor shows all of them, to place. */
