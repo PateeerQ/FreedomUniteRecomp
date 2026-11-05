@@ -60,9 +60,10 @@
 #define MHFU_ADDR_WEAPON_OUT    0x090AF792u
 #define MHFU_ADDR_FPS60_TABLE   0x09B029C8u /* lobby_task's data: 2.0, 3.0, 4.0, the same bytes around them */
 #define MHFU_ADDR_VFPU_ATAN     0u
-/* 60 fps: tools/fps60_patch.py --region JP (46 patches, as in EU). */
+/* 60 fps: tools/fps60_patch.py --region JP (46 patches, as in EU); the
+ * built-in mods: tools/mods_convert.py --region JP (mods/builtin/jp). */
 #define MHFU_HAS_FPS60          1
-#define MHFU_HAS_BUILTIN_MODS   0
+#define MHFU_HAS_BUILTIN_MODS   1
 #else
 #define MHFU_REGION_EU     1
 #define MHFU_IS_US         0
