@@ -57,7 +57,7 @@ void init(const char *exe_dir) {
 
 const std::string &exe_dir() { return g_exe; }
 const std::string &base() { return g_base; }
-std::string work() { return S(P(g_base) / "work"); }
+std::string work() { return MHFU_WORK_SUB[0] ? S(P(g_base) / "work" / MHFU_WORK_SUB) : S(P(g_base) / "work"); }
 std::string launcher() { return S(P(work()) / "launcher"); }
 std::string host_exe() { return S(P(g_exe) / "mhfu_host.exe"); }
 
@@ -70,7 +70,7 @@ std::string iso(const Config &c) {
 }
 
 std::string eboot(const Config &c) {
-    return c.eboot.empty() ? S(P(work()) / "ULES01213_EBOOT.BIN") : c.eboot;
+    return c.eboot.empty() ? S(P(work()) / MHFU_EBOOT_FILE) : c.eboot;
 }
 
 std::string profile_root(const std::string &name) {

@@ -22,7 +22,7 @@ const int k_nbuiltin_mods = (int)(sizeof k_builtin_mods / sizeof k_builtin_mods[
 static const char *DB_URL = "https://raw.githubusercontent.com/Saramagrean/CWCheat-Database-Plus-/master/cheat.db";
 
 std::string cheats_path(const std::string &profile_root) {
-    return (fs::u8path(profile_root) / "cheats" / "ULES01213.ini").u8string();
+    return (fs::u8path(profile_root) / "cheats" / (MHFU_GAME_ID ".ini")).u8string();
 }
 
 static std::vector<std::string> lines_of(const std::string &text) {
@@ -43,7 +43,7 @@ static std::string trim(std::string s) {
 }
 
 static bool our_game(const std::string &l) {
-    return l.find("ULES-01213") != std::string::npos || l.find("ULES01213") != std::string::npos;
+    return l.find(MHFU_GAME_ID_DASH) != std::string::npos || l.find(MHFU_GAME_ID) != std::string::npos;
 }
 
 std::vector<Cheat> cheats_load(const std::string &path) {
@@ -78,7 +78,7 @@ std::vector<Cheat> cheats_load(const std::string &path) {
                 if (a || b) any_nonzero = true;
                 // Types 0-2, 4 and 8 write where they say: the EBOOT's code is recompiled (host/mods.h).
                 const unsigned t = a >> 28, off = a & 0x0FFFFFFF;
-                if ((t <= 2 || t == 4 || t == 8) && off >= 0x4000 && off < 0x10E6B8) cur->writes_code = true;
+                if ((t <= 2 || t == 4 || t == 8) && off >= 0x4000 && off < MHFU_EBOOT_CODE_END) cur->writes_code = true;
             }
         }
     }
@@ -100,7 +100,7 @@ bool cheats_set(const std::string &path, const Cheat &c, bool on, std::string &e
 }
 
 int cheats_import(const std::string &path, const std::string &text, std::string &err) {
-    // ULES-01213's block (or the whole text when it names no game).
+    // Our game's block (or the whole text when it names no game).
     const std::vector<std::string> src = lines_of(text);
     std::vector<std::string> block;
     bool has_games = false, in = false;
@@ -111,7 +111,7 @@ int cheats_import(const std::string &path, const std::string &text, std::string 
             if (l.rfind("_C", 0) == 0 || l.rfind("_L", 0) == 0) block.push_back(l);
         }
     }
-    if (block.empty()) { err = "no cheats for ULES-01213 in it"; return -1; }
+    if (block.empty()) { err = "no cheats for " MHFU_GAME_ID_DASH " in it"; return -1; }
     // What is on now stays on.
     std::vector<std::string> on;
     for (auto &c : cheats_load(path))
@@ -119,7 +119,7 @@ int cheats_import(const std::string &path, const std::string &text, std::string 
     std::ofstream f;
     fs::create_directories(fs::u8path(path).parent_path());
     f.open(fs::u8path(path), std::ios::binary);
-    f << "_S ULES-01213\n_G Monster Hunter Freedom Unite [EU]\n";
+    f << "_S " MHFU_GAME_ID_DASH "\n_G Monster Hunter Freedom Unite [" MHFU_REGION_TAG "]\n";
     int n = 0;
     for (auto &l : block) {
         if (l.rfind("_C", 0) == 0) {
@@ -155,7 +155,7 @@ void cheats_download_start(const std::string &path) {
         } else {
             const int n = cheats_import(path, body, err);
             if (n < 0) msg = err;
-            else { st = CheatJob::Done; msg = std::to_string(n) + " cheats for ULES-01213 from the CWCheat Database Plus."; }
+            else { st = CheatJob::Done; msg = std::to_string(n) + " cheats for " MHFU_GAME_ID_DASH " from the CWCheat Database Plus."; }
         }
         std::lock_guard<std::mutex> l(g_lock);
         g_state = st;

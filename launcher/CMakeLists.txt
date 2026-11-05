@@ -24,7 +24,8 @@ add_executable(mhfu_launcher WIN32
     ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
     ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
     ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp)
-target_include_directories(mhfu_launcher PRIVATE
+# MHFU_GEN_DIR: setup.ps1's mhfu_region_gen.h there makes it the USA launcher.
+target_include_directories(mhfu_launcher PRIVATE "${MHFU_GEN_DIR}"
     ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends ${imgui_SOURCE_DIR}/misc/cpp)
 target_link_libraries(mhfu_launcher PRIVATE SDL3::SDL3-static nlohmann_json::nlohmann_json)
 set_target_properties(mhfu_launcher PROPERTIES

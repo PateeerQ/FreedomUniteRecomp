@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "../host/about.h"
+#include "../host/region.h"
 #define LAUNCHER_VERSION MHFU_VERSION
 
 struct Config {
@@ -33,7 +34,7 @@ struct Config {
     std::string extra_env;              // KEY=VALUE per line
     std::string extra_args;
     std::string iso;                    // empty: work/iso.txt (written by setup.ps1)
-    std::string eboot;                  // empty: work/ULES01213_EBOOT.BIN
+    std::string eboot;                  // empty: work/<game id>_EBOOT.BIN
     std::string ra_user, ra_key;        // RetroAchievements username and Web API key
     std::string ra_token;               // the login token for unlocking in game (never the password)
     bool ra_ingame = true;              // unlock achievements while playing

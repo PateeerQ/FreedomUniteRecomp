@@ -20,19 +20,19 @@ int saves_in(const std::string &root) {
     int n = 0;
     std::error_code e;
     for (auto &d : fs::directory_iterator(P(root) / "ms" / "PSP" / "SAVEDATA", e))
-        if (d.is_directory() && d.path().filename().u8string().rfind("ULES01213", 0) == 0) n++;
+        if (d.is_directory() && d.path().filename().u8string().rfind(MHFU_GAME_ID, 0) == 0) n++;
     return n;
 }
 
 // The disc's product code appears in its first files (UMD_DATA.BIN, PARAM.SFO).
-static bool iso_is_mhfu_eu(const std::string &iso) {
+static bool iso_is_ours(const std::string &iso) {
     std::ifstream f(P(iso), std::ios::binary);
     if (!f) return false;
     std::string buf(1 << 20, '\0');
     for (int chunk = 0; chunk < 32; chunk++) {
         f.read(buf.data(), (std::streamsize)buf.size());
         const std::string got = buf.substr(0, (size_t)f.gcount());
-        if (got.find("ULES-01213") != std::string::npos || got.find("ULES01213") != std::string::npos) return true;
+        if (got.find(MHFU_GAME_ID_DASH) != std::string::npos || got.find(MHFU_GAME_ID) != std::string::npos) return true;
         if (f.gcount() < (std::streamsize)buf.size()) break;
     }
     return false;
@@ -60,9 +60,9 @@ std::vector<Check> ready_check(const Config &c, const std::string &gpu) {
 
     if (iso.empty()) out.push_back({false, false, "Game dump", "no ISO set (run setup.ps1, or choose it under Advanced)"});
     else if (!file_exists(iso)) out.push_back({false, false, "Game dump", "not found: " + iso});
-    else if (!iso_is_mhfu_eu(iso))
-        out.push_back({false, true, "Game dump", "not recognised as ULES01213 (Europe): " + P(iso).filename().u8string()});
-    else out.push_back({true, false, "Game dump", "Monster Hunter Freedom Unite, ULES01213 (Europe)"});
+    else if (!iso_is_ours(iso))
+        out.push_back({false, true, "Game dump", "not recognised as " MHFU_GAME_ID " (" MHFU_REGION_NAME "): " + P(iso).filename().u8string()});
+    else out.push_back({true, false, "Game dump", "Monster Hunter Freedom Unite, " MHFU_GAME_ID " (" MHFU_REGION_NAME ")"});
 
     std::string head = read_text(eboot).substr(0, 4);
     if (!file_exists(eboot)) out.push_back({false, false, "Decrypted EBOOT", "not found: " + eboot});

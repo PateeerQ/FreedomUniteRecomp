@@ -428,7 +428,7 @@ static void banner(float w) {
     dl->AddText(g_small, g_small->FontSize, ImVec2(tx, p.y + h - 102), col(C_GOLD), "HUNTER'S GUILD  \xC2\xB7  POKKE VILLAGE");
     dl->AddText(g_big, g_big->FontSize, ImVec2(tx + 1, p.y + h - 79), IM_COL32(0, 0, 0, 160), "Monster Hunter Freedom Unite");
     dl->AddText(g_big, g_big->FontSize, ImVec2(tx, p.y + h - 80), col(C_TEXT), "Monster Hunter Freedom Unite");
-    dl->AddText(g_body, g_body->FontSize, ImVec2(tx, p.y + h - 40), col(C_DIM), "ULES01213  \xC2\xB7  Europe  \xC2\xB7  PSP");
+    dl->AddText(g_body, g_body->FontSize, ImVec2(tx, p.y + h - 40), col(C_DIM), MHFU_GAME_ID "  \xC2\xB7  " MHFU_REGION_NAME "  \xC2\xB7  PSP");
     ImGui::Dummy(ImVec2(w, h));
 }
 
@@ -540,8 +540,8 @@ static void page_play(float w, float h) {
     ImGui::SetCursorPosX(lw);
     if (ImGui::Checkbox("Fullscreen", &g_cfg.fullscreen)) changed();
     ImGui::SameLine();
-    if (ImGui::Checkbox("60 FPS (beta)", &g_cfg.fps60)) changed();
-    if (ImGui::IsItemHovered())
+    if (MHFU_HAS_FPS60 && ImGui::Checkbox("60 FPS (beta)", &g_cfg.fps60)) changed();
+    if (MHFU_HAS_FPS60 && ImGui::IsItemHovered())
         ImGui::SetTooltip("The game at 60 frames a second. In a room everyone plays at the slowest player's rate.\n"
                           "Beta: tell PateeerQ if something runs too fast or too slow. F4 in game toggles it.");
     label("Volume");
@@ -1086,7 +1086,7 @@ static void page_mods(float w, float) {
     begin_panel("modsp", ImVec2(0, 0));
 
     heading("Built-in mods");
-    for (int i = 0; i < k_nbuiltin_mods; i++) {
+    for (int i = 0; i < (MHFU_HAS_BUILTIN_MODS ? k_nbuiltin_mods : 0); i++) {
         const BuiltinMod &m = k_builtin_mods[i];
         auto it = g_cfg.mods.find(m.id);
         bool on = it == g_cfg.mods.end() ? true : it->second;
@@ -1099,7 +1099,10 @@ static void page_mods(float w, float) {
         ImGui::PopFont();
     }
     ImGui::PushFont(g_small);
-    dim("Community mods for the US game, moved to this (EU) version and recompiled with it.");
+    if (MHFU_HAS_BUILTIN_MODS)
+        dim(MHFU_IS_US ?"Community mods for the US game, recompiled with it."
+                           : "Community mods for the US game, moved to this (EU) version and recompiled with it.");
+    else dim("Not in the " MHFU_REGION_NAME " build yet.");
     ImGui::PopFont();
     ImGui::Spacing();
 
@@ -1109,7 +1112,7 @@ static void page_mods(float w, float) {
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 34);
     dim("The camera takes the window's shape and the picture is stretched over it (with an Output wider than 16:9).");
     ImGui::PopFont();
-    if (ImGui::Checkbox("60 FPS (beta)", &g_cfg.fps60)) changed();
+    if (MHFU_HAS_FPS60 && ImGui::Checkbox("60 FPS (beta)", &g_cfg.fps60)) changed();
     ImGui::Spacing();
 
     heading("Cheats");
@@ -1119,7 +1122,7 @@ static void page_mods(float w, float) {
     if (job == CheatJob::Busy) ImGui::BeginDisabled();
     if (ImGui::Button("Get the cheat list")) cheats_download_start(path);
     if (job == CheatJob::Busy) ImGui::EndDisabled();
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("ULES-01213's cheats from the CWCheat Database Plus (the one PPSSPP uses).");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip(MHFU_GAME_ID_DASH "'s cheats from the CWCheat Database Plus (the one PPSSPP uses).");
     ImGui::SameLine();
     if (ImGui::Button("Import a cheat file")) pick(3, "Cheats (CWCheat)", "ini;db;txt");
     ImGui::SameLine();
@@ -1191,7 +1194,7 @@ static void page_about(float w, float) {
     ImGui::EndGroup();
     ImGui::Spacing();
     heading("What it is");
-    dim("A native port of Monster Hunter Freedom Unite (PSP, ULES01213): the game's own code, statically "
+    dim("A native port of Monster Hunter Freedom Unite (PSP, " MHFU_GAME_ID "): the game's own code, statically "
         "recompiled to x86-64 with psprecomp, running on a reimplementation of the PSP's firmware. No "
         "emulator in between.");
     heading("Built on");
