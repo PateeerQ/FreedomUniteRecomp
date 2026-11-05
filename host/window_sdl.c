@@ -277,12 +277,11 @@ enum { G_STICK, G_DPAD, G_FACE, G_L, G_R, G_SELECT, G_START, G_MENU, G_RSTICK, G
 static const char *const k_group_name[G_COUNT] = { "stick", "dpad", "face", "l", "r", "select", "start", "menu", "rstick", "skill",
                                                    "attack", "roll", "item", "run" };
 /* The button styles, chosen in the drawer: the PSP's face buttons and d-pad
- * everywhere, or the mobile one, which follows what the hunter does. In a
- * quest with the weapon sheathed: the attack pad (Triangle draws, Circle
- * gathers), Crouch (Cross), Run (R) and Item (Square); with the weapon out:
- * the attack pad, Dodge (Cross), Sheathe (Square) and the weapon buttons (R
- * is on the pad and on them). Outside quests (the village, the halls, their
- * menus) the PSP's buttons. The stick, L, Select and Start in all. */
+ * everywhere, or the mobile one: in a quest with the weapon out, the attack
+ * pad, Dodge (Cross), Sheathe (Square) and the weapon buttons (R is on the pad
+ * and on them); the PSP's buttons everywhere else (sheathed, the village, the
+ * menus: no flag for an open menu or the game's prompts was found). The stick,
+ * L, Select and Start in all. */
 enum { STYLE_PSP, STYLE_MOBILE };
 enum { CTX_FREE, CTX_SHEATHED, CTX_DRAWN };
 
@@ -422,16 +421,14 @@ static int hunt_ctx(void) {
     return psp_read8(MHFU_WEAPON_OUT) ? CTX_DRAWN : CTX_SHEATHED;
 }
 /* The mobile buttons are on; the editor shows all of them, to place. */
-static int mobile_now(void) { return g_style == STYLE_MOBILE && (g_edit || hunt_ctx() != CTX_FREE); }
+static int mobile_now(void) { return g_style == STYLE_MOBILE && (g_edit || hunt_ctx() == CTX_DRAWN); }
 static int group_shown(int g) {
     if (g == G_RSTICK) return 0;                       /* the camera is a swipe now */
     const int m = mobile_now();
     if (g == G_FACE || g == G_DPAD) return !m;
     if (!m) return g != G_ATTACK && g != G_ROLL && g != G_ITEM && g != G_RUN;
     if (g == G_R) return 0;                            /* Run, the pad and the weapon buttons have it */
-    if (g_edit) return 1;
-    if (g == G_RUN) return hunt_ctx() == CTX_SHEATHED;
-    if (g == G_SKILL) return hunt_ctx() == CTX_DRAWN;
+    if (g == G_RUN) return 0;                          /* sheathed is the PSP's buttons now */
     return 1;
 }
 
@@ -888,7 +885,7 @@ static void draw_vpad(canvas *c, float s) {
         icon(c, S(kx), S(ky), S(ar * 0.20f), ICON_SWORD, t * 1.3f, held == PSP_CTRL_TRIANGLE ? lit : white);
         /* Cross (Crouch, or Dodge with the weapon out), Square (Item, or
          * Sheathe) and Run (R, sheathed) */
-        const int out = !g_edit && hunt_ctx() == CTX_DRAWN;
+        const int out = 1;                             /* the mobile buttons show only with the weapon out */
         const struct { int g; uint32_t bit; int pic; } sm[3] = {
             { G_ROLL, PSP_CTRL_CROSS, out ? ICON_DODGE : ICON_CROUCH },
             { G_ITEM, PSP_CTRL_SQUARE, out ? ICON_SHEATHE : ICON_ITEM },
