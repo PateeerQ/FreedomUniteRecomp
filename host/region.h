@@ -38,6 +38,28 @@
  * (tools/mods_convert.py --region US, mods/builtin/us). */
 #define MHFU_HAS_FPS60          1
 #define MHFU_HAS_BUILTIN_MODS   1
+#elif MHFU_REGION_JP
+/* Monster Hunter Portable 2nd G (ULJM05500), the Japanese original: its own
+ * layout (.text 0x2558 shorter, .data/.bss and overlays a few KB lower). The
+ * addresses below were found from the EU ones (tools: the same code or table
+ * looked up in the JP EBOOT, 2026-11-05); 0 = not found yet, the host goes
+ * without that. */
+#define MHFU_IS_US         0
+#define MHFU_GAME_ID       "ULJM05500"
+#define MHFU_GAME_ID_DASH  "ULJM-05500"
+#define MHFU_REGION_NAME   "Japan"
+#define MHFU_REGION_TAG    "JP"
+#define MHFU_WORK_SUB      "jp"
+#define MHFU_EBOOT_CODE_END 0x0010C1F0u     /* .lib.ent.top, as the EU one */
+#define MHFU_EBOOT_SIZE    1890112u
+#define MHFU_ADDR_OVL_TABLE     0x089C6B40u /* 0x08804000, 0x09A5A580, 0x09C14280, 0x09D15100, 0x09D5DF80 */
+#define MHFU_ADDR_SAVE_MANAGER  0x09A4099Cu /* the 14 EU loads of 0x09A44C60, found in the JP code */
+#define MHFU_ADDR_WEAPON_CLASS  0u          /* heap: not found yet */
+#define MHFU_ADDR_WEAPON_OUT    0u
+#define MHFU_ADDR_FPS60_TABLE   0u
+#define MHFU_ADDR_VFPU_ATAN     0u
+#define MHFU_HAS_FPS60          0
+#define MHFU_HAS_BUILTIN_MODS   0
 #else
 #define MHFU_REGION_EU     1
 #define MHFU_IS_US         0
