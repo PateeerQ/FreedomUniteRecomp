@@ -12,8 +12,12 @@
 #define MHFU_REPO_URL   "https://github.com/" MHFU_REPO
 
 /* The internet relay rooms go through unless <root>/net.cfg names another
- * (relay=host:port): PateeerQ's mhfu_hub. "" leaves rooms on the LAN only. */
-#define MHFU_DEFAULT_RELAY "139.99.125.70:27313"
+ * (relay=host:port): PateeerQ's mhfu_hub. Its address is not in the sources:
+ * CMake reads it from server/relay.txt (server/ is gitignored) and defines
+ * MHFU_DEFAULT_RELAY; a build without that file has rooms on the LAN only. */
+#ifndef MHFU_DEFAULT_RELAY
+#define MHFU_DEFAULT_RELAY ""
+#endif
 
 #define MHFU_ABOUT_TEXT                                                                                   \
     "A native port of Monster Hunter Freedom Unite (PSP, ULES01213), statically recompiled.\n\n"          \

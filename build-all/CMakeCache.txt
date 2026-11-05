@@ -373,6 +373,9 @@ MHFU_OVL_DIR:PATH=E:/Project/MHFU-Android/work/gen_ovl
 //RetroAchievements in game (rcheevos)
 MHFU_RCHEEVOS:BOOL=ON
 
+//The internet relay builds use by default (host:port)
+MHFU_RELAY:STRING=
+
 //The SDL3 window instead of the Win32 one
 MHFU_SDL_WINDOW:BOOL=OFF
 
