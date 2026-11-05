@@ -1,0 +1,132 @@
+diff --git a/include/psprecomp/cpu.h b/include/psprecomp/cpu.h
+index 0ba25f8..65e7f66 100644
+--- a/include/psprecomp/cpu.h
++++ b/include/psprecomp/cpu.h
+@@ -40,8 +40,12 @@ enum {
+ extern const char *const psp_reg_names[PSP_NUM_GPR];
+ 
+ /* One guest call in flight: the return site the call expects, and the call it
+- * was made from. Nodes live on the host stack of the call site that made them;
+- * see psp_ra_is_jump() in dispatch.h. `ret` is 0 for a call made by the host. */
++ * was made from; see psp_ra_is_jump() in dispatch.h. `ret` is 0 for a call made
++ * by the host. Generated code takes its nodes from the thread's frame stack
++ * (psp_frame_push), not its own host stack: a local whose address is published
++ * stops the C compiler from turning a body's closing `psp_func_X(); return;`
++ * into a jump, so a guest loop that runs through two functions (MHFU's sound
++ * thread) grew the host stack every time round until it overflowed. */
+ typedef struct psp_frame {
+     uint32_t ret;
+     struct psp_frame *prev;
+@@ -65,10 +69,30 @@ typedef struct {
+      * so each thread's chain moves with its context. */
+     psp_frame *frame;
+     uint32_t   unwind;
++    /* This thread's frame stack: the next free node and the end. */
++    psp_frame *fsp, *fend;
+ } psp_cpu_state;
+ 
+ extern psp_cpu_state psp_cpu;
+ 
++/* Nodes in each frame stack: deeper guest calls than this would have run the
++ * host stack out first. */
++#define PSP_FRAME_STACK 65536
++
++/* A fresh frame stack for the calling host thread (each guest thread's own). */
++void psp_cpu_frames_attach(void);
++psp_frame *psp_frame_overflow(void);
++
++static inline psp_frame *psp_frame_push(uint32_t ret) {
++    psp_frame *f = psp_cpu.fsp;
++    if (f == psp_cpu.fend) f = psp_frame_overflow();
++    else psp_cpu.fsp = f + 1;
++    f->ret = ret;
++    f->prev = psp_cpu.frame;
++    psp_cpu.frame = f;
++    return f;
++}
++
+ /* Write a GPR, honouring the hardwired-zero rule for $zero. Generated code
+  * calls this rather than assigning r[] directly, so a stray write to $zero
+  * can never corrupt state. */
+diff --git a/src/cpu.c b/src/cpu.c
+index 8cfeb68..b2d3206 100644
+--- a/src/cpu.c
++++ b/src/cpu.c
+@@ -2,10 +2,37 @@
+ 
+ #include "psprecomp/cpu.h"
+ 
++#include <stdio.h>
++#include <stdlib.h>
+ #include <string.h>
+ 
+ psp_cpu_state psp_cpu;
+ 
++/* The frame stack of the first thread (and of every thread when they all run
++ * on one host stack); other host threads get theirs in psp_cpu_frames_attach. */
++static psp_frame g_boot_frames[PSP_FRAME_STACK];
++
++#if defined(_MSC_VER)
++#  define CPU_TLS __declspec(thread)
++#else
++#  define CPU_TLS _Thread_local
++#endif
++
++void psp_cpu_frames_attach(void) {
++    static CPU_TLS psp_frame *mine;
++    if (!mine) mine = (psp_frame *)malloc(sizeof(psp_frame) * PSP_FRAME_STACK);
++    psp_frame *base = mine ? mine : g_boot_frames;
++    psp_cpu.frame = NULL;
++    psp_cpu.fsp = base;
++    psp_cpu.fend = base + PSP_FRAME_STACK;
++}
++
++psp_frame *psp_frame_overflow(void) {
++    fprintf(stderr, "psprecomp: guest calls nested deeper than %d\n", PSP_FRAME_STACK);
++    fflush(stderr);
++    abort();
++}
++
+ const char *const psp_reg_names[PSP_NUM_GPR] = {
+     "zero","at","v0","v1","a0","a1","a2","a3",
+     "t0","t1","t2","t3","t4","t5","t6","t7",
+@@ -15,6 +42,8 @@ const char *const psp_reg_names[PSP_NUM_GPR] = {
+ 
+ void psp_cpu_reset(void) {
+     memset(&psp_cpu, 0, sizeof psp_cpu);
++    psp_cpu.fsp = g_boot_frames;
++    psp_cpu.fend = g_boot_frames + PSP_FRAME_STACK;
+     /* $sp is set by the loader from the module's stack allocation, not here ?
+      * a reset CPU with a null stack is the correct starting point, and a game
+      * that faults on a null $sp is telling us the loader did not run. */
+diff --git a/src/hle/threadman.c b/src/hle/threadman.c
+index 8c3d2de..0851521 100644
+--- a/src/hle/threadman.c
++++ b/src/hle/threadman.c
+@@ -826,6 +826,7 @@ static void *guest_thread_main(void *arg) {
+      * ran before it. $sp and the o32 argument registers are the firmware's to
+      * set, everything else starts at zero. */
+     psp_cpu_reset();
++    psp_cpu_frames_attach();                /* its guest calls on a frame stack of its own */
+     psp_cpu.r[PSP_REG_A0] = t->arglen;
+     psp_cpu.r[PSP_REG_A1] = t->argp;
+     thread_entry_regs(t);
+diff --git a/tools/allegrexrecomp/emit.c b/tools/allegrexrecomp/emit.c
+index 2b14846..fae0bfb 100644
+--- a/tools/allegrexrecomp/emit.c
++++ b/tools/allegrexrecomp/emit.c
+@@ -1219,10 +1219,10 @@ static void emit_header(FILE *f, const ectx *c, const emit_opts *o) {
+         "#ifdef __cplusplus\nextern \"C\" {\n#endif\n"
+         "\n"
+         "/* A guest call: push the return site it expects, and after it returns,\n"
+-        " * stop an unwind aimed here or pass on one aimed further out. */\n"
+-        "#define PSP_CALL_BEGIN(r) { psp_frame _f; _f.ret = (r); _f.prev = psp_cpu.frame;"
+-        " psp_cpu.frame = &_f;\n"
+-        "#define PSP_CALL_END(r) psp_cpu.frame = _f.prev; if (psp_cpu.unwind) {"
++        " * stop an unwind aimed here or pass on one aimed further out. The node\n"
++        " * is on the thread's frame stack, not this C frame (see cpu.h). */\n"
++        "#define PSP_CALL_BEGIN(r) { psp_frame *_f = psp_frame_push(r);\n"
++        "#define PSP_CALL_END(r) psp_cpu.frame = _f->prev; psp_cpu.fsp = _f; if (psp_cpu.unwind) {"
+         " if (psp_cpu.unwind == (r)) psp_cpu.unwind = 0; else return; } }\n"
+         "\n"
+         "/* Build with -DPSPRECOMP_TRACE to record every function entry. Costs\n"
