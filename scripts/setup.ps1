@@ -208,10 +208,11 @@ $seen = @{}
 $table = @()
 # The built-in code mods (tools/mods_convert.py) are recompiled the same way
 # (an older conversion's copies out first: their hashes changed).
-# They are converted for the EU build only (their addresses are EU's).
+# Each region has its own conversion: mods\builtin (EU), mods\builtin\us (USA,
+# the build they were written for: tools/mods_convert.py --region US).
 Get-ChildItem $ovlSrc -Filter "mod_*.bin" | Remove-Item -Force
-$builtinMods = @()
-if ($Region -eq "EU") { $builtinMods = @(Get-ChildItem (Join-Path $repo "mods\builtin") -Filter *.bin -ErrorAction SilentlyContinue) }
+$modsDir = if ($Region -eq "US") { Join-Path $repo "mods\builtin\us" } else { Join-Path $repo "mods\builtin" }
+$builtinMods = @(Get-ChildItem $modsDir -Filter *.bin -ErrorAction SilentlyContinue)
 foreach ($mod in $builtinMods) {
     Copy-Item -Force $mod.FullName (Join-Path $ovlSrc ("mod_" + $mod.Name))
 }
@@ -282,16 +283,14 @@ if ($Region -eq "US") {
         "/* Written by scripts/setup.ps1: this build is the USA one. */`n#define MHFU_REGION_US 1`n")
 }
 # The 60 fps mode, behind a switch (tools/fps60_patch.py). Its patches are the
-# EU cheat's, by address: the US build goes without it for now.
-if ($Region -eq "EU") {
-    python (Join-Path $repo "tools\fps60_patch.py") $gen $ovlGen
-    if ($LASTEXITCODE) { throw "the 60 fps patch did not apply" }
-}
-# Built-in mods (widescreen, mods\builtin), behind switches (tools/mods_patch.py);
-# it also writes their data, gen_ovl\mods_builtin.c.
-$modsArgs = @()
-if ($Region -eq "US") { $modsArgs = @("--no-builtin") }
-python (Join-Path $repo "tools\mods_patch.py") $gen $ovlGen @modsArgs
+# EU cheat's; --region US moves them to the US build's addresses.
+$regionArgs = @()
+if ($Region -eq "US") { $regionArgs = @("--region", "US") }
+python (Join-Path $repo "tools\fps60_patch.py") $gen $ovlGen @regionArgs
+if ($LASTEXITCODE) { throw "the 60 fps patch did not apply" }
+# Built-in mods (widescreen, mods\builtin or mods\builtin\us), behind switches
+# (tools/mods_patch.py); it also writes their data, gen_ovl\mods_builtin.c.
+python (Join-Path $repo "tools\mods_patch.py") $gen $ovlGen @regionArgs
 if ($LASTEXITCODE) { throw "the mods patch did not apply" }
 
 # --- 5. the host --------------------------------------------------------------
