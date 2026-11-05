@@ -8,12 +8,14 @@ plugins {
 // 2nd G (ULJM05500, work/jp, com.pateeerq.mhfu.jp). Without it: Europe, from work/.
 def mhfuRegion = (project.findProperty('mhfu.region') ?: 'EU').toString().toUpperCase()
 def mhfuUs = mhfuRegion == 'US'
-def mhfuJp = mhfuRegion == 'JP'
-def mhfuSub = mhfuUs ? 'us' : mhfuJp ? 'jp' : ''
+def mhfuFuc = mhfuRegion == 'FUC'                // FUComplete, the English MHP2G disc (work/fuc)
+def mhfuJp = mhfuRegion == 'JP' || mhfuFuc       // the same code as JP
+def mhfuSub = mhfuUs ? 'us' : mhfuFuc ? 'fuc' : mhfuJp ? 'jp' : ''
 def mhfuWork = new File(rootDir, mhfuSub ? "../work/${mhfuSub}" : '../work').canonicalPath.replace('\\', '/')
 def mhfuIds = [EU: ['ULES01213', 'ULES-01213', 'Europe', '1910384L', 'Monster Hunter: Freedom Unite Recomp'],
                US: ['ULUS10391', 'ULUS-10391', 'USA', '1910672L', 'Monster Hunter: Freedom Unite Recomp (USA)'],
-               JP: ['ULJM05500', 'ULJM-05500', 'Japan', '1890112L', 'Monster Hunter Portable 2nd G Recomp']][mhfuRegion]
+               JP: ['ULJM05500', 'ULJM-05500', 'Japan', '1890112L', 'Monster Hunter Portable 2nd G Recomp'],
+               FUC: ['ULJM05500', 'ULJM-05500', 'FUComplete', '1889772L', 'Monster Hunter Freedom Unite Complete Recomp']][mhfuRegion]
 
 android {
     namespace 'com.pateeerq.mhfu'
@@ -36,7 +38,9 @@ android {
         buildConfigField 'long', 'EBOOT_SIZE', mhfuIds[3]
         // CWCheat offset where the EBOOT's code ends (host/region.h MHFU_EBOOT_CODE_END).
         buildConfigField 'int', 'EBOOT_CODE_END', mhfuJp ? '0x10C1F0' : mhfuUs ? '0x10E7D8' : '0x10E6B8'
-        buildConfigField 'String', 'GAME_TITLE', mhfuJp ? '"Monster Hunter Portable 2nd G"' : '"Monster Hunter Freedom Unite"'
+        buildConfigField 'String', 'GAME_TITLE', mhfuFuc ? '"Monster Hunter Portable 2nd G FUComplete"' : mhfuJp ? '"Monster Hunter Portable 2nd G"' : '"Monster Hunter Freedom Unite"'
+        // FUComplete: the EBOOT is taken from the disc (SetupActivity.ebootFromDisc).
+        buildConfigField 'boolean', 'EBOOT_ON_DISC', mhfuFuc ? 'true' : 'false'
         resValue 'string', 'app_name', mhfuIds[4]
         externalNativeBuild {
             cmake {
