@@ -29,7 +29,7 @@ import java.nio.channels.FileChannel;
  * (Android's file manager, "Use this folder"), keeps the permission to it, and
  * hands the game an open file, /proc/self/fd/N, in iso.txt.
  *
- * The same folder may hold the decrypted EBOOT (ULES01213_EBOOT.BIN) and the
+ * The same folder may hold the decrypted EBOOT (ULES01213_EBOOT.BIN, or ULUS10391_ in the USA build) and the
  * PSP's fonts (.pgf, there or in a font/ folder below it); those are copied
  * into the app's folder when it has none yet. Files put there by hand (adb
  * push) count too. The fonts usually come from PPSSPP itself: on Android they
@@ -71,7 +71,7 @@ public class SetupActivity extends Activity {
 
     // ---- what is there -----------------------------------------------------------------
 
-    private File eboot() { return new File(base, "ULES01213_EBOOT.BIN"); }
+    private File eboot() { return new File(base, BuildConfig.GAME_ID + "_EBOOT.BIN"); }
     private File fonts() { return new File(base, "root/flash0/font"); }
 
     private boolean haveEboot() { return eboot().length() > 100000 && elf(eboot()); }
@@ -191,9 +191,10 @@ public class SetupActivity extends Activity {
         if (!haveFonts()) fontsFromPpsspp();
         String problem = openDisc();
         if (problem == null && !haveEboot())
-            problem = "The decrypted EBOOT is missing: put ULES01213_EBOOT.BIN (PPSSPP: Tools, Developer tools, "
+            problem = "The decrypted EBOOT is missing: put " + BuildConfig.GAME_ID + "_EBOOT.BIN (PPSSPP: Tools, Developer tools, "
                     + "\"Dump decrypted EBOOT.BIN\", then start Monster Hunter Freedom Unite once) in the game's "
-                    + "folder and choose it. Only the Europe version's (ULES01213) works; other EBOOTs are ignored.";
+                    + "folder and choose it. Only the " + BuildConfig.REGION_NAME + " version's (" + BuildConfig.GAME_ID
+                    + ") works in this app; other EBOOTs are ignored.";
         else if (problem == null && !haveFonts())
             problem = "The PSP fonts are missing. Install PPSSPP (from the Play Store): this app takes the fonts "
                     + "from it by itself. Or put the .pgf files (PPSSPP's assets/flash0/font) in the game's folder "
@@ -333,8 +334,8 @@ public class SetupActivity extends Activity {
     private final java.util.List<Uri> ebootCandidates = new java.util.ArrayList<>();
     private final java.util.List<String> ebootNames = new java.util.ArrayList<>();
 
-    /** The EU game's decrypted EBOOT, as PPSSPP dumps it: its size, and its module's name. */
-    private static final long EBOOT_SIZE = 1910384;
+    /** This build's region's decrypted EBOOT, as PPSSPP dumps it: its size, and its module's name. */
+    private static final long EBOOT_SIZE = BuildConfig.EBOOT_SIZE;
     private static final byte[] MODULE_NAME = "MonsterHunterPortable2ndG".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
 
     /** How well a copied candidate fits: -1 not MHFU's EBOOT at all, higher is better. */
@@ -356,8 +357,8 @@ public class SetupActivity extends Activity {
             break;
         }
         if (!mhfu) return -1;                      // another game's EBOOT
-        if (f.length() != EBOOT_SIZE) return -1;   // another region's (the recompiled code is the EU one's)
-        return name.toLowerCase().contains("ules01213") ? 1 : 0;
+        if (f.length() != EBOOT_SIZE) return -1;   // another region's (the recompiled code is one region's)
+        return name.toLowerCase().contains(BuildConfig.GAME_ID.toLowerCase()) ? 1 : 0;
     }
 
     /** Of the candidates the walk found, the one that is this game's EBOOT, into the app's folder. */
