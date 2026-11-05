@@ -38,7 +38,7 @@
  * (tools/mods_convert.py --region US, mods/builtin/us). */
 #define MHFU_HAS_FPS60          1
 #define MHFU_HAS_BUILTIN_MODS   1
-#elif MHFU_REGION_JP
+#elif MHFU_REGION_JP || MHFU_REGION_FUC
 /* Monster Hunter Portable 2nd G (ULJM05500), the Japanese original: its own
  * layout (.text 0x2558 shorter, .data/.bss and overlays a few KB lower). The
  * addresses below were found from the EU ones (tools: the same code or table
@@ -47,11 +47,21 @@
 #define MHFU_IS_US         0
 #define MHFU_GAME_ID       "ULJM05500"
 #define MHFU_GAME_ID_DASH  "ULJM-05500"
+#if MHFU_REGION_FUC
+/* FUComplete: the English fan translation of the same disc, the JP code with
+ * its loader, PRELOAD/MODLOAD and run-time code words built in
+ * (tools/fuc_prepare.py). Same layout, so the same addresses below. */
+#define MHFU_REGION_NAME   "FUComplete"
+#define MHFU_REGION_TAG    "FUC"
+#define MHFU_WORK_SUB      "fuc"
+#define MHFU_EBOOT_SIZE    1889772u         /* PSP_GAME/SYSDIR/EBOOT.BIN on the disc (plain ELF) */
+#else
 #define MHFU_REGION_NAME   "Japan"
 #define MHFU_REGION_TAG    "JP"
 #define MHFU_WORK_SUB      "jp"
-#define MHFU_EBOOT_CODE_END 0x0010C1F0u     /* .lib.ent.top, as the EU one */
 #define MHFU_EBOOT_SIZE    1890112u
+#endif
+#define MHFU_EBOOT_CODE_END 0x0010C1F0u     /* .lib.ent.top, as the EU one */
 #define MHFU_ADDR_OVL_TABLE     0x089C6B40u /* 0x08804000, 0x09A5A580, 0x09C14280, 0x09D15100, 0x09D5DF80 */
 #define MHFU_ADDR_SAVE_MANAGER  0x09A4099Cu /* the 14 EU loads of 0x09A44C60, found in the JP code */
 /* The heap is EU - 0x42C0 (64-byte blocks of village memory dumps of both,
