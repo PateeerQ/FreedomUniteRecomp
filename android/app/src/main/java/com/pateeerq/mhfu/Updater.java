@@ -98,7 +98,7 @@ final class Updater {
                 // one's in -jp.apk, the Europe one's in neither (scripts/release.ps1).
                 String an = as.optString("name").toLowerCase();
                 String tag = BuildConfig.REGION_TAG.toLowerCase();
-                boolean other = an.endsWith("-us.apk") || an.endsWith("-jp.apk");
+                boolean other = an.endsWith("-us.apk") || an.endsWith("-jp.apk") || an.endsWith("-fuc.apk");
                 if (an.endsWith(".apk") && (tag.equals("eu") ? !other : an.endsWith("-" + tag + ".apk"))) {
                     r.apkUrl = as.optString("browser_download_url");
                     r.apkSize = as.optLong("size");
