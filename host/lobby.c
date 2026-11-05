@@ -1,5 +1,6 @@
 /* MHFU-Android -- see lobby.h. */
 #include "lobby.h"
+#include "region.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -229,7 +230,7 @@ unsigned mhfu_fps_tog(int which) {
 void mhfu_fps60_data(void) {
     static const uint32_t at30[3] = { 0x40000000u, 0x40400000u, 0x40800000u };
     static const uint32_t at60[3] = { 0x3F800000u, 0x3FC00000u, 0x40000000u };
-    const uint32_t a = 0x09B07C98u;
+    const uint32_t a = MHFU_ADDR_FPS60_TABLE;
     const uint32_t now[3] = { psp_read32(a), psp_read32(a + 4), psp_read32(a + 8) };
     const int fps60 = mhfu_fps60();
     const uint32_t *from = fps60 ? at30 : at60, *to = fps60 ? at60 : at30;
