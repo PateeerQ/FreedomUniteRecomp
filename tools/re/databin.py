@@ -29,13 +29,20 @@ JP_SBOX_ADDR = 0x089970C8                        # the same 256 bytes, found in 
 JP_SLOTS = {0x09A5A580: 1, 0x09C14280: 2, 0x09D15100: 3, 0x09D5DF80: 4}   # its slot table, 0x089C6B40
 
 
+FUC_LOADER_WORD = 0x27BDFFE0                     # addiu $sp, $sp, -0x20: FUComplete's loader where the S-box was
+
+
 def region_of(eboot):
-    """(S-box address, slots) for the EBOOT given, told by its size."""
+    """(S-box address, slots) for the EBOOT given, told by its size. The S-box
+    address is None for FUComplete (the English MHP2G): its EBOOT is the JP one
+    with a loader where the table was, and its DATA.BIN is not encrypted."""
     n = os.path.getsize(eboot)
     if n == US_EBOOT_SIZE:
         return SBOX_ADDR + 0x120, {a + 0x100: s for a, s in SLOTS.items()}
     if n == JP_EBOOT_SIZE:
         return JP_SBOX_ADDR, JP_SLOTS
+    if struct.unpack("<I", eboot_bytes(eboot, JP_SBOX_ADDR, 4))[0] == FUC_LOADER_WORD:
+        return None, JP_SLOTS
     return SBOX_ADDR, SLOTS
 
 
@@ -56,9 +63,11 @@ def eboot_bytes(path, addr, n):
 
 class Cipher:
     def __init__(self, sbox):
-        self.sbox = bytes(sbox)
+        self.sbox = bytes(sbox) if sbox is not None else None
 
     def decrypt(self, data, seed):
+        if self.sbox is None:                    # FUComplete: stored as it is
+            return bytes(data)
         k0, k1 = seed & 0xFFFF, seed >> 16 & 0xFFFF
         k0 = k0 or 32653
         k1 = k1 or 9029
@@ -85,7 +94,7 @@ def main():
         raise SystemExit(__doc__)
     eboot, data, cmd = sys.argv[1:4]
     sbox, slots = region_of(eboot)
-    c = Cipher(eboot_bytes(eboot, sbox, 256))
+    c = Cipher(eboot_bytes(eboot, sbox, 256) if sbox is not None else None)
     f = open(data, 'rb')
     size = os.path.getsize(data)
     toc = struct.unpack('<%dI' % (TOC_BYTES // 4), c.decrypt(f.read(TOC_BYTES), 0))
