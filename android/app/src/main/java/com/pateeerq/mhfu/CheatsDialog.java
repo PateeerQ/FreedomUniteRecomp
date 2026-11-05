@@ -90,7 +90,7 @@ final class CheatsDialog {
                     if (a != 0 || v != 0) nonZero = true;
                     long t = a >>> 28, off = a & 0x0FFFFFFF;
                     // types 0-2, 4 and 8 write where they say: the EBOOT's code (host/mods.h) is recompiled
-                    if ((t <= 2 || t == 4 || t == 8) && off >= 0x4000 && off < (BuildConfig.REGION_TAG.equals("US") ? 0x10E7D8 : 0x10E6B8)) cur.writesCode = true;
+                    if ((t <= 2 || t == 4 || t == 8) && off >= 0x4000 && off < BuildConfig.EBOOT_CODE_END)cur.writesCode = true;
                 } catch (NumberFormatException ignored) { }
             }
         }
@@ -104,7 +104,7 @@ final class CheatsDialog {
         for (Cheat c : load(f)) if (c.on) on.add(c.name);
         List<String> out = new ArrayList<>();
         out.add("_S " + BuildConfig.GAME_ID_DASH);
-        out.add("_G Monster Hunter Freedom Unite [" + BuildConfig.REGION_TAG + "]");
+        out.add("_G " + BuildConfig.GAME_TITLE + " [" + BuildConfig.REGION_TAG + "]");
         boolean games = false, in = false;
         int n = 0;
         for (String raw : text.split("\n")) {
