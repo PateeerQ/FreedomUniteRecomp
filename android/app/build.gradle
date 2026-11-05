@@ -4,10 +4,16 @@ plugins {
 
 // The region: -Pmhfu.region=US builds the USA game from setup.ps1's work/us
 // (the ULUS10391 EBOOT) as its own app (com.pateeerq.mhfu.us), which can sit
-// next to the Europe one. Without it: Europe, from work/.
+// next to the Europe one; -Pmhfu.region=JP the Japanese Monster Hunter Portable
+// 2nd G (ULJM05500, work/jp, com.pateeerq.mhfu.jp). Without it: Europe, from work/.
 def mhfuRegion = (project.findProperty('mhfu.region') ?: 'EU').toString().toUpperCase()
 def mhfuUs = mhfuRegion == 'US'
-def mhfuWork = new File(rootDir, mhfuUs ? '../work/us' : '../work').canonicalPath.replace('\\', '/')
+def mhfuJp = mhfuRegion == 'JP'
+def mhfuSub = mhfuUs ? 'us' : mhfuJp ? 'jp' : ''
+def mhfuWork = new File(rootDir, mhfuSub ? "../work/${mhfuSub}" : '../work').canonicalPath.replace('\\', '/')
+def mhfuIds = [EU: ['ULES01213', 'ULES-01213', 'Europe', '1910384L', 'Monster Hunter: Freedom Unite Recomp'],
+               US: ['ULUS10391', 'ULUS-10391', 'USA', '1910672L', 'Monster Hunter: Freedom Unite Recomp (USA)'],
+               JP: ['ULJM05500', 'ULJM-05500', 'Japan', '1890112L', 'Monster Hunter Portable 2nd G Recomp']][mhfuRegion]
 
 android {
     namespace 'com.pateeerq.mhfu'
@@ -21,14 +27,17 @@ android {
         targetSdk 35
         versionCode 7
         versionName '0.3.2'
-        if (mhfuUs) applicationIdSuffix '.us'
+        if (mhfuSub) applicationIdSuffix ".${mhfuSub}"
         // What the Java side checks the player's files against (host/region.h has the same).
-        buildConfigField 'String', 'GAME_ID', mhfuUs ? '"ULUS10391"' : '"ULES01213"'
-        buildConfigField 'String', 'GAME_ID_DASH', mhfuUs ? '"ULUS-10391"' : '"ULES-01213"'
-        buildConfigField 'String', 'REGION_NAME', mhfuUs ? '"USA"' : '"Europe"'
-        buildConfigField 'String', 'REGION_TAG', mhfuUs ? '"US"' : '"EU"'
-        buildConfigField 'long', 'EBOOT_SIZE', mhfuUs ? '1910672L' : '1910384L'
-        resValue 'string', 'app_name', mhfuUs ? 'Monster Hunter: Freedom Unite Recomp (USA)' : 'Monster Hunter: Freedom Unite Recomp'
+        buildConfigField 'String', 'GAME_ID', "\"${mhfuIds[0]}\""
+        buildConfigField 'String', 'GAME_ID_DASH', "\"${mhfuIds[1]}\""
+        buildConfigField 'String', 'REGION_NAME', "\"${mhfuIds[2]}\""
+        buildConfigField 'String', 'REGION_TAG', "\"${mhfuRegion}\""
+        buildConfigField 'long', 'EBOOT_SIZE', mhfuIds[3]
+        // CWCheat offset where the EBOOT's code ends (host/region.h MHFU_EBOOT_CODE_END).
+        buildConfigField 'int', 'EBOOT_CODE_END', mhfuJp ? '0x10C1F0' : mhfuUs ? '0x10E7D8' : '0x10E6B8'
+        buildConfigField 'String', 'GAME_TITLE', mhfuJp ? '"Monster Hunter Portable 2nd G"' : '"Monster Hunter Freedom Unite"'
+        resValue 'string', 'app_name', mhfuIds[4]
         externalNativeBuild {
             cmake {
                 // The repository's CMakeLists.txt: SDL3 static inside libmain.so,
