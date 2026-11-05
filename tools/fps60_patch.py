@@ -139,6 +139,11 @@ JP_OVERLAY = {
         0x09ACB7B8: 0x09AC6A88, 0x09ACB7E0: 0x09AC6AB0, 0x09ADD930: 0x09AD8BF8, 0x09ADD948: 0x09AD8C10,
         0x09BA1FC4: 0x09B9D274},
 }
+# FUComplete's lobby_task (5588B454): the JP one with a few words changed,
+# every patch at the same address (checked by the code around each).
+JP_OVERLAY[0x5588B454] = JP_OVERLAY[0x7AA81434]
+# ... and as it runs, after MODLOAD.BIN patched it on loading (110 words, none of these).
+JP_OVERLAY[0xF98AD556] = JP_OVERLAY[0x7AA81434]
 JP_DATA = {"0x08B59914u": "0x08B55654u", "0x090AF21Cu": "0x090AAF5Cu"}
 
 
