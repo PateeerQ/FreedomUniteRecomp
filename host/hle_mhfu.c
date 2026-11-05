@@ -16,6 +16,7 @@
 
 #include "adhoc.h"
 #include "hle_mhfu.h"
+#include "region.h"
 #include "lobby.h"
 #include "mods.h"
 #include "overlays.h"
@@ -433,8 +434,10 @@ int mhfu_overlay_slot(uint32_t addr) {
 int mhfu_overlays_missing(void) { return g_ovl_missing; }
 
 /* game_task.ovl is in slot 1 during a quest (lobby_task.ovl in the village
- * and the halls); its hash is taken without the mods' hooks. */
-int mhfu_in_quest(void) { return g_ovl_hash[1] == 0xC5DF3522u; }
+ * and the halls). By the name in its header, which both regions share (the
+ * hash differs: EU C5DF3522). */
+static char g_ovl_name[OVL_SLOTS][33];
+int mhfu_in_quest(void) { return g_ovl_hash[1] && !strncmp(g_ovl_name[1], "game_task", 9); }
 
 static uint32_t fnv1a(const uint8_t *p, size_t n) {
     uint32_t h = 2166136261u;
@@ -494,6 +497,7 @@ static void check_overlays(void) {
         }
         char name[33] = {0};
         for (int k = 0; k < 32; k++) name[k] = (char)psp_read8(a + 32 + (uint32_t)k);
+        memcpy(g_ovl_name[i], name, sizeof name);
         const mhfu_overlay *ov = find_overlay(hash);
         if (ov) {
             ov->reg();
@@ -581,6 +585,7 @@ void mhfu_hle_register(const char *overlay_dir) {
     psp_hle_register(0xA14F40B2, "sceSuspendForUser", "sceKernelVolatileMemTryLock", volatile_lock);
     psp_hle_register(0xA569E425, "sceSuspendForUser", "sceKernelVolatileMemUnlock",  hle_VolatileMemUnlock);
     memset(g_ovl_hash, 0, sizeof g_ovl_hash);
+    memset(g_ovl_name, 0, sizeof g_ovl_name);
 
     psp_hle_register(0x920F104A, "UtilsForUser", "sceKernelIcacheInvalidateAll", hle_IcacheInvalidateAll);
     psp_hle_register(0x3AD58B8C, "ThreadManForUser", "sceKernelSuspendDispatchThread",
