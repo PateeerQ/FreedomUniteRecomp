@@ -232,7 +232,7 @@ public class MhfuActivity extends SDLActivity {
         runOnUiThread(() -> dialog(getString(R.string.app_name))
                 .setIcon(R.mipmap.ic_launcher)
                 .setMessage("Version " + Updater.currentVersion(this) + "\n\n"
-                        + "A native port of Monster Hunter Freedom Unite (PSP, ULES01213), statically recompiled.\n\n"
+                        + "A native port of Monster Hunter Freedom Unite (PSP, " + BuildConfig.GAME_ID + "), statically recompiled.\n\n"
                         + "Maintained by PateeerQ.\ngithub.com/" + Updater.REPO + "\n\n"
                         + "Built on psprecomp (sp00nznet), SDL3, FFmpeg (LGPL), rcheevos and stb.\n"
                         + "Touch button icons by Lorc and Delapouite, game-icons.net (CC BY 3.0).\n\n"
