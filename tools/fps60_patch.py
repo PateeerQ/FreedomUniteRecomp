@@ -106,6 +106,56 @@ US_OVERLAY_SHIFT = 0x100
 US_DATA = {"0x08B59914u": "0x08B59A54u", "0x090AF21Cu": "0x090AF35Cu"}
 
 
+# The Japanese build (--region JP, Monster Hunter Portable 2nd G): every EU
+# instruction found again in the JP code by the instructions around it, each
+# with the same word (2026-11-06). The overlays moved unevenly, and lobby_task
+# and game_task (whose shared code sits at the same EU addresses) differently,
+# so their maps are per overlay, keyed by the JP overlay's hash. The data:
+# the vblank flag object EU 0x08B59900 is JP 0x08B55640 (its pointer at JP
+# 0x08A5DE54 in a run), and the heap is EU - 0x42C0 (memory dumps of both
+# in the village).
+JP_EBOOT = {0x088591A4: 0x088590C4, 0x0886DFCC: 0x0886DFC4, 0x088D5DF8: 0x088D8740, 0x0888749C: 0x088871A0,
+            0x088874A0: 0x088871A4, 0x088D5E1C: 0x088D8764, 0x088D1C3C: 0x088D4584, 0x088D1C44: 0x088D458C,
+            0x088D1C54: 0x088D459C, 0x0886B3B4: 0x0886B3AC}
+JP_OVERLAY = {
+    0x7AA81434: {  # lobby_task (EU 208A07B1)
+        0x09A65FB0: 0x09A612E0, 0x09A6767C: 0x09A62994, 0x09A6867C: 0x09A63994, 0x09A6A22C: 0x09A65544,
+        0x09A7599C: 0x09A70C24, 0x09A759B4: 0x09A70C3C, 0x09A759D4: 0x09A70C5C, 0x09A9E208: 0x09A991C0,
+        0x09A9E234: 0x09A991EC, 0x09A9E260: 0x09A99218, 0x09A9ECFC: 0x09A99CB4, 0x09A9ED10: 0x09A99CC8,
+        0x09AA25CC: 0x09A9D564, 0x09AA25D4: 0x09A9D56C, 0x09AA31CC: 0x09A9E164, 0x09AA31F0: 0x09A9E188,
+        0x09AA31F4: 0x09A9E18C, 0x09AA4ACC: 0x09A9FA64, 0x09AAB030: 0x09AA5FC8, 0x09AAB044: 0x09AA5FDC,
+        0x09AAEDD0: 0x09AA9D68, 0x09AAF030: 0x09AA9FC8, 0x09AB235C: 0x09AAD2F4, 0x09AB24DC: 0x09AAD474,
+        0x09AB25B0: 0x09AAD548, 0x09AB31E8: 0x09AAE180, 0x09AB34DC: 0x09AAE474, 0x09ABC4C8: 0x09AB7460,
+        0x09AC6698: 0x09AC1630, 0x09AC6964: 0x09AC18FC, 0x09ACB7B8: 0x09AC6750, 0x09ACB7E0: 0x09AC6778,
+        0x09ADD930: 0x09AD88C8, 0x09ADD948: 0x09AD88E0},
+    0x6EF0CAAD: {  # game_task (EU C5DF3522)
+        0x09A65FB0: 0x09A612B0, 0x09A6767C: 0x09A6297C, 0x09A6867C: 0x09A6397C, 0x09A6A22C: 0x09A6552C,
+        0x09A7599C: 0x09A70C9C, 0x09A759B4: 0x09A70CB4, 0x09A759D4: 0x09A70CD4, 0x09A9E208: 0x09A99508,
+        0x09A9E234: 0x09A99534, 0x09A9E260: 0x09A99560, 0x09A9ECFC: 0x09A99FFC, 0x09A9ED10: 0x09A9A010,
+        0x09AA25CC: 0x09A9D8CC, 0x09AA25D4: 0x09A9D8D4, 0x09AA31CC: 0x09A9E49C, 0x09AA31F0: 0x09A9E4C0,
+        0x09AA31F4: 0x09A9E4C4, 0x09AA4ACC: 0x09A9FD9C, 0x09AA4AD0: 0x09A9FDA0, 0x09AAB044: 0x09AA6314,
+        0x09AAEDD0: 0x09AAA0A0, 0x09AAF030: 0x09AAA300, 0x09AB31E8: 0x09AAE4B8, 0x09AB34DC: 0x09AAE7AC,
+        0x09ABC4C8: 0x09AB7798, 0x09AC6698: 0x09AC1968, 0x09AC6964: 0x09AC1C34, 0x09AC6AF4: 0x09AC1DC4,
+        0x09ACB7B8: 0x09AC6A88, 0x09ACB7E0: 0x09AC6AB0, 0x09ADD930: 0x09AD8BF8, 0x09ADD948: 0x09AD8C10,
+        0x09BA1FC4: 0x09B9D274},
+}
+JP_DATA = {"0x08B59914u": "0x08B55654u", "0x090AF21Cu": "0x090AAF5Cu"}
+
+
+def to_jp(p, amap):
+    """One patch at the JP address `amap` gives, or None where it has none."""
+    if p[1] not in amap:
+        return None
+    p = list(p)
+    p[1] = amap[p[1]]
+    p[3] = re.sub(r"0x(09[0-9A-F]{6})", lambda m: f"0x{amap.get(int(m.group(1), 16), 0):08X}", p[3])
+    for k in range(4, len(p)):
+        if isinstance(p[k], str):
+            for eu, jp in JP_DATA.items():
+                p[k] = p[k].replace(eu, jp)
+    return tuple(p)
+
+
 def to_us(p):
     """One patch in the USA build's terms."""
     p = list(p)
@@ -239,12 +289,28 @@ def patch_unit(files, groups):
 def main():
     global EBOOT, OVERLAY
     args = sys.argv[1:]
+    jp = False
     if "--region" in args:
         k = args.index("--region")
         if args[k + 1].upper() == "US":
             EBOOT = [to_us(p) for p in EBOOT]
             OVERLAY = [[to_us(p) for p in g] for g in OVERLAY]
+        elif args[k + 1].upper() == "JP":
+            jp = True
+            EBOOT = [to_jp(p, JP_EBOOT) for p in EBOOT]
         del args[k:k + 2]
+
+    def groups_for(unit):
+        """The overlay groups for one unit: the EU ones, or the JP ones for that overlay."""
+        if not jp:
+            return OVERLAY
+        amap = JP_OVERLAY.get(int(unit[2:], 16), {}) if unit.startswith("ov") else {}
+        out = []
+        for g in OVERLAY:
+            ps = [to_jp(p, amap) for p in g]
+            if ps[0] is not None:
+                out.append([p for p in ps if p is not None])
+        return out
     undo = "--revert" in args
     dirs = [a for a in args if a != "--revert"] or [os.path.join("work", "gen"), os.path.join("work", "gen_ovl")]
     units = []                                             # (name, files, groups)
@@ -255,7 +321,8 @@ def main():
         for sub in sorted(glob.glob(os.path.join(d, "*", ""))):
             fs = sorted(glob.glob(os.path.join(sub, "*.c")))
             if fs:
-                units.append((os.path.basename(os.path.dirname(sub)), fs, OVERLAY))
+                unit = os.path.basename(os.path.dirname(sub))
+                units.append((unit, fs, groups_for(unit)))
     total = 0
     for name, files, groups in units:
         if undo:
