@@ -55,21 +55,48 @@ def window(mem, base, a, n=8):
 def translate(a, src, dst, guess):
     """a in src (base, bytes) -> the one place in dst near a + guess, or None.
     Prologues and epilogues repeat, so a window that matches in several places
-    is widened until one is left."""
+    is widened until one is left. Not found near: looked for anywhere in dst
+    (the Japanese build moved by kilobytes, unevenly)."""
     for n in (8, 32, 128):
         w = window(src[1], src[0], a, n)
         if w is None:
-            return None
+            break
         hits = [a + guess + d for d in range(-0x400, 0x404, 4) if window(dst[1], dst[0], a + guess + d, n) == w]
-        if len(hits) <= 1:
-            return hits[0] if hits else None
+        if len(hits) == 1:
+            return hits[0]
+        if not hits:
+            break
+    return translate_anywhere(a, src, dst)
+
+
+_index = {}
+
+
+def translate_anywhere(a, src, dst):
+    for n in (8, 16, 32):
+        w = window(src[1], src[0], a, n)
+        if w is None:
+            return None
+        key = (id(dst[1]), n)
+        if key not in _index:
+            va, m = dst
+            idx = {}
+            ws = [mask(struct.unpack_from("<I", m, x)[0]) for x in range(0, len(m) - 3, 4)]
+            for i in range(n, len(ws) - n):
+                idx.setdefault(tuple(ws[i - n:i + n]), []).append(va + 4 * i)
+            _index[key] = idx
+        hits = _index[key].get(tuple(w), [])
+        if len(hits) == 1:
+            return hits[0]
+        if not hits:
+            return None
     return None
 
 
 def overlays(eboot, data):
     """DATA.BIN file index -> (hash, load address, bytes), the way databin does."""
-    us = os.path.getsize(eboot) == databin.US_EBOOT_SIZE
-    c = databin.Cipher(databin.eboot_bytes(eboot, databin.SBOX_ADDR + (0x120 if us else 0), 256))
+    sbox, _ = databin.region_of(eboot)
+    c = databin.Cipher(databin.eboot_bytes(eboot, sbox, 256))
     f = open(data, "rb")
     size = os.path.getsize(data)
     toc = struct.unpack("<%dI" % (databin.TOC_BYTES // 4), c.decrypt(f.read(databin.TOC_BYTES), 0))
@@ -111,6 +138,7 @@ def main():
     if len(sys.argv) != 5:
         raise SystemExit(__doc__)
     eu_eboot, us_eboot, eu_data, us_data = sys.argv[1:]
+    sub = "jp" if os.path.getsize(us_eboot) == databin.JP_EBOOT_SIZE else "us"
     EU, US = load_elf(eu_eboot), load_elf(us_eboot)
     bad = 0
 
@@ -118,14 +146,19 @@ def main():
     for a in seeds(os.path.join(REPO, "seeds", "eboot.txt")):
         b = translate(a, EU, US, 0) or translate(a, EU, US, 0x120)
         if b is None:
-            print(f"eboot: {a:08X}: no single match in the US EBOOT, left out")
+            print(f"eboot: {a:08X}: no single match in the {sub.upper()} EBOOT, left out")
             bad += 1
         else:
             got.append(b)
-    write(os.path.join(REPO, "seeds", "us", "eboot.txt"), got, "eboot.txt")
+    write(os.path.join(REPO, "seeds", sub, "eboot.txt"), got, "eboot.txt")
     print(f"eboot: {len(got)} seed(s)")
 
     eu_ov, us_ov = overlays(eu_eboot, eu_data), overlays(us_eboot, us_data)
+    if sub == "jp":
+        # Another DATA.BIN: the same overlays, paired by the name in their header.
+        by_name = {body[0x20:0x40].split(b"\0")[0]: i for i, (_, _, body) in us_ov.items()}
+        us_ov = {i: us_ov[by_name[body[0x20:0x40].split(b"\0")[0]]]
+                 for i, (_, _, body) in eu_ov.items() if body[0x20:0x40].split(b"\0")[0] in by_name}
     by_hash = {h: i for i, (h, _, _) in eu_ov.items()}
     for name in sorted(os.listdir(os.path.join(REPO, "seeds"))):
         if not (name.startswith("ov") and name.endswith(".txt")):
@@ -146,7 +179,7 @@ def main():
                 bad += 1
             else:
                 got.append(b)
-        write(os.path.join(REPO, "seeds", "us", f"ov{uh:08X}.txt"), got, name)
+        write(os.path.join(REPO, "seeds", sub, f"ov{uh:08X}.txt"), got, name)
         print(f"{name} -> ov{uh:08X}.txt: {len(got)} seed(s)")
     return 1 if bad else 0
 
