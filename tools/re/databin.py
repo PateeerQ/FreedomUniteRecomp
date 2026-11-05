@@ -1,4 +1,4 @@
-"""Decrypt MHFU's DATA.BIN (ULES01213), the way the game does it.
+"""Decrypt MHFU's DATA.BIN (ULES01213, or ULUS10391), the way the game does it.
 
     python tools/re/databin.py EBOOT DATA.BIN toc
     python tools/re/databin.py EBOOT DATA.BIN overlays OUT_DIR
@@ -13,7 +13,8 @@ with 0: word i is file i's first sector (2048-byte sectors).
 `overlays` writes every file that is an MWo3 overlay as slot1_<hash>.bin-style
 files (hash as hle_mhfu.c computes it: FNV-1a over header + code), named by
 the slot its load address falls in. Nothing here is game data; the table is
-read from the EBOOT you give it."""
+read from the EBOOT you give it. The US EBOOT (told by its size) has the
+table 0x120 higher and loads overlays 0x100 higher; the rest is the same."""
 import os
 import struct
 import sys
@@ -22,6 +23,7 @@ SBOX_ADDR = 0x0899A018
 TOC_BYTES = 26632
 SECTOR = 2048
 SLOTS = {0x09A5F200: 1, 0x09C19000: 2, 0x09D1A180: 3, 0x09D63000: 4}   # load address -> slot
+US_EBOOT_SIZE = 1910672                          # ULUS10391: S-box +0x120, slots +0x100
 
 
 def eboot_bytes(path, addr, n):
@@ -69,7 +71,9 @@ def main():
     if len(sys.argv) < 4:
         raise SystemExit(__doc__)
     eboot, data, cmd = sys.argv[1:4]
-    c = Cipher(eboot_bytes(eboot, SBOX_ADDR, 256))
+    us = os.path.getsize(eboot) == US_EBOOT_SIZE
+    slots = {a + 0x100: s for a, s in SLOTS.items()} if us else SLOTS
+    c = Cipher(eboot_bytes(eboot, SBOX_ADDR + (0x120 if us else 0), 256))
     f = open(data, 'rb')
     size = os.path.getsize(data)
     toc = struct.unpack('<%dI' % (TOC_BYTES // 4), c.decrypt(f.read(TOC_BYTES), 0))
@@ -97,7 +101,7 @@ def main():
         body = c.decrypt(f.read((n + 3) & ~3), toc[i])[:n]
         name = body[32:64].split(b'\0')[0].decode('ascii', 'replace')
         h = fnv1a(body[:0x40 + code])
-        slot = SLOTS.get(base, 9)
+        slot = slots.get(base, 9)
         path = os.path.join(out, 'slot%d_%08X.bin' % (slot, h))
         open(path, 'wb').write(body)
         print('file %4d  %-20s %08X at %08X, %d bytes' % (i, name, h, base, n))
