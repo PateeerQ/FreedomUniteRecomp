@@ -2203,6 +2203,7 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
             int ww = 0, wh = 0;
             SDL_GetWindowSizeInPixels(g_window, &ww, &wh);
             touch_update((float)ww, (float)wh);
+            moving = 1;                         /* wake again soon (16 ms, not 100) */
         }
         const uint64_t now = SDL_GetTicks();
         if (now >= next_stats) {
