@@ -1,0 +1,23 @@
+# Written by tools/region_seeds.py from seeds/eboot.txt: the same functions in the US build.
+088178A4
+0889AD5C
+0889CFBC
+0889D584
+088A1EC0
+088B5844
+088B7408
+088C5920
+088C5AC8
+088F3270
+088AEEF8
+0886940C
+088871FC
+08841DD8
+08890E0C
+08845C9C
+# FUComplete (tools/fuc_prepare.py): its loader, PRELOAD.BIN, MODLOAD.BIN and the hooks into it
+089970C8
+089C7530
+08A35910
+08A359EC
+08A360BC

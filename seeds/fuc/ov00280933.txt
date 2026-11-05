@@ -1,0 +1,4 @@
+# Written by tools/region_seeds.py from seeds/ovCF9AF581.txt: the same functions in the US build.
+09CC2370
+09CBF188
+09CB5B68
