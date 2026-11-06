@@ -1,0 +1,2 @@
+# tools/fuc_variants.py: where MODLOAD's hooks return into option_task.ovl
+09A5AE1C

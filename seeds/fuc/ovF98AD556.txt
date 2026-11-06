@@ -1,2 +1,6 @@
 # Written by tools/region_seeds.py from seeds/ov208A07B1.txt: the same functions in the US build.
 09A67230
+09A822F0
+09A83510
+09A835B8
+09AAA0F8

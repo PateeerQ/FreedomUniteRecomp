@@ -64,3 +64,6 @@ release/
 
 # The internet relay (mhfu_hub and its deployment): closed source, kept out of the repository
 server/
+
+# Skills
+.claude/skills

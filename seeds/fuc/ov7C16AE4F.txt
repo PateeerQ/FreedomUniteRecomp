@@ -1,0 +1,3 @@
+# tools/fuc_variants.py: where MODLOAD's hooks return into arcade_task.ovl
+09A5EF24
+09A6951C

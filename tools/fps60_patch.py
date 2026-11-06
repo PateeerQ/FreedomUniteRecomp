@@ -146,6 +146,11 @@ JP_OVERLAY[0x5588B454] = JP_OVERLAY[0x7AA81434]
 JP_OVERLAY[0xF98AD556] = JP_OVERLAY[0x7AA81434]
 # Its game_task as it runs: the JP one (also on its disc) with 4 words patched by MODLOAD.
 JP_OVERLAY[0xE8E323D5] = JP_OVERLAY[0x6EF0CAAD]
+# The same two with FUComplete's options (CONFIG.BIN 0x1A/0x1B, 0x18/0x19) on: tools/fuc_variants.py.
+for _h in (0x0960C4EC, 0x05A8DF52, 0x454F003C):
+    JP_OVERLAY[_h] = JP_OVERLAY[0x7AA81434]
+for _h in (0xDDC4E525, 0xE489EA57, 0xB82E9D47):
+    JP_OVERLAY[_h] = JP_OVERLAY[0x6EF0CAAD]
 JP_DATA = {"0x08B59914u": "0x08B55654u", "0x090AF21Cu": "0x090AAF5Cu"}
 
 

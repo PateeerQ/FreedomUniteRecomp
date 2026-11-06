@@ -1,0 +1,7 @@
+# tools/fuc_variants.py: where MODLOAD's hooks return into lobby_task.ovl
+09A822F0
+09A83510
+09A835B8
+09AA8DF0
+09AA8E00
+09AAA0F8
