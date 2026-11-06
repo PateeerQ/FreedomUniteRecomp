@@ -86,7 +86,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\third_party\libkirk;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <BufferSecurityCheck></BufferSecurityCheck>
@@ -113,10 +113,10 @@
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;MHFU_DEFAULT_RELAY=\"lunarpride.net:27313\";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\third_party\libkirk;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\third_party\libkirk;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -136,7 +136,7 @@ exit /b %1
 if %errorlevel% neq 0 goto :VCEnd</Command>
     </PostBuildEvent>
     <Link>
-      <AdditionalDependencies>psprecomp\Debug\psprecomp.lib;Debug\mhfu_net.lib;user32.lib;gdi32.lib;opengl32.lib;ole32.lib;windowscodecs.lib;Debug\rcheevos.lib;winhttp.lib;_deps\sdl3-build\Debug\SDL3-static.lib;Debug\mhfu_basisu.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avcodec.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swscale.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swresample.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avutil.lib;dbghelp.lib;winmm.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;imm32.lib;ole32.lib;oleaut32.lib;version.lib;uuid.lib;advapi32.lib;setupapi.lib;shell32.lib;dinput8.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>psprecomp\Debug\psprecomp.lib;Debug\mhfu_net.lib;Debug\mhfu_kirk.lib;user32.lib;gdi32.lib;opengl32.lib;ole32.lib;windowscodecs.lib;Debug\rcheevos.lib;winhttp.lib;_deps\sdl3-build\Debug\SDL3-static.lib;Debug\mhfu_basisu.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avcodec.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swscale.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swresample.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avutil.lib;dbghelp.lib;winmm.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;imm32.lib;ole32.lib;oleaut32.lib;version.lib;uuid.lib;advapi32.lib;setupapi.lib;shell32.lib;dinput8.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <DataExecutionPrevention></DataExecutionPrevention>
@@ -157,7 +157,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\third_party\libkirk;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <BufferSecurityCheck></BufferSecurityCheck>
@@ -185,10 +185,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;MHFU_DEFAULT_RELAY=\"lunarpride.net:27313\";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\third_party\libkirk;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\third_party\libkirk;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -208,7 +208,7 @@ exit /b %1
 if %errorlevel% neq 0 goto :VCEnd</Command>
     </PostBuildEvent>
     <Link>
-      <AdditionalDependencies>psprecomp\Release\psprecomp.lib;Release\mhfu_net.lib;user32.lib;gdi32.lib;opengl32.lib;ole32.lib;windowscodecs.lib;Release\rcheevos.lib;winhttp.lib;_deps\sdl3-build\Release\SDL3-static.lib;Release\mhfu_basisu.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avcodec.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swscale.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swresample.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avutil.lib;dbghelp.lib;winmm.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;imm32.lib;ole32.lib;oleaut32.lib;version.lib;uuid.lib;advapi32.lib;setupapi.lib;shell32.lib;dinput8.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>psprecomp\Release\psprecomp.lib;Release\mhfu_net.lib;Release\mhfu_kirk.lib;user32.lib;gdi32.lib;opengl32.lib;ole32.lib;windowscodecs.lib;Release\rcheevos.lib;winhttp.lib;_deps\sdl3-build\Release\SDL3-static.lib;Release\mhfu_basisu.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avcodec.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swscale.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swresample.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avutil.lib;dbghelp.lib;winmm.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;imm32.lib;ole32.lib;oleaut32.lib;version.lib;uuid.lib;advapi32.lib;setupapi.lib;shell32.lib;dinput8.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <DataExecutionPrevention></DataExecutionPrevention>
@@ -229,7 +229,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\third_party\libkirk;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <BufferSecurityCheck></BufferSecurityCheck>
@@ -257,10 +257,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;MHFU_DEFAULT_RELAY=\"lunarpride.net:27313\";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\third_party\libkirk;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\third_party\libkirk;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -280,7 +280,7 @@ exit /b %1
 if %errorlevel% neq 0 goto :VCEnd</Command>
     </PostBuildEvent>
     <Link>
-      <AdditionalDependencies>psprecomp\MinSizeRel\psprecomp.lib;MinSizeRel\mhfu_net.lib;user32.lib;gdi32.lib;opengl32.lib;ole32.lib;windowscodecs.lib;MinSizeRel\rcheevos.lib;winhttp.lib;_deps\sdl3-build\MinSizeRel\SDL3-static.lib;MinSizeRel\mhfu_basisu.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avcodec.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swscale.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swresample.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avutil.lib;dbghelp.lib;winmm.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;imm32.lib;ole32.lib;oleaut32.lib;version.lib;uuid.lib;advapi32.lib;setupapi.lib;shell32.lib;dinput8.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>psprecomp\MinSizeRel\psprecomp.lib;MinSizeRel\mhfu_net.lib;MinSizeRel\mhfu_kirk.lib;user32.lib;gdi32.lib;opengl32.lib;ole32.lib;windowscodecs.lib;MinSizeRel\rcheevos.lib;winhttp.lib;_deps\sdl3-build\MinSizeRel\SDL3-static.lib;MinSizeRel\mhfu_basisu.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avcodec.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swscale.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swresample.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avutil.lib;dbghelp.lib;winmm.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;imm32.lib;ole32.lib;oleaut32.lib;version.lib;uuid.lib;advapi32.lib;setupapi.lib;shell32.lib;dinput8.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <DataExecutionPrevention></DataExecutionPrevention>
@@ -301,7 +301,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\third_party\libkirk;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <BufferSecurityCheck></BufferSecurityCheck>
@@ -328,10 +328,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;MHFU_DEFAULT_RELAY=\"lunarpride.net:27313\";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\third_party\libkirk;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\us\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\third_party\libkirk;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -351,7 +351,7 @@ exit /b %1
 if %errorlevel% neq 0 goto :VCEnd</Command>
     </PostBuildEvent>
     <Link>
-      <AdditionalDependencies>psprecomp\RelWithDebInfo\psprecomp.lib;RelWithDebInfo\mhfu_net.lib;user32.lib;gdi32.lib;opengl32.lib;ole32.lib;windowscodecs.lib;RelWithDebInfo\rcheevos.lib;winhttp.lib;_deps\sdl3-build\RelWithDebInfo\SDL3-static.lib;RelWithDebInfo\mhfu_basisu.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avcodec.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swscale.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swresample.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avutil.lib;dbghelp.lib;winmm.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;imm32.lib;ole32.lib;oleaut32.lib;version.lib;uuid.lib;advapi32.lib;setupapi.lib;shell32.lib;dinput8.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>psprecomp\RelWithDebInfo\psprecomp.lib;RelWithDebInfo\mhfu_net.lib;RelWithDebInfo\mhfu_kirk.lib;user32.lib;gdi32.lib;opengl32.lib;ole32.lib;windowscodecs.lib;RelWithDebInfo\rcheevos.lib;winhttp.lib;_deps\sdl3-build\RelWithDebInfo\SDL3-static.lib;RelWithDebInfo\mhfu_basisu.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avcodec.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swscale.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swresample.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avutil.lib;dbghelp.lib;winmm.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;imm32.lib;ole32.lib;oleaut32.lib;version.lib;uuid.lib;advapi32.lib;setupapi.lib;shell32.lib;dinput8.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <DataExecutionPrevention></DataExecutionPrevention>
@@ -523,6 +523,12 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <ClCompile Include="E:\Project\MHFU-Android\host\prof.c">
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\host\chnnlsv.c">
       <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
       <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
       <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>
@@ -9909,6 +9915,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ProjectReference Include="E:\Project\MHFU-Android\build-all\mhfu_basisu.vcxproj">
       <Project>{2FE57554-783D-3CA8-A43B-54E8150C21DC}</Project>
       <Name>mhfu_basisu</Name>
+    </ProjectReference>
+    <ProjectReference Include="E:\Project\MHFU-Android\build-all\mhfu_kirk.vcxproj">
+      <Project>{3B611C03-9D9D-3D12-96C3-0C98242441BC}</Project>
+      <Name>mhfu_kirk</Name>
     </ProjectReference>
     <ProjectReference Include="E:\Project\MHFU-Android\build-all\mhfu_net.vcxproj">
       <Project>{CF25427A-D71E-3E42-BC28-AB667615E7ED}</Project>

@@ -49,6 +49,11 @@ FILES
   mhfu_host_*.exe     the game, one per release
   *.dll               FFmpeg 7.1 (LGPL 2.1), for movies and music
 
+LICENSE
+  This program is free software under the GNU General Public License,
+  version 3 (the source: https://github.com/PateeerQ/FreedomUniteRecomp).
+  It includes libkirk (GPL 3) to read saves from a PSP or PPSSPP.
+
 NOTICE
   Not affiliated with or endorsed by Capcom. Monster Hunter is a trademark of
   Capcom. FFmpeg is licensed under the LGPL 2.1 (https://ffmpeg.org/legal.html);

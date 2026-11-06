@@ -8,8 +8,10 @@
  * <root>/ms/PSP/SAVEDATA/<gameName><saveName>/.
  *
  * Saves are stored as the game hands them over, unencrypted: the PSP
- * encrypts savedata in the firmware, and the firmware is us. That means a
- * save from a real PSP or PPSSPP (encrypted) cannot be read yet.
+ * encrypts savedata in the firmware, and the firmware is us (PPSSPP reads
+ * plain saves too). A save from a real PSP or PPSSPP (encrypted) is decrypted
+ * when it loads (chnnlsv.c, over libkirk); one that will not decrypt is set
+ * aside whole.
  *
  * Every dialog follows the same status sequence the games poll for:
  * InitStart -> INITIALIZE -> RUNNING -> FINISHED, ShutdownStart -> SHUTDOWN
@@ -43,6 +45,7 @@
 
 #include "utility.h"
 #include "window.h"
+#include "chnnlsv.h"
 
 enum { ST_NONE, ST_INIT, ST_RUNNING, ST_FINISHED, ST_SHUTDOWN };
 
@@ -67,7 +70,7 @@ enum {
     P_FILE = 100, P_DATABUF = 116, P_DATABUFSIZE = 120, P_DATASIZE = 124,
     P_SFO_TITLE = 128, P_SFO_SAVETITLE = 256, P_SFO_DETAIL = 384, P_SFO_PARENTAL = 1408,
     P_ICON0 = 1412, P_ICON1 = 1428, P_PIC1 = 1444, P_SND0 = 1460,
-    P_FOCUS = 1480, P_MSFREE = 1488, P_MSDATA = 1492, P_UTILDATA = 1496,
+    P_FOCUS = 1480, P_MSFREE = 1488, P_MSDATA = 1492, P_UTILDATA = 1496, P_KEY = 1500,
     P_IDLIST = 1524, P_FILELIST = 1528, P_SIZEINFO = 1532
 };
 
@@ -309,6 +312,160 @@ static int resolve_wild(uint32_t p, char *name, size_t cap) {
     return 0;
 }
 
+/* One value of a save's PARAM.SFO, copied into out (up to cap bytes); its
+ * length, or -1 when there is none. */
+static int sfo_value(const char *dir, const char *want, uint8_t *out, int cap) {
+    char path[900];
+    snprintf(path, sizeof path, "%s/PARAM.SFO", dir);
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+    static uint8_t buf[16384];
+    const size_t n = fread(buf, 1, sizeof buf, f);
+    fclose(f);
+    if (n < 20 || memcmp(buf, "\0PSF", 4)) return -1;
+    uint32_t keys, data, cnt;
+    memcpy(&keys, buf + 8, 4); memcpy(&data, buf + 12, 4); memcpy(&cnt, buf + 16, 4);
+    for (uint32_t i = 0; i < cnt && 20 + 16 * i + 16 <= n; i++) {
+        const uint8_t *e = buf + 20 + 16 * i;
+        const uint32_t ko = (uint32_t)e[0] | (uint32_t)e[1] << 8;
+        uint32_t len, off;
+        memcpy(&len, e + 4, 4); memcpy(&off, e + 12, 4);
+        if (keys + ko >= n || strcmp((const char *)buf + keys + ko, want)) continue;
+        if (data + off >= n) return -1;
+        if (len > n - (data + off)) len = (uint32_t)(n - (data + off));
+        const int k = (int)len < cap ? (int)len : cap;
+        memcpy(out, buf + data + off, (size_t)k);
+        return (int)len;
+    }
+    return -1;
+}
+
+/* A save the PSP's firmware encrypted (a real PSP's, or PPSSPP's with its
+ * default "encrypt savedata"): PARAM.SFO's SAVEDATA_PARAMS says so, and how,
+ * in its first byte (PPSSPP's GetSaveCryptMode). 0 for a plain save. */
+static int sfo_crypt_mode(const char *dir) {
+    uint8_t p[128];
+    if (sfo_value(dir, "SAVEDATA_PARAMS", p, sizeof p) <= 0) return 0;
+    switch (p[0]) {
+    case 0x00: return 0;
+    case 0x21: return 3;
+    case 0x41: return 5;
+    default: return 1;
+    }
+}
+
+/* The hash SAVEDATA_FILE_LIST keeps for a file (entries of 32 bytes: name
+ * [13], hash [16], padding); 1 if there is one. */
+static int sfo_file_hash(const char *dir, const char *file, uint8_t hash[16]) {
+    static uint8_t list[3168];
+    const int n = sfo_value(dir, "SAVEDATA_FILE_LIST", list, sizeof list);
+    for (int i = 0; i + 32 <= n && i + 32 <= (int)sizeof list; i += 32)
+        if (list[i] && strncmp((const char *)list + i, file, 13) == 0) { memcpy(hash, list + i + 13, 16); return 1; }
+    return 0;
+}
+
+/* An encrypted save file, decrypted into the game's buffer (chnnlsv.c), with
+ * the game's own key: the file's mode first, then the others, each checked
+ * against the hash PARAM.SFO keeps (as PPSSPP's LoadCryptedSave does). The
+ * plain length, or -1. */
+static long load_encrypted(const char *dir, const char *file, int mode, uint32_t p) {
+    char path[900];
+    snprintf(path, sizeof path, "%s/%s", dir, file);
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+    fseek(f, 0, SEEK_END);
+    const long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (size <= 0x10 || size > 64L << 20) { fclose(f); return -1; }
+    uint8_t *raw = (uint8_t *)malloc((size_t)size + 16), *work = (uint8_t *)malloc((size_t)size + 16);
+    const size_t got = raw ? fread(raw, 1, (size_t)size, f) : 0;
+    fclose(f);
+    if (!raw || !work || got != (size_t)size) { free(raw); free(work); return -1; }
+    uint8_t key[16], hash[16];
+    for (int i = 0; i < 16; i++) key[i] = psp_read8(p + P_KEY + (uint32_t)i);
+    const int has_hash = sfo_file_hash(dir, file, hash);
+    const int modes[4] = { mode, 5, 3, 1 };
+    long plain = -1;
+    for (int pass = 0; pass < (has_hash ? 2 : 1) && plain < 0; pass++)
+        for (int m = 0; m < 4 && plain < 0; m++) {
+            if (m && modes[m] == mode) continue;
+            memset(work, 0, (size_t)size + 16);
+            memcpy(work, raw, (size_t)size);
+            int len = (int)size;
+            /* pass 0 checks the hash; pass 1 (only the file's mode) as PPSSPP: without */
+            if (pass == 1 && m) break;
+            if (mhfu_save_decrypt(modes[m], work, &len, modes[m] > 1 ? key : NULL,
+                                  pass == 0 && has_hash ? hash : NULL) == 0) {
+                const uint32_t buf = psp_read32(p + P_DATABUF), cap = psp_read32(p + P_DATABUFSIZE);
+                if ((uint32_t)len <= cap && psp_mem_write_block(buf, work, (uint32_t)len) == 0) {
+                    plain = len;
+                    printf("savedata: %s decrypted (mode %d%s), %d bytes\n", path, modes[m],
+                           pass == 0 && has_hash ? ", hash checked" : ", hash not checked", len);
+                }
+            }
+        }
+    free(raw);
+    free(work);
+    return plain;
+}
+
+/* Same files, same bytes, in two save folders (no subfolders in a save). */
+struct same_ctx { const char *a, *b; int same, n; };
+static void same_one(const char *name, void *ctx) {
+    struct same_ctx *c = (struct same_ctx *)ctx;
+    if (!c->same) return;
+    char pa[900], pb[900];
+    snprintf(pa, sizeof pa, "%s/%s", c->a, name);
+    snprintf(pb, sizeof pb, "%s/%s", c->b, name);
+    FILE *fa = fopen(pa, "rb"), *fb = fopen(pb, "rb");
+    if (!fa || !fb) c->same = 0;
+    while (c->same) {
+        char x[4096], y[4096];
+        const size_t na = fread(x, 1, sizeof x, fa), nb = fread(y, 1, sizeof y, fb);
+        if (na != nb || memcmp(x, y, na)) c->same = 0;
+        if (!na) break;
+    }
+    if (fa) fclose(fa);
+    if (fb) fclose(fb);
+    c->n++;
+}
+static int same_save(const char *a, const char *b) {
+    struct same_ctx c = { a, b, 1, 0 }, d = { b, a, 1, 0 };
+    each_entry(a, 0, same_one, &c);
+    each_entry(b, 0, same_one, &d);
+    return c.same && d.same && c.n == d.n;
+}
+static void rm_one(const char *name, void *ctx) {
+    char p[900];
+    snprintf(p, sizeof p, "%s/%s", (const char *)ctx, name);
+    remove(p);
+}
+
+/* Out of the game's way, kept whole (renamed, never deleted), so that a new
+ * save does not overwrite it, with a word on the screen. Android's save folder
+ * (SaveSync) brings the same save back at every start: a copy identical to
+ * one already set aside goes (the original is still in that folder). */
+static void set_aside_encrypted(const char *dir) {
+    char to[900];
+    for (int i = 0; i < 100; i++) {
+        snprintf(to, sizeof to, i ? "%s.encrypted-%d" : "%s.encrypted", dir, i);
+        if (dir_exists(to) && same_save(dir, to)) {
+            each_entry(dir, 0, rm_one, (void *)dir);
+#ifdef _WIN32
+            _rmdir(dir);
+#else
+            rmdir(dir);
+#endif
+            break;
+        }
+        if (!dir_exists(to) && rename(dir, to) == 0) break;
+    }
+    printf("savedata: %s is encrypted (from a PSP or PPSSPP) and did not decrypt with this game's key; "
+           "moved to %s\n", dir, to);
+    mhfu_window_notify("SAVE DATA", "This save could not be read",
+                       "It is encrypted (from a PSP or PPSSPP) and did not decrypt. It was kept, set aside.", NULL);
+}
+
 static uint32_t sd_load(uint32_t p, int list_mode) {
     char name[21], dir[800], file[14], path[900];
     if (list_mode ? pick_save(p, 1, name, sizeof name) != 0 : (guest_str(p + P_SAVE, name, sizeof name), 0))
@@ -318,6 +475,16 @@ static uint32_t sd_load(uint32_t p, int list_mode) {
     save_dir(p, name, dir, sizeof dir);
     if (!dir_exists(dir)) return SD_ERR_LOAD_NO_DATA;
     guest_str(p + P_FILE, file, sizeof file);
+    const int crypt = sfo_crypt_mode(dir);
+    if (crypt && file[0]) {
+        /* From a PSP or PPSSPP: decrypted as the firmware would. The next save
+         * writes it plain, which PPSSPP reads as well. */
+        const long n = load_encrypted(dir, file, crypt, p);
+        if (n < 0) { set_aside_encrypted(dir); return SD_ERR_LOAD_NO_DATA; }
+        psp_write32(p + P_DATASIZE, (uint32_t)n);
+        printf("savedata: loaded %s\n", dir);
+        return 0;
+    }
     if (file[0]) {
         snprintf(path, sizeof path, "%s/%s", dir, file);
         long n = read_file(path, psp_read32(p + P_DATABUF), psp_read32(p + P_DATABUFSIZE));

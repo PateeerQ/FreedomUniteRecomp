@@ -10,7 +10,7 @@
 <p align="center">
   <a href="https://github.com/PateeerQ/FreedomUniteRecomp/releases/latest"><img src="https://img.shields.io/github/v/release/PateeerQ/FreedomUniteRecomp?label=release&color=c8a04a" alt="Release"></a>
   <a href="https://github.com/PateeerQ/FreedomUniteRecomp/releases"><img src="https://img.shields.io/github/downloads/PateeerQ/FreedomUniteRecomp/total?color=8a6d3b" alt="Downloads"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="License: GPL-3.0"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20x64-0078d6" alt="Windows x64">
   <img src="https://img.shields.io/badge/platform-Android%208%2B%20(arm64)-3ddc84" alt="Android 8+ arm64">
   <a href="https://github.com/sp00nznet/psprecomp"><img src="https://img.shields.io/badge/built%20with-psprecomp-555" alt="Built with psprecomp"></a>
@@ -75,7 +75,7 @@ Both check for updates by themselves (the launcher on PC, the app at start or fr
 
 ## Status
 
-Version **0.4.0**. The game boots, plays its movies, creates and saves a character, and runs the village,
+Version **0.4.1**. The game boots, plays its movies, creates and saves a character, and runs the village,
 the Gathering Hall and quests in 3D at its own 30 fps, or 60 in 60 FPS mode, with sound, music, keyboard,
 controllers and touch buttons. Quests have been played start to finish, alone and together through a room, on
 PC and on Android (Poco X7 Pro).
@@ -97,7 +97,7 @@ PC and on Android (Poco X7 Pro).
 | Audio | ![85%](https://img.shields.io/badge/85%25-brightgreen?style=flat-square) | sound effects, music (ATRAC3/3+ via FFmpeg), movie sound; small gaps while loading |
 | Movies | ![90%](https://img.shields.io/badge/90%25-brightgreen?style=flat-square) | H.264 + ATRAC3+ via FFmpeg, own PSMF demuxer |
 | Input | ![90%](https://img.shields.io/badge/90%25-brightgreen?style=flat-square) | keyboard, mouse camera, controllers, touch buttons with a layout editor, swipe camera, weapon buttons |
-| Save data | ![80%](https://img.shields.io/badge/80%25-brightgreen?style=flat-square) | save and load (unencrypted); on Android a save folder of your choice, kept in sync |
+| Save data | ![88%](https://img.shields.io/badge/88%25-brightgreen?style=flat-square) | save and load; saves from a PSP or PPSSPP (encrypted) load too; on Android a save folder of your choice, kept in sync |
 | Multiplayer (ad hoc over rooms) | ![88%](https://img.shields.io/badge/88%25-brightgreen?style=flat-square) | LAN and internet rooms, passcodes, chat, ping, 60 fps rooms, every release in one room with its name shown; Gathering Hall and quests together; movement in the hall lags |
 | Mods | ![80%](https://img.shields.io/badge/80%25-brightgreen?style=flat-square) | widescreen, CWCheat cheats, three built-in code mods in every release |
 | Texture packs | ![70%](https://img.shields.io/badge/70%25-yellow?style=flat-square) | PPSSPP packs (quick/xxh32/xxh64 hashes, PNG, KTX2 as ASTC/BC7), styles from ADDONS; tested on PC, not yet on a phone |
@@ -302,7 +302,11 @@ yet, GE work, and a framebuffer capture. A `dispatch miss` names an address that
 ## Credits
 
 - **[psprecomp](https://github.com/sp00nznet/psprecomp)** by sp00nznet: the static recompiler this is built on (MIT)
-- **[PPSSPP](https://github.com/hrydgard/ppsspp)**: its source was the reference for the firmware's and the GPU's behaviour
+- **[PPSSPP](https://github.com/hrydgard/ppsspp)**: its source was the reference for the firmware's and the GPU's behaviour;
+  the save data cipher (`host/chnnlsv.c`) is ported from its `sceChnnlsv.cpp` (GPL 2.0 or later)
+- **libkirk** (Draan and the PSP scene, from PPSSPP's `ext/libkirk`, GPL 3): the PSP's KIRK crypto engine, used to read
+  saves from a PSP or PPSSPP (`third_party/libkirk`)
+- **[Basis Universal](https://github.com/BinomialLLC/basis_universal)** (Apache 2.0): KTX2 textures in texture packs
 - **[OceanTriRecomp](https://github.com/krisztsa/OceanTriRecomp)**: the model for the approach
 - **[SDL3](https://libsdl.org)** (zlib), **[FFmpeg](https://ffmpeg.org)** (LGPL 2.1),
   **[rcheevos](https://github.com/RetroAchievements/rcheevos)** (MIT), **[Dear ImGui](https://github.com/ocornut/imgui)** (MIT),
@@ -314,6 +318,7 @@ yet, GE work, and a framebuffer capture. A `dispatch miss` names an address that
 
 ## License
 
-The code in this repository is released under the **[MIT License](LICENSE)**. Third-party components keep their own
-licenses (see [Credits](#credits)). The license covers this project's code only, not *Monster Hunter Freedom Unite*
-or anything made from it.
+Copyright (c) 2026 PateeerQ. The code in this repository is released under the **[GNU General Public License,
+version 3](LICENSE)** (since v0.4.0; it was MIT before): it includes libkirk (GPL 3) to read saves from a PSP or
+PPSSPP. Third-party components keep their own licenses (see [Credits](#credits)). The license covers this project's
+code only, not *Monster Hunter Freedom Unite* or anything made from it.

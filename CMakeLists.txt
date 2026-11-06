@@ -154,8 +154,20 @@ endif()
 # What every host shares, made once.
 set(MHFU_HOST_SOURCES host/main.c host/achievements.c host/chat.c host/hle_mhfu.c host/input.c host/keys.c
     host/stats.c host/libfont.c host/utility.c host/adhoc.c host/lobby.c host/mods.c host/audio.c host/atrac.c
-    host/mpeg.c host/prof.c)
+    host/mpeg.c host/prof.c host/chnnlsv.c)
 set(MHFU_HOST_DEPS_READY OFF)
+
+# The PSP's KIRK crypto engine (PPSSPP's ext/libkirk, GPL v3): decrypts save data
+# a PSP or PPSSPP encrypted (host/chnnlsv.c).
+add_library(mhfu_kirk STATIC third_party/libkirk/AES.c third_party/libkirk/SHA1.c third_party/libkirk/bn.c
+    third_party/libkirk/ec.c third_party/libkirk/kirk_engine.c)
+target_include_directories(mhfu_kirk PUBLIC third_party/libkirk)
+if(MSVC)
+    target_compile_options(mhfu_kirk PRIVATE /W0)
+    target_compile_definitions(mhfu_kirk PRIVATE _CRT_SECURE_NO_WARNINGS)
+else()
+    target_compile_options(mhfu_kirk PRIVATE -w)
+endif()
 macro(mhfu_host_deps)
     if(NOT MHFU_HOST_DEPS_READY)
         set(MHFU_HOST_DEPS_READY ON)
@@ -263,7 +275,7 @@ function(mhfu_add_host target gen_dir ovl_dir)
     if(MHFU_RELAY_VALUE)
         target_compile_definitions(${target} PRIVATE "MHFU_DEFAULT_RELAY=\"${MHFU_RELAY_VALUE}\"")
     endif()
-    target_link_libraries(${target} PRIVATE psprecomp mhfu_net)
+    target_link_libraries(${target} PRIVATE psprecomp mhfu_net mhfu_kirk)
     if(WIN32)
         target_sources(${target} PRIVATE assets/icon/mhfu.rc)       # the crest, as the exe's icon
         target_link_libraries(${target} PRIVATE user32 gdi32 opengl32 ole32 windowscodecs)

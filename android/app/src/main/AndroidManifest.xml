@@ -35,6 +35,15 @@
         android:appCategory="game"
         android:isGame="true">
 
+        <!-- simpleperf (the NDK's profiler) may sample release builds too, from adb -->
+        <profileable android:shell="true" />
+
+        <!-- The crash log's .zip, shared with another app (CrashLog.share) -->
+        <provider android:name=".CrashProvider"
+            android:authorities="${applicationId}.crashlog"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+
         <!-- The entry: checks the game files (asks for the .iso folder if needed), then starts the game -->
         <activity android:name=".SetupActivity"
             android:label="@string/app_name"

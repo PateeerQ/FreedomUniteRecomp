@@ -243,7 +243,8 @@ public class MhfuActivity extends SDLActivity {
                 .setMessage("Version " + Updater.currentVersion(this) + "\n\n"
                         + "A native port of " + Region.get(this).title + " (PSP, " + Region.get(this).gameId + "), statically recompiled.\n\n"
                         + "Maintained by PateeerQ.\ngithub.com/" + Updater.REPO + "\n\n"
-                        + "Built on psprecomp (sp00nznet), SDL3, FFmpeg (LGPL), rcheevos and stb.\n"
+                        + "Free software under the GNU GPL v3. Built on psprecomp (sp00nznet), SDL3, FFmpeg (LGPL), "
+                        + "rcheevos, stb, Basis Universal and libkirk (GPL v3, from PPSSPP).\n"
                         + "Touch button icons by Lorc and Delapouite, game-icons.net (CC BY 3.0).\n\n"
                         + "Not affiliated with or endorsed by Capcom. Monster Hunter is a trademark of Capcom. "
                         + "Play with your own copy of the game: no game files come with this app.")

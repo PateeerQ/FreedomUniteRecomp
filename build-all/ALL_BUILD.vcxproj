@@ -214,6 +214,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <Project>{A2354E34-D4B1-37E9-A05B-F90D7F1BB4AC}</Project>
       <Name>mhfu_hub</Name>
     </ProjectReference>
+    <ProjectReference Include="E:\Project\MHFU-Android\build-all\mhfu_kirk.vcxproj">
+      <Project>{3B611C03-9D9D-3D12-96C3-0C98242441BC}</Project>
+      <Name>mhfu_kirk</Name>
+    </ProjectReference>
     <ProjectReference Include="E:\Project\MHFU-Android\build-all\launcher\mhfu_launcher.vcxproj">
       <Project>{DB48F489-02CD-350D-B6BF-B56468A07E68}</Project>
       <Name>mhfu_launcher</Name>

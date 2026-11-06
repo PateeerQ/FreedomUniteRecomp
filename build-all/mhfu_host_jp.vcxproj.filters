@@ -49,6 +49,9 @@
     <ClCompile Include="E:\Project\MHFU-Android\host\prof.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\host\chnnlsv.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="E:\Project\MHFU-Android\work\jp\gen\mhfu_funcs_000.c">
       <Filter>Source Files</Filter>
     </ClCompile>
