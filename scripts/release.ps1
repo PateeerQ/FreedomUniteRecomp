@@ -6,13 +6,16 @@
 #   .\scripts\release.ps1 -NoBuild
 #   .\scripts\release.ps1 -Region US        # the USA build (setup.ps1 with its EBOOT:
 #                                           # build-us, work\us): ...-us.zip / -us.apk
+#   .\scripts\release.ps1 -Region ALL       # the universal one: every release set up so far
+#                                           # (build-universal.ps1: build-all; the APK with
+#                                           # every libmain_<tag>.so): ...-universal.zip / .apk
 #
 # Both contain the game's code recompiled from your EBOOT (mhfu_host.exe,
 # libmain.so). No game files go in (no ISO, EBOOT, fonts, saves), but
 # think before publishing them: see the README's notice.
 param(
     [switch]$NoBuild,
-    [ValidateSet("EU", "US", "JP", "FUC")] [string]$Region = "EU"
+    [ValidateSet("EU", "US", "JP", "FUC", "ALL")] [string]$Region = "EU"
 )
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
@@ -20,15 +23,17 @@ $version = (Select-String -Path "$repo\host\about.h" -Pattern '#define MHFU_VERS
 $gradleVersion = (Select-String -Path "$repo\android\app\build.gradle" -Pattern "versionName '([^']+)'").Matches[0].Groups[1].Value
 if ($version -ne $gradleVersion) { throw "host/about.h says $version, android/app/build.gradle says ${gradleVersion}: make them the same" }
 #   -Region JP: the Japanese Portable 2nd G (build-jp, work\jp): ...-jp.zip / -jp.apk
-$us = $Region -ne "EU"                     # a build in a region subfolder (USA or Japan)
+$all = $Region -eq "ALL"
+$us = $Region -ne "EU" -and -not $all      # a build in a region subfolder (USA, Japan, FUComplete)
 $sub = $Region.ToLower()
-$buildDir = if ($us) { "$repo\build-$sub" } else { "$repo\build" }
-$suffix = if ($us) { "-$sub" } else { "" }
+$buildDir = if ($all) { "$repo\build-all" } elseif ($us) { "$repo\build-$sub" } else { "$repo\build" }
+$suffix = if ($all) { "-universal" } elseif ($us) { "-$sub" } else { "" }
 $workSub = if ($us) { "work\$sub" } else { "work" }
 if ($us -and -not (Test-Path "$repo\$workSub\gen\mhfu_region_gen.h")) { throw "no $Region build: run setup.ps1 with that region's EBOOT first" }
 
 if (-not $NoBuild) {
-    cmake --build $buildDir --config Release --target mhfu_host mhfu_launcher
+    if ($all) { & "$repo\scripts\build-universal.ps1" }
+    else { cmake --build $buildDir --config Release --target mhfu_host mhfu_launcher }
     if ($LASTEXITCODE) { throw "the Windows build failed" }
     # AGP 8.7's Gradle runs on JDK 17-21; Android Studio's own JBR became 25. A JBR 21 under ~/.jdks first.
     $jdk = Get-ChildItem "$env:USERPROFILE\.jdks\jbr-21*", "$env:USERPROFILE\.jdks\*-21*" -Directory -ErrorAction SilentlyContinue |
@@ -51,7 +56,9 @@ $stage = "$out\$name-windows-x64$suffix"
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Force "$stage\$workSub\root\flash0\font" | Out-Null
 $bin = "$buildDir\Release"
-foreach ($f in "mhfu_launcher.exe", "mhfu_host.exe", "mhfu.png") { Copy-Item "$bin\$f" $stage }
+$hosts = if ($all) { @(Get-ChildItem "$bin\mhfu_host_*.exe" | ForEach-Object Name) } else { @("mhfu_host.exe") }
+if (-not $hosts.Count) { throw "no game in $bin: build it first" }
+foreach ($f in @("mhfu_launcher.exe", "mhfu.png") + $hosts) { Copy-Item "$bin\$f" $stage }
 Get-ChildItem "$bin\*.dll" | Copy-Item -Destination $stage
 # The Visual C++ runtime, beside the exes (app-local), so no redistributable has to be installed.
 $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath

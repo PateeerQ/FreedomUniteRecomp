@@ -68,8 +68,10 @@ std::vector<Check> ready_check(const Config &c, const std::string &gpu) {
                         P(paths::host_exe()).filename().u8string() + ", " + std::to_string(ovl) + " of 298 overlays recompiled"});
 
     const int fonts = count_files(P(paths::profile_root("Default")) / "flash0" / "font", ".pgf");
-    if (!fonts) out.push_back({false, false, "PSP fonts", "none in work/root/flash0/font: all text would be blank"});
-    else out.push_back({true, false, "PSP fonts", std::to_string(fonts) + " system fonts"});
+    const int shared = count_files(P(paths::base()) / "work" / "root" / "flash0" / "font", ".pgf");   // Europe's, every release's
+    if (fonts) out.push_back({true, false, "PSP fonts", std::to_string(fonts) + " system fonts"});
+    else if (shared) out.push_back({true, false, "PSP fonts", std::to_string(shared) + " system fonts, from work/root/flash0/font"});
+    else out.push_back({false, false, "PSP fonts", "none in work/root/flash0/font: all text would be blank"});
 
     const bool ffmpeg = file_exists((P(paths::exe_dir()) / "avcodec-61.dll").u8string());
     out.push_back({ffmpeg, !ffmpeg, "Movies and music",
@@ -171,6 +173,14 @@ bool game_start(const Config &c, std::string &err) {
     const std::string root = paths::profile_root(c.profile);
     std::error_code e;
     fs::create_directories(P(root) / "ms" / "PSP" / "SAVEDATA", e);
+    // The fonts are put once in work/root/flash0/font (the release zip says so): each
+    // release's own device root gets a copy the first time.
+    const fs::path fonts = P(root) / "flash0" / "font", shared = P(paths::base()) / "work" / "root" / "flash0" / "font";
+    if (!count_files(fonts, ".pgf") && fonts != shared) {
+        fs::create_directories(fonts, e);
+        for (auto &f : fs::directory_iterator(shared, e))
+            if (f.path().extension().u8string() == ".pgf") fs::copy_file(f.path(), fonts / f.path().filename(), fs::copy_options::skip_existing, e);
+    }
     fs::create_directories(P(paths::work()) / "overlays", e);
 
     const std::string keys = (P(paths::launcher()) / "input.ini").u8string();

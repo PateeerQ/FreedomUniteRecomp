@@ -107,6 +107,9 @@ endif()
 # Android libmain_eu.so ...), which the launcher and the app choose from by the
 # disc the player has (scripts/build-universal.ps1).
 
+if(ANDROID)
+    enable_language(CXX)        # the hosts link as C++ (SDL3's HID code): enabled here, at the top scope
+endif()
 option(MHFU_UNIVERSAL "A host for every region set up in work/ (mhfu_host_<region>)" OFF)
 option(MHFU_RCHEEVOS "RetroAchievements in game (rcheevos)" ON)
 option(MHFU_TRACE "Record every recompiled function entry" ON)
@@ -211,10 +214,10 @@ function(mhfu_add_host target gen_dir ovl_dir)
     list(APPEND gen_sources ${ovl_sources})
 
     if(ANDROID)
-        # SDL's Android activity loads libmain*.so and calls its SDL_main.
-        # SDL3 for Android has some C++ (its HID code): link with the C++ driver,
-        # so the static libc++ (ANDROID_STL=c++_static) comes in.
-        enable_language(CXX)
+        # SDL's Android activity loads libmain*.so and calls its SDL_main. SDL3 for
+        # Android has some C++ (its HID code): linked with the C++ driver, so the
+        # static libc++ (ANDROID_STL=c++_static) comes in. CXX is enabled at the top:
+        # enabled in here, its link rule was empty ("cd . && cd .") and no .so came out.
         add_library(${target} SHARED ${MHFU_HOST_SOURCES} host/android.c ${gen_sources})
         set_target_properties(${target} PROPERTIES LINKER_LANGUAGE CXX)
         target_link_libraries(${target} PRIVATE android log EGL GLESv3 OpenSLES)

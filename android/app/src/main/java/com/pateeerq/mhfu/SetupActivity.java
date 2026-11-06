@@ -102,35 +102,62 @@ public class SetupActivity extends Activity {
      * a plain ELF of this build's size.
      */
     static boolean ebootFromDisc(String isoPath, File out, Region r) {
-        try (java.io.RandomAccessFile f = new java.io.RandomAccessFile(isoPath, "r")) {
-            long[] at = isoPath(f, "PSP_GAME", "SYSDIR", "EBOOT.BIN");
+        FileChannel ch = null;
+        try {
+            ch = discChannel(isoPath);
+            long[] at = isoPath(ch, "PSP_GAME", "SYSDIR", "EBOOT.BIN");
             if (at == null) return false;
             if (at[1] != r.ebootSize) return false;
             byte[] buf = new byte[1 << 16];
-            f.seek(at[0] * 2048);
             try (OutputStream o = new FileOutputStream(out)) {
-                for (long left = at[1]; left > 0;) {
-                    int n = f.read(buf, 0, (int) Math.min(buf.length, left));
-                    if (n <= 0) return false;
+                for (long done = 0; done < at[1];) {
+                    int n = (int) Math.min(buf.length, at[1] - done);
+                    readAt(ch, at[0] * 2048 + done, buf, n);
                     o.write(buf, 0, n);
-                    left -= n;
+                    done += n;
                 }
             }
             return elf(out);
         } catch (Exception e) {
             android.util.Log.w("mhfu", "EBOOT from the disc: " + e);
             return false;
+        } finally {
+            doneWith(isoPath, ch);
+        }
+    }
+
+    /**
+     * The disc, to read by position. A disc picked through Android's picker is
+     * /proc/self/fd/N, and opening that path again is refused (shared storage's
+     * check): it is read through the descriptor kept open for the game (isoFd).
+     */
+    static FileChannel discChannel(String isoPath) throws java.io.IOException {
+        if (isoPath.startsWith("/proc/self/fd/") && isoFd != null)
+            return new FileInputStream(isoFd.getFileDescriptor()).getChannel();
+        return new FileInputStream(isoPath).getChannel();
+    }
+
+    /** Closes a channel discChannel opened by path; the game's own descriptor stays open. */
+    static void doneWith(String isoPath, FileChannel ch) {
+        if (ch == null || (isoPath.startsWith("/proc/self/fd/") && isoFd != null)) return;
+        try { ch.close(); } catch (Exception ignored) { }
+    }
+
+    static void readAt(FileChannel ch, long pos, byte[] b, int n) throws java.io.IOException {
+        ByteBuffer bb = ByteBuffer.wrap(b, 0, n);
+        while (bb.hasRemaining()) {
+            int got = ch.read(bb, pos + bb.position());
+            if (got <= 0) throw new java.io.EOFException("the disc ends early");
         }
     }
 
     /** {sector, size} of a file in the image, by its path's parts; null if it is not there. */
-    static long[] isoPath(java.io.RandomAccessFile f, String... parts) throws java.io.IOException {
+    static long[] isoPath(FileChannel ch, String... parts) throws java.io.IOException {
         byte[] pvd = new byte[2048];
-        f.seek(16L * 2048);
-        f.readFully(pvd);
+        readAt(ch, 16L * 2048, pvd, pvd.length);
         long[] at = { le32(pvd, 156 + 2), le32(pvd, 156 + 10) };
         for (String part : parts) {
-            at = isoFind(f, at[0], at[1], part);
+            at = isoFind(ch, at[0], at[1], part);
             if (at == null) return null;
         }
         return at;
@@ -141,10 +168,10 @@ public class SetupActivity extends Activity {
     }
 
     /** {sector, size} of `name` in the directory at `lba` (`size` bytes), or null. */
-    private static long[] isoFind(java.io.RandomAccessFile f, long lba, long size, String name) throws java.io.IOException {
+    private static long[] isoFind(FileChannel ch, long lba, long size, String name) throws java.io.IOException {
+        if (size > (16 << 20)) return null;
         byte[] dir = new byte[(int) size];
-        f.seek(lba * 2048);
-        f.readFully(dir);
+        readAt(ch, lba * 2048, dir, dir.length);
         for (int i = 0; i < dir.length;) {
             int n = dir[i] & 0xFF;
             if (n == 0) { i = (i / 2048 + 1) * 2048; continue; }
@@ -157,7 +184,6 @@ public class SetupActivity extends Activity {
         }
         return null;
     }
-
     private static boolean elf(File f) {
         try (InputStream in = new FileInputStream(f)) {
             byte[] h = new byte[4];

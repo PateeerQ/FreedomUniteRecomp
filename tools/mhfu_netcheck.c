@@ -117,7 +117,12 @@ static int join(const char *code, const char *relay) {
     mhn_room_info rooms[16];
     const int listed = relay ? mhn_hub_list(host, port, rooms, 16, 3000) : mhn_lan_list(rooms, 16, 1000);
     int seen = -1;
-    for (int i = 0; i < listed; i++) if (!strcmp(rooms[i].code, code)) seen = i;
+    printf("     listed %d room(s)\n", listed);
+    for (int i = 0; i < listed; i++) {
+        printf("     %s \"%s\" %d player(s) locked %d, %d fps, %s\n", rooms[i].code, rooms[i].name, rooms[i].players,
+               rooms[i].locked, rooms[i].fps, rooms[i].game[0] ? rooms[i].game : "(no release)");
+        if (!strcmp(rooms[i].code, code)) seen = i;
+    }
     CHECK(seen >= 0 && rooms[seen].players == 1 && rooms[seen].locked == (g_pass[0] != 0),
           "the room is in the list, one player, locked as it should be");
     CHECK((rooms[seen].fps == 30 || rooms[seen].fps == 60) && rooms[seen].ping_ms >= 0,

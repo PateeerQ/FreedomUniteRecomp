@@ -75,20 +75,24 @@ final class Region {
 
     /** The release on a disc image (a path SetupActivity can read), or null. */
     static Region ofDisc(String isoPath) {
-        try (java.io.RandomAccessFile f = new java.io.RandomAccessFile(isoPath, "r")) {
-            long[] sfo = SetupActivity.isoPath(f, "PSP_GAME", "PARAM.SFO");
+        java.nio.channels.FileChannel ch = null;
+        try {
+            ch = SetupActivity.discChannel(isoPath);
+            long[] sfo = SetupActivity.isoPath(ch, "PSP_GAME", "PARAM.SFO");
             if (sfo == null || sfo[1] > 65536) return null;
             byte[] b = new byte[(int) sfo[1]];
-            f.seek(sfo[0] * 2048);
-            f.readFully(b);
+            SetupActivity.readAt(ch, sfo[0] * 2048, b, b.length);
             String s = new String(b, "ISO-8859-1");
             if (s.contains("ULES01213")) return byTag("EU");
             if (s.contains("ULUS10391")) return byTag("US");
             if (s.contains("ULJM05500"))
-                return SetupActivity.isoPath(f, "FUC", "PRELOAD.BIN") != null ? byTag("FUC") : byTag("JP");
+                return SetupActivity.isoPath(ch, "FUC", "PRELOAD.BIN") != null ? byTag("FUC") : byTag("JP");
             return null;
         } catch (Exception e) {
+            android.util.Log.w("mhfu", "which release is the disc: " + e);
             return null;
+        } finally {
+            SetupActivity.doneWith(isoPath, ch);
         }
     }
 }
