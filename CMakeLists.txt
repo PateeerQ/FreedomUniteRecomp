@@ -32,6 +32,10 @@ endif()
 set(PSPRECOMP_REAL_THREADS ON CACHE BOOL "Enable cooperative host-thread scheduling")
 
 add_subdirectory("${PSPRECOMP_DIR}" psprecomp)
+if(MSVC)
+    # Full debug info for the runtime (small), so host/prof.c names its static functions too.
+    target_compile_options(psprecomp PRIVATE /Zi)
+endif()
 
 # --- tools ------------------------------------------------------------------------
 
@@ -150,7 +154,7 @@ endif()
 # What every host shares, made once.
 set(MHFU_HOST_SOURCES host/main.c host/achievements.c host/chat.c host/hle_mhfu.c host/input.c host/keys.c
     host/stats.c host/libfont.c host/utility.c host/adhoc.c host/lobby.c host/mods.c host/audio.c host/atrac.c
-    host/mpeg.c)
+    host/mpeg.c host/prof.c)
 set(MHFU_HOST_DEPS_READY OFF)
 macro(mhfu_host_deps)
     if(NOT MHFU_HOST_DEPS_READY)
@@ -327,7 +331,12 @@ function(mhfu_add_host target gen_dir ovl_dir)
     if(MSVC)
         target_compile_options(${target} PRIVATE /MP)
         target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS)
+        # A PDB of the public symbols (no /Zi: the code is unchanged), for host/prof.c's
+        # report; /DEBUG turns the size optimisations off unless they are asked for.
+        target_link_options(${target} PRIVATE /DEBUG /OPT:REF /OPT:ICF)
+        target_link_libraries(${target} PRIVATE dbghelp winmm)
         set_source_files_properties(${gen_sources} PROPERTIES COMPILE_OPTIONS "/W0")
+        set_property(SOURCE ${MHFU_HOST_SOURCES} APPEND PROPERTY COMPILE_OPTIONS /Zi)
     else()
         set_source_files_properties(${gen_sources} PROPERTIES COMPILE_OPTIONS "-w")
     endif()

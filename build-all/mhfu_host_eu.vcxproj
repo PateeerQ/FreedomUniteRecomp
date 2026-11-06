@@ -136,15 +136,17 @@ exit /b %1
 if %errorlevel% neq 0 goto :VCEnd</Command>
     </PostBuildEvent>
     <Link>
-      <AdditionalDependencies>psprecomp\Debug\psprecomp.lib;Debug\mhfu_net.lib;user32.lib;gdi32.lib;opengl32.lib;ole32.lib;windowscodecs.lib;Debug\rcheevos.lib;winhttp.lib;_deps\sdl3-build\Debug\SDL3-static.lib;Debug\mhfu_basisu.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avcodec.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swscale.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swresample.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avutil.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;imm32.lib;ole32.lib;oleaut32.lib;version.lib;uuid.lib;advapi32.lib;setupapi.lib;shell32.lib;dinput8.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>psprecomp\Debug\psprecomp.lib;Debug\mhfu_net.lib;user32.lib;gdi32.lib;opengl32.lib;ole32.lib;windowscodecs.lib;Debug\rcheevos.lib;winhttp.lib;_deps\sdl3-build\Debug\SDL3-static.lib;Debug\mhfu_basisu.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avcodec.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swscale.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swresample.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avutil.lib;dbghelp.lib;winmm.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;imm32.lib;ole32.lib;oleaut32.lib;version.lib;uuid.lib;advapi32.lib;setupapi.lib;shell32.lib;dinput8.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <DataExecutionPrevention></DataExecutionPrevention>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ImageHasSafeExceptionHandlers></ImageHasSafeExceptionHandlers>
       <ImportLibrary>E:/Project/MHFU-Android/build-all/Debug/mhfu_host_eu.lib</ImportLibrary>
       <LinkErrorReporting></LinkErrorReporting>
+      <OptimizeReferences>true</OptimizeReferences>
       <ProgramDataBaseFile>E:/Project/MHFU-Android/build-all/Debug/mhfu_host_eu.pdb</ProgramDataBaseFile>
       <RandomizedBaseAddress></RandomizedBaseAddress>
       <SubSystem>Console</SubSystem>
@@ -206,15 +208,17 @@ exit /b %1
 if %errorlevel% neq 0 goto :VCEnd</Command>
     </PostBuildEvent>
     <Link>
-      <AdditionalDependencies>psprecomp\Release\psprecomp.lib;Release\mhfu_net.lib;user32.lib;gdi32.lib;opengl32.lib;ole32.lib;windowscodecs.lib;Release\rcheevos.lib;winhttp.lib;_deps\sdl3-build\Release\SDL3-static.lib;Release\mhfu_basisu.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avcodec.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swscale.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swresample.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avutil.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;imm32.lib;ole32.lib;oleaut32.lib;version.lib;uuid.lib;advapi32.lib;setupapi.lib;shell32.lib;dinput8.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>psprecomp\Release\psprecomp.lib;Release\mhfu_net.lib;user32.lib;gdi32.lib;opengl32.lib;ole32.lib;windowscodecs.lib;Release\rcheevos.lib;winhttp.lib;_deps\sdl3-build\Release\SDL3-static.lib;Release\mhfu_basisu.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avcodec.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swscale.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swresample.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avutil.lib;dbghelp.lib;winmm.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;imm32.lib;ole32.lib;oleaut32.lib;version.lib;uuid.lib;advapi32.lib;setupapi.lib;shell32.lib;dinput8.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <DataExecutionPrevention></DataExecutionPrevention>
-      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ImageHasSafeExceptionHandlers></ImageHasSafeExceptionHandlers>
       <ImportLibrary>E:/Project/MHFU-Android/build-all/Release/mhfu_host_eu.lib</ImportLibrary>
       <LinkErrorReporting></LinkErrorReporting>
+      <OptimizeReferences>true</OptimizeReferences>
       <ProgramDataBaseFile>E:/Project/MHFU-Android/build-all/Release/mhfu_host_eu.pdb</ProgramDataBaseFile>
       <RandomizedBaseAddress></RandomizedBaseAddress>
       <SubSystem>Console</SubSystem>
@@ -276,15 +280,17 @@ exit /b %1
 if %errorlevel% neq 0 goto :VCEnd</Command>
     </PostBuildEvent>
     <Link>
-      <AdditionalDependencies>psprecomp\MinSizeRel\psprecomp.lib;MinSizeRel\mhfu_net.lib;user32.lib;gdi32.lib;opengl32.lib;ole32.lib;windowscodecs.lib;MinSizeRel\rcheevos.lib;winhttp.lib;_deps\sdl3-build\MinSizeRel\SDL3-static.lib;MinSizeRel\mhfu_basisu.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avcodec.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swscale.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swresample.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avutil.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;imm32.lib;ole32.lib;oleaut32.lib;version.lib;uuid.lib;advapi32.lib;setupapi.lib;shell32.lib;dinput8.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>psprecomp\MinSizeRel\psprecomp.lib;MinSizeRel\mhfu_net.lib;user32.lib;gdi32.lib;opengl32.lib;ole32.lib;windowscodecs.lib;MinSizeRel\rcheevos.lib;winhttp.lib;_deps\sdl3-build\MinSizeRel\SDL3-static.lib;MinSizeRel\mhfu_basisu.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avcodec.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swscale.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swresample.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avutil.lib;dbghelp.lib;winmm.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;imm32.lib;ole32.lib;oleaut32.lib;version.lib;uuid.lib;advapi32.lib;setupapi.lib;shell32.lib;dinput8.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <DataExecutionPrevention></DataExecutionPrevention>
-      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ImageHasSafeExceptionHandlers></ImageHasSafeExceptionHandlers>
       <ImportLibrary>E:/Project/MHFU-Android/build-all/MinSizeRel/mhfu_host_eu.lib</ImportLibrary>
       <LinkErrorReporting></LinkErrorReporting>
+      <OptimizeReferences>true</OptimizeReferences>
       <ProgramDataBaseFile>E:/Project/MHFU-Android/build-all/MinSizeRel/mhfu_host_eu.pdb</ProgramDataBaseFile>
       <RandomizedBaseAddress></RandomizedBaseAddress>
       <SubSystem>Console</SubSystem>
@@ -345,15 +351,17 @@ exit /b %1
 if %errorlevel% neq 0 goto :VCEnd</Command>
     </PostBuildEvent>
     <Link>
-      <AdditionalDependencies>psprecomp\RelWithDebInfo\psprecomp.lib;RelWithDebInfo\mhfu_net.lib;user32.lib;gdi32.lib;opengl32.lib;ole32.lib;windowscodecs.lib;RelWithDebInfo\rcheevos.lib;winhttp.lib;_deps\sdl3-build\RelWithDebInfo\SDL3-static.lib;RelWithDebInfo\mhfu_basisu.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avcodec.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swscale.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swresample.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avutil.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;imm32.lib;ole32.lib;oleaut32.lib;version.lib;uuid.lib;advapi32.lib;setupapi.lib;shell32.lib;dinput8.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>psprecomp\RelWithDebInfo\psprecomp.lib;RelWithDebInfo\mhfu_net.lib;user32.lib;gdi32.lib;opengl32.lib;ole32.lib;windowscodecs.lib;RelWithDebInfo\rcheevos.lib;winhttp.lib;_deps\sdl3-build\RelWithDebInfo\SDL3-static.lib;RelWithDebInfo\mhfu_basisu.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avcodec.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swscale.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\swresample.lib;E:\Project\MHFU-Android\deps\ffmpeg\lib\avutil.lib;dbghelp.lib;winmm.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;imm32.lib;ole32.lib;oleaut32.lib;version.lib;uuid.lib;advapi32.lib;setupapi.lib;shell32.lib;dinput8.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <DataExecutionPrevention></DataExecutionPrevention>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ImageHasSafeExceptionHandlers></ImageHasSafeExceptionHandlers>
       <ImportLibrary>E:/Project/MHFU-Android/build-all/RelWithDebInfo/mhfu_host_eu.lib</ImportLibrary>
       <LinkErrorReporting></LinkErrorReporting>
+      <OptimizeReferences>true</OptimizeReferences>
       <ProgramDataBaseFile>E:/Project/MHFU-Android/build-all/RelWithDebInfo/mhfu_host_eu.pdb</ProgramDataBaseFile>
       <RandomizedBaseAddress></RandomizedBaseAddress>
       <SubSystem>Console</SubSystem>
@@ -421,25 +429,105 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="E:\Project\MHFU-Android\host\main.c">
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(PreprocessorDefinitions);MHFU_TEXPACK=1</PreprocessorDefinitions>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(PreprocessorDefinitions);MHFU_TEXPACK=1</PreprocessorDefinitions>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">%(PreprocessorDefinitions);MHFU_TEXPACK=1</PreprocessorDefinitions>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">%(PreprocessorDefinitions);MHFU_TEXPACK=1</PreprocessorDefinitions>
     </ClCompile>
-    <ClCompile Include="E:\Project\MHFU-Android\host\achievements.c" />
-    <ClCompile Include="E:\Project\MHFU-Android\host\chat.c" />
-    <ClCompile Include="E:\Project\MHFU-Android\host\hle_mhfu.c" />
-    <ClCompile Include="E:\Project\MHFU-Android\host\input.c" />
-    <ClCompile Include="E:\Project\MHFU-Android\host\keys.c" />
-    <ClCompile Include="E:\Project\MHFU-Android\host\stats.c" />
-    <ClCompile Include="E:\Project\MHFU-Android\host\libfont.c" />
-    <ClCompile Include="E:\Project\MHFU-Android\host\utility.c" />
-    <ClCompile Include="E:\Project\MHFU-Android\host\adhoc.c" />
-    <ClCompile Include="E:\Project\MHFU-Android\host\lobby.c" />
-    <ClCompile Include="E:\Project\MHFU-Android\host\mods.c" />
-    <ClCompile Include="E:\Project\MHFU-Android\host\audio.c" />
-    <ClCompile Include="E:\Project\MHFU-Android\host\atrac.c" />
-    <ClCompile Include="E:\Project\MHFU-Android\host\mpeg.c" />
+    <ClCompile Include="E:\Project\MHFU-Android\host\achievements.c">
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\host\chat.c">
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\host\hle_mhfu.c">
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\host\input.c">
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\host\keys.c">
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\host\stats.c">
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\host\libfont.c">
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\host\utility.c">
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\host\adhoc.c">
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\host\lobby.c">
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\host\mods.c">
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\host\audio.c">
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\host\atrac.c">
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\host\mpeg.c">
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\host\prof.c">
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
     <ClCompile Include="E:\Project\MHFU-Android\work\gen\mhfu_funcs_000.c">
       <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">TurnOffAllWarnings</WarningLevel>
       <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">TurnOffAllWarnings</WarningLevel>

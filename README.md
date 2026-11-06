@@ -45,7 +45,9 @@ anyone can join with a code, 60 FPS, widescreen, controllers, rearrangeable touc
 | **Native** | The EBOOT and all 298 overlays (menus, stages, monsters) recompiled to C; firmware reimplemented in the host |
 | **Online play** | **Create Server / Join Server** with room codes and optional passcodes, on your Wi-Fi or over the internet relay; no port forwarding. PC and phone in the same room. Room chat and ping |
 | **60 FPS (beta)** | The game at 60 fps and normal speed. A room plays at its slowest player's rate |
+| **One app, every release** | Europe, USA, Japan and the FUComplete translation from one launcher and one app, told from your disc; every release can share a room |
 | **Mods** | Widescreen, CWCheat cheats, and built-in mods: Target Camera + Crosshair, Damage Numbers, Gathering Node Indicators |
+| **Texture packs** | HD packs made for PPSSPP (PNG or KTX2, with their style variants), optional |
 | **Android** | Touch buttons you can move and resize, a swipe camera, weapon buttons that change with your weapon, a save folder you choose |
 | **PC launcher** | Profiles, upscaling, fullscreen, key bindings, controller tester, RetroAchievements, update check, log |
 | **Controllers** | DualSense, DualShock, Xbox and more (SDL3); the right stick moves the camera |
@@ -56,8 +58,9 @@ anyone can join with a code, 60 FPS, widescreen, controllers, rearrangeable touc
 | Game | Region | ID | Status |
 |---|---|---|---|
 | Monster Hunter Freedom Unite | Europe | `ULES01213` | **Playable**: village, Gathering Hall, quests, online |
-| Monster Hunter Freedom Unite | North America | `ULUS10391` | **In progress**: quests on Android, online together with EU players; no release yet |
-| Monster Hunter Portable 2nd G | Japan | `ULJM05500` | **In progress**: quests on PC and Android, 60 FPS and the built-in mods; no release yet |
+| Monster Hunter Freedom Unite | North America | `ULUS10391` | **Playable**: quests on PC and Android, 60 FPS, the built-in mods, online with every release |
+| Monster Hunter Portable 2nd G | Japan | `ULJM05500` | **Playable**: quests on PC and Android, 60 FPS, the built-in mods, online with every release |
+| FUComplete (MHP2G English translation) | — | `ULJM05500` | **Playable**: the translated `.iso` as it is, no EBOOT dump needed |
 
 ## Download
 
@@ -65,20 +68,20 @@ Get the newest build from **[Releases](https://github.com/PateeerQ/FreedomUniteR
 
 | Platform | File | Needs |
 |---|---|---|
-| Windows 10/11 x64 | `FreedomUniteRecomp-v<version>-windows-x64.zip` | OpenGL 3.3 GPU |
-| Android 8+ arm64 | `FreedomUniteRecomp-v<version>-android-arm64.apk` | OpenGL ES 3.0 GPU |
+| Windows 10/11 x64 | `FreedomUniteRecomp-v<version>-windows-x64-universal.zip` | OpenGL 3.3 GPU |
+| Android 8+ arm64 | `FreedomUniteRecomp-v<version>-android-arm64-universal.apk` | OpenGL ES 3.0 GPU |
 
 Both check for updates by themselves (the launcher on PC, the app at start or from its menu).
 
 ## Status
 
-Version **0.3.2**. The game boots, plays its movies, creates and saves a character, and runs the village,
+Version **0.4.0**. The game boots, plays its movies, creates and saves a character, and runs the village,
 the Gathering Hall and quests in 3D at its own 30 fps, or 60 in 60 FPS mode, with sound, music, keyboard,
 controllers and touch buttons. Quests have been played start to finish, alone and together through a room, on
 PC and on Android (Poco X7 Pro).
 
 <details>
-<summary><b>Progress by area</b> (rough estimates, 2026-11-05)</summary>
+<summary><b>Progress by area</b> (rough estimates, 2026-11-06)</summary>
 
 <br>
 
@@ -95,13 +98,17 @@ PC and on Android (Poco X7 Pro).
 | Movies | ![90%](https://img.shields.io/badge/90%25-brightgreen?style=flat-square) | H.264 + ATRAC3+ via FFmpeg, own PSMF demuxer |
 | Input | ![90%](https://img.shields.io/badge/90%25-brightgreen?style=flat-square) | keyboard, mouse camera, controllers, touch buttons with a layout editor, swipe camera, weapon buttons |
 | Save data | ![80%](https://img.shields.io/badge/80%25-brightgreen?style=flat-square) | save and load (unencrypted); on Android a save folder of your choice, kept in sync |
-| Multiplayer (ad hoc over rooms) | ![85%](https://img.shields.io/badge/85%25-brightgreen?style=flat-square) | LAN and internet rooms, passcodes, chat, ping, 60 fps rooms; Gathering Hall and quests together; movement in the hall lags |
-| Mods | ![75%](https://img.shields.io/badge/75%25-yellow?style=flat-square) | widescreen, CWCheat cheats, three built-in code mods (EU) |
+| Multiplayer (ad hoc over rooms) | ![88%](https://img.shields.io/badge/88%25-brightgreen?style=flat-square) | LAN and internet rooms, passcodes, chat, ping, 60 fps rooms, every release in one room with its name shown; Gathering Hall and quests together; movement in the hall lags |
+| Mods | ![80%](https://img.shields.io/badge/80%25-brightgreen?style=flat-square) | widescreen, CWCheat cheats, three built-in code mods in every release |
+| Texture packs | ![70%](https://img.shields.io/badge/70%25-yellow?style=flat-square) | PPSSPP packs (quick/xxh32/xxh64 hashes, PNG, KTX2 as ASTC/BC7), styles from ADDONS; tested on PC, not yet on a phone |
+| Performance | ![40%](https://img.shields.io/badge/40%25-yellow?style=flat-square) | being worked on for low-end phones: the GE's vertex work is done on the CPU; vertex reads made direct (village about 18% lighter on PC) |
 | RetroAchievements | ![70%](https://img.shields.io/badge/70%25-yellow?style=flat-square) | sign-in, game identified, unlock toasts (softcore); not yet checked against a real unlock |
 | Gameplay coverage | ![40%](https://img.shields.io/badge/40%25-yellow?style=flat-square) | village life, full quests, the Gathering Hall together; more maps and monsters untested |
 | PC release (launcher) | ![85%](https://img.shields.io/badge/85%25-brightgreen?style=flat-square) | launcher, profiles, keys, controllers, achievements, mods, 60 FPS, updates, log, crash report |
 | Android port | ![75%](https://img.shields.io/badge/75%25-yellow?style=flat-square) | 30 or 60 fps, touch buttons, layout editor, drawer menu, multiplayer, achievements, mods, save folder, crash log, updates |
-| USA release (`ULUS10391`) | ![55%](https://img.shields.io/badge/55%25-yellow?style=flat-square) | 60 FPS and the built-in mods; a quest on Android with the mods and weapon buttons, in one room with an EU player |
+| USA release (`ULUS10391`) | ![75%](https://img.shields.io/badge/75%25-yellow?style=flat-square) | 60 FPS and the built-in mods; quests on Android with the mods and weapon buttons, in one room with an EU player |
+| Japan release (`ULJM05500`) | ![75%](https://img.shields.io/badge/75%25-yellow?style=flat-square) | 60 FPS and the built-in mods; quests and area changes on PC and Android, in one room with an EU player |
+| FUComplete | ![70%](https://img.shields.io/badge/70%25-yellow?style=flat-square) | the English translation's own code and voices; checked on PC and Android |
 
 </details>
 
@@ -111,14 +118,15 @@ It is early software: expect rough edges, and please report crashes (both apps c
 
 You need your own copy of the game and three files made from it:
 
-1. **the disc image**: Monster Hunter Freedom Unite (Europe), `ULES01213`, as an `.iso`
+1. **the disc image** as an `.iso`: Freedom Unite Europe (`ULES01213`) or USA (`ULUS10391`), Portable 2nd G
+   (`ULJM05500`), or the FUComplete translation
 2. **its decrypted EBOOT**: in PPSSPP, *Settings → Tools → Developer tools → "Dump decrypted EBOOT.BIN on game
-   boot"* (gives `ULES01213_EBOOT.BIN`)
+   boot"* (gives `<game id>_EBOOT.BIN`); not needed for FUComplete
 3. **the PSP's fonts**: the `.pgf` files from PPSSPP's `assets/flash0/font`
 
 ### Windows
 
-1. Unzip `FreedomUniteRecomp-v<version>-windows-x64.zip`.
+1. Unzip `FreedomUniteRecomp-v<version>-windows-x64-universal.zip`.
 2. Put the fonts in `work\root\flash0\font`.
 3. Run `mhfu_launcher.exe`, choose the ISO and the EBOOT under **Advanced**, then press **DEPART** on the Play page.
 
@@ -147,7 +155,7 @@ camera's sensitivity, mouse look and mods.
 
 ### Android
 
-1. Install `FreedomUniteRecomp-v<version>-android-arm64.apk` (arm64, Android 8+).
+1. Install `FreedomUniteRecomp-v<version>-android-arm64-universal.apk` (arm64, Android 8+).
 2. Put the ISO and the EBOOT in one folder on the phone.
 3. Open the app and pick that folder (*"Use this folder"*). After that it goes straight into the game.
 

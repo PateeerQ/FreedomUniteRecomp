@@ -49,6 +49,7 @@
 #include "lobby.h"
 #include "mods.h"
 #include "texpack.h"
+#include "prof.h"
 #include "utility.h"
 #include "window.h"
 
@@ -216,6 +217,7 @@ static void report(void) {
 #if MHFU_TEXPACK
     mhfu_texpack_report();
 #endif
+    mhfu_prof_report();
     uint32_t sm = psp_read32(MHFU_ADDR_SAVE_MANAGER);
     if (sm) {
         printf("save manager       0x%08X  state %u  result 0x%08X  +0x9AC %u  +0x960:", sm,
@@ -655,6 +657,7 @@ int main(int argc, char **argv) {
     mhfu_texpack_init(g_root);    /* a texture pack in <root>/textures/<game id>, or MHFU_TEXPACK */
 #endif
     printf("free user memory   %u KB\n", psp_sysmem_free() / 1024);
+    mhfu_prof_start();            /* MHFU_PROFILE=1: where the time goes (prof.c) */
 
     /* Boot thread: stack from the top of memory, a zeroed $k0 block at its top
      * (the firmware keeps per-thread data there), the boot path as argp just
