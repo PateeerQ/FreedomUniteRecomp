@@ -1,0 +1,10 @@
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\BASISU-SUBBUILD\CMAKEFILES\B5FEDD9C2D2C43667FA33903DC35A496\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SE:/Project/MHFU-Android/build-all/_deps/basisu-subbuild -BE:/Project/MHFU-Android/build-all/_deps/basisu-subbuild --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/basisu-populate.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

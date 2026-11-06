@@ -1,0 +1,55 @@
+diff --git a/src/hle/iofilemgr.c b/src/hle/iofilemgr.c
+index f94e3f8..87acfcf 100644
+--- a/src/hle/iofilemgr.c
++++ b/src/hle/iofilemgr.c
+@@ -489,6 +489,41 @@ static void hle_Rename(void) {
+     psp_ret(rename(ha, hb) == 0 ? 0 : ERR_NOENT);
+ }
+ 
++/* (path, mode) -> 0, or 0x80010011 (EEXIST) when it is there already. The
++ * folders above it are made too: the memory stick on the host may not have
++ * PSP/SAVEDATA yet. MHP2G's FUComplete makes ms0:/PSP/SAVEDATA/FUCDAT this
++ * way before copying its files in. */
++#ifdef _WIN32
++#  include <direct.h>
++#  define io_mkdir(p) _mkdir(p)
++#  define io_rmdir(p) _rmdir(p)
++#else
++#  include <unistd.h>
++#  define io_mkdir(p) mkdir((p), 0777)
++#  define io_rmdir(p) rmdir(p)
++#endif
++#define ERR_EXIST 0x80010011u
++static void hle_Mkdir(void) {
++    char g[512], h[1024];
++    psp_str(psp_arg(0), g, sizeof g);
++    int disc;
++    split_device(g, &disc);
++    if (disc) { psp_ret(ERR_NOENT); return; }          /* a read-only device */
++    map_path(g, h, sizeof h);
++    struct stat st;
++    if (stat(h, &st) == 0) { psp_ret(ERR_EXIST); return; }
++    for (char *p = h + 1; *p; p++)
++        if (*p == '/' || *p == '\\') { char c = *p; *p = 0; io_mkdir(h); *p = c; }
++    psp_ret(io_mkdir(h) == 0 ? 0 : ERR_NOENT);
++}
++
++static void hle_Rmdir(void) {
++    char g[512], h[1024];
++    psp_str(psp_arg(0), g, sizeof g);
++    map_path(g, h, sizeof h);
++    psp_ret(io_rmdir(h) == 0 ? 0 : ERR_NOENT);
++}
++
+ /* ---- stat ------------------------------------------------------------------
+  *
+  * SceIoStat: mode, attr, u64 size, then creation, access and modification
+@@ -771,6 +806,8 @@ void psp_io_register(void) {
+     psp_hle_register(0x27EB27B8, "IoFileMgrForUser", "sceIoLseek",   hle_Lseek);
+     psp_hle_register(0x68963324, "IoFileMgrForUser", "sceIoLseek32", hle_Lseek32);
+     psp_hle_register(0x779103A0, "IoFileMgrForUser", "sceIoRename",  hle_Rename);
++    psp_hle_register(0x06A70004, "IoFileMgrForUser", "sceIoMkdir",   hle_Mkdir);
++    psp_hle_register(0x1117C65F, "IoFileMgrForUser", "sceIoRmdir",   hle_Rmdir);
+     psp_hle_register(0xACE946E8, "IoFileMgrForUser", "sceIoGetstat", hle_Getstat);
+     psp_hle_register(0x63632449, "IoFileMgrForUser", "sceIoIoctl",   hle_Ioctl);
+     psp_hle_register(0x54F5FB11, "IoFileMgrForUser", "sceIoDevctl",  hle_Devctl);

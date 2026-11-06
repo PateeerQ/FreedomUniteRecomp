@@ -107,8 +107,11 @@ endif()
 # Android libmain_eu.so ...), which the launcher and the app choose from by the
 # disc the player has (scripts/build-universal.ps1).
 
-if(ANDROID)
-    enable_language(CXX)        # the hosts link as C++ (SDL3's HID code): enabled here, at the top scope
+option(MHFU_TEXPACK "Texture packs (PPSSPP's textures.ini, PNG and KTX2)" ON)
+if(ANDROID OR MHFU_TEXPACK)
+    # The hosts link as C++ (SDL3's HID code on Android; the KTX2 transcoder):
+    # enabled here, at the top scope.
+    enable_language(CXX)
 endif()
 option(MHFU_UNIVERSAL "A host for every region set up in work/ (mhfu_host_<region>)" OFF)
 option(MHFU_RCHEEVOS "RetroAchievements in game (rcheevos)" ON)
@@ -171,13 +174,38 @@ macro(mhfu_host_deps)
             target_compile_definitions(rcheevos PUBLIC RC_CLIENT_SUPPORTS_HASH RC_DISABLE_LUA PRIVATE _CRT_SECURE_NO_WARNINGS)
             set_target_properties(rcheevos PROPERTIES C_STANDARD 11)
         endif()
-        # The SDL window draws its overlay with stb_truetype.
-        if(MHFU_SDL_WINDOW)
+        # The SDL window draws its overlay with stb_truetype; texture packs read
+        # PNG files with stb_image.
+        if(MHFU_SDL_WINDOW OR MHFU_GAMEPAD)
             include(FetchContent)
             FetchContent_Declare(stb
                 URL https://github.com/nothings/stb/archive/2c980bb59875b0d32144a71867fbdebb2f77cd20.tar.gz)
             FetchContent_MakeAvailable(stb)
+        endif()
+        if(MHFU_SDL_WINDOW)
             set_source_files_properties(host/window_sdl.c host/main.c host/window.c PROPERTIES COMPILE_DEFINITIONS MHFU_SDL_WINDOW=1)
+        endif()
+        # Texture packs (host/texpack.c, PPSSPP's format): their KTX2 pictures
+        # through Basis Universal's transcoder, with its zstd decoder (UASTC +
+        # zstd is how PPSSPP's packs ship). Needs SDL (the loader's thread).
+        if(MHFU_TEXPACK AND MHFU_GAMEPAD)
+            include(FetchContent)
+            # SOURCE_SUBDIR names no folder: fetched only (its own CMakeLists builds the encoder: not wanted).
+            FetchContent_Declare(basisu
+                URL https://github.com/BinomialLLC/basis_universal/archive/refs/tags/v1_60.tar.gz
+                SOURCE_SUBDIR fetch-only)
+            FetchContent_MakeAvailable(basisu)
+            add_library(mhfu_basisu STATIC "${basisu_SOURCE_DIR}/transcoder/basisu_transcoder.cpp"
+                                           "${basisu_SOURCE_DIR}/zstd/zstddeclib.c")
+            target_include_directories(mhfu_basisu PUBLIC "${basisu_SOURCE_DIR}/transcoder")
+            target_compile_definitions(mhfu_basisu PUBLIC BASISD_SUPPORT_KTX2=1 BASISD_SUPPORT_KTX2_ZSTD=1)
+            # Its asserts do not compile where uint64_t is unsigned long (Android: safe_shift_left(1ULL, ...)).
+            target_compile_definitions(mhfu_basisu PRIVATE NDEBUG)
+            if(MSVC)
+                target_compile_options(mhfu_basisu PRIVATE /W0)
+            else()
+                target_compile_options(mhfu_basisu PRIVATE -w)
+            endif()
         endif()
         if(EXISTS "${MHFU_FFMPEG_DIR}/include/libavcodec/avcodec.h")
             message(STATUS "mhfu_host: FFmpeg from ${MHFU_FFMPEG_DIR}")
@@ -252,6 +280,14 @@ function(mhfu_add_host target gen_dir ovl_dir)
         target_sources(${target} PRIVATE host/gamepad.c)
         target_link_libraries(${target} PRIVATE SDL3::SDL3-static)
         target_compile_definitions(${target} PRIVATE MHFU_GAMEPAD=1)
+    endif()
+    if(TARGET mhfu_basisu)
+        target_sources(${target} PRIVATE host/texpack.c host/ktx2.cpp)
+        target_include_directories(${target} PRIVATE "${stb_SOURCE_DIR}")
+        target_link_libraries(${target} PRIVATE mhfu_basisu)
+        # Only main.c asks for it: on the whole target, turning it over would
+        # recompile every generated file.
+        set_property(SOURCE host/main.c host/window_sdl.c APPEND PROPERTY COMPILE_DEFINITIONS MHFU_TEXPACK=1)
     endif()
     # Movies and music (host/mpeg.c, host/atrac.c): FFmpeg's H.264 and ATRAC3+
     # decoders, from a shared LGPL build in deps/ffmpeg (on Windows, BtbN's

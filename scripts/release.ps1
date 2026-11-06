@@ -57,7 +57,7 @@ if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Force "$stage\$workSub\root\flash0\font" | Out-Null
 $bin = "$buildDir\Release"
 $hosts = if ($all) { @(Get-ChildItem "$bin\mhfu_host_*.exe" | ForEach-Object Name) } else { @("mhfu_host.exe") }
-if (-not $hosts.Count) { throw "no game in $bin: build it first" }
+if (-not $hosts.Count) { throw "no game in ${bin}: build it first" }
 foreach ($f in @("mhfu_launcher.exe", "mhfu.png") + $hosts) { Copy-Item "$bin\$f" $stage }
 Get-ChildItem "$bin\*.dll" | Copy-Item -Destination $stage
 # The Visual C++ runtime, beside the exes (app-local), so no redistributable has to be installed.

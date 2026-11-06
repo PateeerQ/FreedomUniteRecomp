@@ -1,5 +1,6 @@
 # CMake generation dependency list for this directory.
 C:/Program Files/CMake/share/cmake-4.5/Modules/CMakeCInformation.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/CMakeCXXInformation.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/CMakeCommonLanguageInclude.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/CMakeGenericSystem.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/CMakeInitializeConfigs.cmake
@@ -9,6 +10,7 @@ C:/Program Files/CMake/share/cmake-4.5/Modules/CMakeSystemSpecificInformation.cm
 C:/Program Files/CMake/share/cmake-4.5/Modules/CMakeSystemSpecificInitialize.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/Compiler/CMakeCommonCompilerMacros.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/Compiler/MSVC-C.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/Compiler/MSVC-CXX.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/Compiler/MSVC.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/ExternalProject/shared_internal_commands.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/FetchContent.cmake
@@ -17,18 +19,23 @@ C:/Program Files/CMake/share/cmake-4.5/Modules/FindGit.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/FindPackageHandleStandardArgs.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/FindPackageMessage.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/Internal/CMakeCLinkerInformation.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/Internal/CMakeCXXLinkerInformation.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/Internal/CMakeCommonLinkerInformation.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/Linker/MSVC-C.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/Linker/MSVC-CXX.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/Linker/MSVC.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/Platform/Linker/Windows-MSVC-C.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/Platform/Linker/Windows-MSVC-CXX.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/Platform/Linker/Windows-MSVC.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/Platform/Windows-Initialize.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/Platform/Windows-MSVC-C.cmake
+C:/Program Files/CMake/share/cmake-4.5/Modules/Platform/Windows-MSVC-CXX.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/Platform/Windows-MSVC.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/Platform/Windows.cmake
 C:/Program Files/CMake/share/cmake-4.5/Modules/Platform/WindowsPaths.cmake
 E:/Project/MHFU-Android/CMakeLists.txt
 E:/Project/MHFU-Android/build-all/CMakeFiles/4.5.0-rc1/CMakeCCompiler.cmake
+E:/Project/MHFU-Android/build-all/CMakeFiles/4.5.0-rc1/CMakeCXXCompiler.cmake
 E:/Project/MHFU-Android/build-all/CMakeFiles/4.5.0-rc1/CMakeRCCompiler.cmake
 E:/Project/MHFU-Android/build-all/CMakeFiles/4.5.0-rc1/CMakeSystem.cmake
 E:/Project/MHFU-Android/build-all/CMakeFiles/cmake.verify_globs

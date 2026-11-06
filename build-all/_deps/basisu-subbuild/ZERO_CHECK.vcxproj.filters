@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="E:\Project\MHFU-Android\build-all\_deps\basisu-subbuild\CMakeFiles\b5fedd9c2d2c43667fa33903dc35a496\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{FEDA327A-F60E-3ADE-B0BB-DDCBD8702F9E}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

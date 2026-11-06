@@ -163,6 +163,9 @@ bool config_load(Config &c) {
         else if (k == "volume") c.volume = std::clamp(atoi(v.c_str()), 0, 100);
         else if (k == "mouse_sens") c.mouse_sens = std::clamp(atoi(v.c_str()), 25, 300);
         else if (k == "widescreen") b(c.widescreen);
+        else if (k == "texpack") b(c.texpack);
+        else if (k == "texpack_dir") c.texpack_dir = v;
+        else if (k == "texpack_style") c.texpack_style = v;
         else if (k.rfind("mod_", 0) == 0) c.mods[k.substr(4)] = v == "1" || v == "true";
         else if (k == "nick") c.nick = v;
         else if (k == "gamepad") c.gamepad = v;
@@ -227,6 +230,9 @@ bool config_save(const Config &c) {
     o << "volume=" << c.volume << "\n";
     o << "mouse_sens=" << c.mouse_sens << "\n";
     o << "widescreen=" << (c.widescreen ? 1 : 0) << "\n";
+    o << "texpack=" << (c.texpack ? 1 : 0) << "\n";
+    o << "texpack_dir=" << escape(c.texpack_dir) << "\n";
+    o << "texpack_style=" << escape(c.texpack_style) << "\n";
     for (auto &m : c.mods) o << "mod_" << m.first << "=" << (m.second ? 1 : 0) << "\n";
     o << "nick=" << escape(c.nick) << "\n";
     o << "check_updates=" << (c.check_updates ? 1 : 0) << "\n";

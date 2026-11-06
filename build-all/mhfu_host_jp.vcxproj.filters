@@ -4708,6 +4708,12 @@
     <ClCompile Include="E:\Project\MHFU-Android\host\gamepad.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\host\texpack.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\host\ktx2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="E:\Project\MHFU-Android\CMakeLists.txt" />

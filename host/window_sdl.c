@@ -28,6 +28,9 @@
 #include "mods.h"
 #include "net/client.h"
 #include "stats.h"
+#if MHFU_TEXPACK
+#include "texpack.h"
+#endif
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_system.h>
@@ -333,6 +336,11 @@ static int vpad_visible(void) {
 static int g_res_setting;
 static int g_fps60;                  /* the 60 fps mode (mhfu_fps_set_preferred) */
 static int g_wide;                   /* the widescreen mod (mhfu_mod_set_widescreen) */
+/* A texture pack (texpack.c): 1 use one when there is one, 0 not; read at
+ * start (texpack_off tells mhfu_texpack_init through MHFU_TEXPACK=0), so a
+ * change shows after a restart. */
+static int g_texpack = 1, g_texpack_started = -1;
+static char g_texstyle[256], g_texstyle_started[256];   /* its ADDONS style ("": MAIN's own) */
 static int g_mod_set[16] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
                                      /* the built-in mods as settings.ini has them: -1 not there */
 
@@ -356,6 +364,11 @@ static void settings_load(void) {
         if (sscanf(line, "resolution=%d", &v) == 1 && v >= 1 && v <= 4) g_res_setting = v;
         if (sscanf(line, "fps60=%d", &v) == 1) g_fps60 = v != 0;
         if (sscanf(line, "widescreen=%d", &v) == 1) g_wide = v != 0;
+        if (sscanf(line, "texpack=%d", &v) == 1) g_texpack = v != 0;
+        if (!strncmp(line, "texpack_style=", 14)) {
+            snprintf(g_texstyle, sizeof g_texstyle, "%s", line + 14);
+            g_texstyle[strcspn(g_texstyle, "\r\n")] = 0;
+        }
         char id[32];
         if (sscanf(line, "mod_%31[a-z0-9]=%d", id, &v) == 2)
             for (int i = 0; i < mhfu_mod_count(); i++)
@@ -365,6 +378,15 @@ static void settings_load(void) {
                 if (!strcmp(name, k_group_name[g])) g_place[g] = (placed){ 1, x, y, k };
     }
     if (f) fclose(f);
+    if (g_texpack_started < 0) {
+        g_texpack_started = g_texpack;
+        snprintf(g_texstyle_started, sizeof g_texstyle_started, "%s", g_texstyle);
+#if defined(__ANDROID__)
+        /* The desktop's launcher sets MHFU_TEXPACK itself. */
+        if (!g_texpack && !getenv("MHFU_TEXPACK")) setenv("MHFU_TEXPACK", "0", 1);
+        if (g_texstyle[0] && !getenv("MHFU_TEXPACK_STYLE")) setenv("MHFU_TEXPACK_STYLE", g_texstyle, 1);
+#endif
+    }
 }
 static void settings_save(void) {
     FILE *f = g_settings_path[0] ? fopen(g_settings_path, "w") : NULL;
@@ -372,7 +394,9 @@ static void settings_save(void) {
     fprintf(f, "# MHFU: the in-game menu's settings\nvirtual_gamepad=%d\nshow_fps=%d\nbutton_opacity=%d\n",
             g_vpad_mode, g_show_fps_init, g_vpad_alpha);
     if (g_res_setting) fprintf(f, "resolution=%d\n", g_res_setting);
-    fprintf(f, "fps60=%d\nwidescreen=%d\nweapon_buttons=%d\nbutton_style=%d\n", g_fps60, g_wide, g_skills_on, g_style);
+    fprintf(f, "fps60=%d\nwidescreen=%d\nweapon_buttons=%d\nbutton_style=%d\ntexpack=%d\n", g_fps60, g_wide,
+            g_skills_on, g_style, g_texpack);
+    if (g_texstyle[0]) fprintf(f, "texpack_style=%s\n", g_texstyle);
     for (int i = 0; i < mhfu_mod_count(); i++) fprintf(f, "mod_%s=%d\n", mhfu_mod_id(i), mhfu_mod_on(i));
     for (int g = 0; g < G_COUNT; g++)
         if (g_place[g].set)
@@ -1204,7 +1228,7 @@ static void draw_editor(canvas *c, float s) {
  * Android dialogs (MhfuActivity, over JNI): they need text fields. */
 
 enum { R_HEAD, R_ITEM };
-enum { M_RESUME, M_NET, M_ACH, M_VPAD, M_STYLE, M_EDIT, M_OPACITY, M_SKILLS, M_FPS, M_RES, M_SMOOTH, M_WIDE, M_CHEATS, M_MOD0, M_MOD1, M_MOD2, M_SAVES, M_FILES, M_CRASH, M_UPDATE, M_ABOUT, M_EXIT };
+enum { M_RESUME, M_NET, M_ACH, M_VPAD, M_STYLE, M_EDIT, M_OPACITY, M_SKILLS, M_FPS, M_RES, M_SMOOTH, M_WIDE, M_CHEATS, M_TEXPACK, M_TEXSTYLE, M_TEXINSTALL, M_MOD0, M_MOD1, M_MOD2, M_SAVES, M_FILES, M_CRASH, M_UPDATE, M_ABOUT, M_EXIT };
 typedef struct { int kind, id; const char *text; } menu_row;
 static const menu_row k_menu[] = {
     { R_HEAD, -1, "GAME" },     { R_ITEM, M_RESUME, "Back to game" },
@@ -1219,6 +1243,12 @@ static const menu_row k_menu[] = {
     { R_HEAD, -1, "MODS" },     { R_ITEM, M_WIDE, "Widescreen" },
     /* the built-in mods (mods.c), in mhfu_builtin_mods' order */
     { R_ITEM, M_MOD0, "Target Camera" }, { R_ITEM, M_MOD1, "Damage Numbers" }, { R_ITEM, M_MOD2, "Gathering Nodes" },
+#if MHFU_TEXPACK
+    { R_ITEM, M_TEXPACK, "Texture pack" }, { R_ITEM, M_TEXSTYLE, "Pack style" },
+#endif
+#if MHFU_TEXPACK && defined(__ANDROID__)
+    { R_ITEM, M_TEXINSTALL, "Install texture pack" },
+#endif
 #ifdef __ANDROID__
     { R_ITEM, M_CHEATS, "Cheats" },
 #endif
@@ -1283,6 +1313,20 @@ static const char *menu_value(int id) {
     case M_STYLE: return g_style == STYLE_MOBILE ? "Mobile" : "Legacy PSP";
     case M_SMOOTH: return !MHFU_HAS_FPS60 ? "Not in this build" : !g_fps60 ? "Off" : mhfu_fps_target() >= 60 ? "On" : "On (room at 30)";
     case M_WIDE: return mhfu_mod_widescreen() ? "On" : "Off";
+#if MHFU_TEXPACK
+    case M_TEXPACK:
+        if (g_texpack != g_texpack_started) return g_texpack ? "On, restart" : "Off, restart";
+        if (!g_texpack) return "Off";
+        return mhfu_texpack_textures() > 0 ? "On" : "None installed";
+    case M_TEXSTYLE: {
+        static char v[300];
+        if (!mhfu_texpack_styles()) return mhfu_texpack_textures() > 0 ? "Only one" : "-";
+        snprintf(v, sizeof v, "%s%s", g_texstyle[0] ? g_texstyle : "Pack default",
+                 strcmp(g_texstyle, g_texstyle_started) ? ", restart" : "");
+        for (char *p = v; *p; p++) if (*p == '/') *p = ' ';
+        return v;
+    }
+#endif
     case M_MOD0: case M_MOD1: case M_MOD2:
         return id - M_MOD0 >= mhfu_mod_count() ? "Not built in" : mhfu_mod_on(id - M_MOD0) ? "On" : "Off";
     case M_CHEATS: {
@@ -1408,6 +1452,18 @@ static void menu_tap(float px, float py, float w, float h) {
             case M_FPS: g_show_fps = !g_show_fps; g_show_fps_init = g_show_fps; settings_save(); break;
             case M_SMOOTH: g_fps60 = !g_fps60; mhfu_fps_set_preferred(g_fps60 ? 60 : 30); settings_save(); break;
             case M_WIDE: g_wide = !mhfu_mod_widescreen(); mhfu_mod_set_widescreen(g_wide); settings_save(); break;
+#if MHFU_TEXPACK
+            case M_TEXPACK: g_texpack = !g_texpack; settings_save(); break;
+            case M_TEXSTYLE: {                     /* the next style; after the last, the pack's default */
+                const int n = mhfu_texpack_styles();
+                if (!n) break;
+                int at = -1;
+                for (int k = 0; k < n; k++) if (!strcmp(g_texstyle, mhfu_texpack_style(k))) at = k;
+                snprintf(g_texstyle, sizeof g_texstyle, "%s", at + 1 < n ? mhfu_texpack_style(at + 1) : "");
+                settings_save();
+                break;
+            }
+#endif
             case M_MOD0: case M_MOD1: case M_MOD2:
                 mhfu_mod_set(r->id - M_MOD0, !mhfu_mod_on(r->id - M_MOD0));
                 settings_save();
@@ -1417,6 +1473,7 @@ static void menu_tap(float px, float py, float w, float h) {
 #ifdef __ANDROID__
             case M_UPDATE: menu_set(0); android_call("checkUpdates"); break;
             case M_CHEATS: menu_set(0); android_call("openCheats"); break;
+            case M_TEXINSTALL: menu_set(0); android_call("installTexturePack"); break;
             case M_NET: menu_set(0); android_call("openMultiplayer"); break;
             case M_ACH: menu_set(0); android_call("openAchievements"); break;
             case M_ABOUT: menu_set(0); android_call("openAbout"); break;

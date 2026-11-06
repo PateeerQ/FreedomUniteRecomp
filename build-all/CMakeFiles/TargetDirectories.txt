@@ -3,6 +3,7 @@ E:/Project/MHFU-Android/build-all/CMakeFiles/mhfu_net.dir
 E:/Project/MHFU-Android/build-all/CMakeFiles/mhfu_netcheck.dir
 E:/Project/MHFU-Android/build-all/CMakeFiles/mhfu_hub.dir
 E:/Project/MHFU-Android/build-all/CMakeFiles/rcheevos.dir
+E:/Project/MHFU-Android/build-all/CMakeFiles/mhfu_basisu.dir
 E:/Project/MHFU-Android/build-all/CMakeFiles/mhfu_host_eu.dir
 E:/Project/MHFU-Android/build-all/CMakeFiles/mhfu_host_us.dir
 E:/Project/MHFU-Android/build-all/CMakeFiles/mhfu_host_jp.dir

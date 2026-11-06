@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"E:/Project/MHFU-Android/build-all/_deps/stb-subbuild/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

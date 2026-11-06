@@ -1,0 +1,14 @@
+# Target labels
+ basisu-populate
+# Source files and their labels
+E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/CMakeFiles/basisu-populate
+E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/CMakeFiles/b5fedd9c2d2c43667fa33903dc35a496/basisu-populate.rule
+E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/CMakeFiles/634ab572318fb4b34ad4c7fe77971bae/basisu-populate-complete.rule
+E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/CMakeFiles/ad3e77f30eef7a97e34111ab28ffd7d8/basisu-populate-build.rule
+E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/CMakeFiles/ad3e77f30eef7a97e34111ab28ffd7d8/basisu-populate-configure.rule
+E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/CMakeFiles/ad3e77f30eef7a97e34111ab28ffd7d8/basisu-populate-download.rule
+E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/CMakeFiles/ad3e77f30eef7a97e34111ab28ffd7d8/basisu-populate-install.rule
+E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/CMakeFiles/ad3e77f30eef7a97e34111ab28ffd7d8/basisu-populate-mkdir.rule
+E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/CMakeFiles/ad3e77f30eef7a97e34111ab28ffd7d8/basisu-populate-patch.rule
+E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/CMakeFiles/ad3e77f30eef7a97e34111ab28ffd7d8/basisu-populate-test.rule
+E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/CMakeFiles/ad3e77f30eef7a97e34111ab28ffd7d8/basisu-populate-update.rule

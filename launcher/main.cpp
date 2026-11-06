@@ -33,6 +33,7 @@
 #include <cstdarg>
 #include <cstring>
 #include <filesystem>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <sstream>
@@ -295,7 +296,7 @@ static void changed() { g_dirty = true; }
 // The file dialog answers on whichever thread SDL likes.
 static std::mutex g_pick_lock;
 static std::string g_pick_result;
-static int g_pick_target;           // 1 ISO, 2 EBOOT, 3 a cheat file to import
+static int g_pick_target;           // 1 ISO, 2 EBOOT, 3 a cheat file to import, 4 a texture pack folder
 static void SDLCALL picked(void *, const char *const *files, int) {
     std::lock_guard<std::mutex> l(g_pick_lock);
     if (files && files[0]) g_pick_result = files[0];
@@ -306,6 +307,10 @@ static void pick(int target, const char *name, const char *pattern) {
     f[1] = {"All files", "*"};
     g_pick_target = target;
     SDL_ShowOpenFileDialog(picked, nullptr, g_window, f, 2, nullptr, false);
+}
+static void pick_folder(int target) {
+    g_pick_target = target;
+    SDL_ShowOpenFolderDialog(picked, nullptr, g_window, nullptr, false);
 }
 
 static std::string pad_guid(SDL_JoystickID id) {
@@ -1130,6 +1135,67 @@ static void page_mods(float w, float) {
     if (region().fps60 && ImGui::Checkbox("60 FPS (beta)", &g_cfg.fps60)) changed();
     ImGui::Spacing();
 
+    // Texture packs (host/texpack.c): optional, the game's own textures unless one is put there.
+    heading("Texture pack");
+    if (ImGui::Checkbox("Use a texture pack", &g_cfg.texpack)) changed();
+    if (!g_cfg.texpack) ImGui::BeginDisabled();
+    const std::string tex_default =
+        (fs::u8path(paths::profile_root(g_cfg.profile)) / "textures" / region().game_id).u8string();
+    ImGui::SetNextItemWidth(-190);
+    if (ImGui::InputTextWithHint("##texpack", tex_default.c_str(), &g_cfg.texpack_dir)) changed();
+    ImGui::SameLine();
+    if (ImGui::Button("Browse##texpack")) pick_folder(4);
+    ImGui::SameLine();
+    if (ImGui::Button("Default##texpack")) { g_cfg.texpack_dir.clear(); changed(); }
+    {
+        // Which list the game will read (texpack.h): MAIN/ inside, the release's own ini first.
+        fs::path dir = fs::u8path(g_cfg.texpack_dir.empty() ? tex_default : g_cfg.texpack_dir);
+        std::error_code e;
+        if (fs::exists(dir / "MAIN" / "textures.ini", e)) dir /= "MAIN";
+        const char *own = !strcmp(region().tag, "EU") ? "textures_FU_EU.ini" : !strcmp(region().tag, "US") ? "textures_FU_US.ini" : "";
+        std::string ini = own[0] && fs::exists(dir / own, e) ? own : fs::exists(dir / "textures.ini", e) ? "textures.ini" : "";
+        // The pack's styles (ADDONS/<style>, texpack.c's rule): a folder holding one of MAIN's own folders.
+        static std::string styles_of;
+        static std::vector<std::string> styles;
+        const fs::path pack = dir.filename() == "MAIN" ? dir.parent_path() : dir;
+        if (styles_of != pack.u8string()) {
+            styles_of = pack.u8string();
+            styles.clear();
+            std::function<void(const fs::path &, const std::string &, int)> scan =
+                [&](const fs::path &p, const std::string &rel, int depth) {
+                    std::vector<std::string> kids;
+                    for (auto &d : fs::directory_iterator(p, e))
+                        if (d.is_directory(e)) kids.push_back(d.path().filename().u8string());
+                    std::sort(kids.begin(), kids.end());
+                    bool style = false;
+                    for (auto &k : kids) if (!rel.empty() && fs::is_directory(dir / fs::u8path(k), e)) style = true;
+                    if (style) { styles.push_back(rel); return; }
+                    if (depth < 4)
+                        for (auto &k : kids) scan(p / fs::u8path(k), rel.empty() ? k : rel + "/" + k, depth + 1);
+                };
+            if (!ini.empty() && fs::is_directory(pack / "ADDONS", e)) scan(pack / "ADDONS", "", 0);
+        }
+        if (!styles.empty()) {
+            ImGui::SetNextItemWidth(320);
+            const char *cur = g_cfg.texpack_style.empty() ? "Pack default (MAIN)" : g_cfg.texpack_style.c_str();
+            if (ImGui::BeginCombo("Style##texpack", cur)) {
+                if (ImGui::Selectable("Pack default (MAIN)", g_cfg.texpack_style.empty())) { g_cfg.texpack_style.clear(); changed(); }
+                for (auto &s : styles)
+                    if (ImGui::Selectable(s.c_str(), s == g_cfg.texpack_style)) { g_cfg.texpack_style = s; changed(); }
+                ImGui::EndCombo();
+            }
+        }
+        ImGui::PushFont(g_small);
+        if (!ini.empty()) ImGui::TextColored(C_OK, "Found: %s", (dir / ini).u8string().c_str());
+        else dim("No pack there: the game's own textures.");
+        if (!styles.empty()) dim("Style: the pack's ADDONS (buttons, HUD) in place of its own.");
+        dim("Optional. A texture pack made for PPSSPP (textures.ini with PNG or KTX2 pictures) works as it is: "
+            "put its folder above (or in the default place). Takes effect at the next start.");
+        ImGui::PopFont();
+    }
+    if (!g_cfg.texpack) ImGui::EndDisabled();
+    ImGui::Spacing();
+
     heading("Cheats");
     const std::string path = cheats_path(paths::profile_root(g_cfg.profile));
     std::string msg;
@@ -1368,6 +1434,9 @@ int main(int, char **) {
                     std::string err;
                     const int n = cheats_import(cheats_path(paths::profile_root(g_cfg.profile)), read_text(g_pick_result), err);
                     g_status = n < 0 ? "Import: " + err : "Imported " + std::to_string(n) + " cheats.";
+                } else if (g_pick_target == 4) {
+                    g_cfg.texpack_dir = g_pick_result;
+                    changed();
                 } else {
                     if (g_pick_target == 1) {
                         // A disc of another release built here: switch to it, the disc going with it.

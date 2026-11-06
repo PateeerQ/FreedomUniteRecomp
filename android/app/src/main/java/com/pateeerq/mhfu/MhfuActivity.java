@@ -41,7 +41,7 @@ import org.libsdl.app.SDLActivity;
 public class MhfuActivity extends SDLActivity {
     private static boolean checked;     // once per process: the quiet update check at start
     private WifiManager.MulticastLock multicast;
-    private static final int PICK_SAVES = 31;
+    private static final int PICK_SAVES = 31, PICK_TEXTURES = 32;
     /** What the game writes to its memory stick, to the save folder (SaveSync): every few seconds. */
     private android.os.HandlerThread savesThread;
     private android.os.Handler saves;
@@ -126,6 +126,10 @@ public class MhfuActivity extends SDLActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == PICK_TEXTURES && resultCode == RESULT_OK && data != null && data.getData() != null) {
+            TexturePack.install(this, data.getData());
+            return;
+        }
         if (requestCode != PICK_SAVES || resultCode != RESULT_OK || data == null || data.getData() == null) return;
         try {
             // While playing the app's saves are the ones that count: they go to the new folder.
@@ -218,6 +222,11 @@ public class MhfuActivity extends SDLActivity {
     /** The drawer's Cheats (over JNI): the cheat list (CheatsDialog). */
     public void openCheats() {
         runOnUiThread(() -> CheatsDialog.show(this));
+    }
+
+    /** The drawer's "Install texture pack" (TexturePack). */
+    public void installTexturePack() {
+        TexturePack.offer(this, PICK_TEXTURES);
     }
 
     public void checkUpdates() {

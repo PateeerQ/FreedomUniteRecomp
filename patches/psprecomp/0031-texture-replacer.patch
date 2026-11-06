@@ -1,0 +1,244 @@
+diff --git a/include/psprecomp/render.h b/include/psprecomp/render.h
+index 2b07067..f736934 100644
+--- a/include/psprecomp/render.h
++++ b/include/psprecomp/render.h
+@@ -172,6 +172,28 @@ int  psp_render_gl_interpolation(void);
+  * from any thread. */
+ void psp_render_gl_set_stretch(int on);
+ 
++/* Texture replacement (a host's texture pack, as PPSSPP's): asked on the GE's
++ * thread each time a texture is decoded from memory, with its address, buffer
++ * width (pixels), size, format (PSP_TPSM_*) and whether it is swizzled.
++ * Returns PSP_REPLACE_NONE (decode it as usual), PSP_REPLACE_PENDING (decode
++ * it as usual for now; ask again next frame, the replacement is being loaded)
++ * or PSP_REPLACE_READY, with *w, *h and *data (malloc'd, the backend frees
++ * it) set: RGBA8 when *gl_fmt is 0, else blocks of that compressed GL format
++ * (one psp_render_gl_compressed_formats() offered), *bytes long. NULL turns
++ * it off. */
++enum { PSP_REPLACE_NONE = 0, PSP_REPLACE_PENDING = 1, PSP_REPLACE_READY = 2 };
++typedef int (*psp_texture_replacer)(uint32_t addr, int bufw, int w, int h, int fmt, int swizzled,
++                                    int *out_w, int *out_h, uint32_t **data, uint32_t *gl_fmt, uint32_t *bytes);
++void psp_render_gl_set_replacer(psp_texture_replacer fn);
++
++/* The compressed texture formats the GL takes, once it is up (-1 before):
++ * PSP_GL_ASTC4x4 (GL_COMPRESSED_RGBA_ASTC_4x4_KHR, phones), PSP_GL_BC7
++ * (GL_COMPRESSED_RGBA_BPTC_UNORM, PC graphics cards). */
++enum { PSP_GL_ASTC4x4 = 1, PSP_GL_BC7 = 2 };
++#define PSP_GL_FMT_ASTC4x4 0x93B0u
++#define PSP_GL_FMT_BC7     0x8E8Cu
++int psp_render_gl_compressed_formats(void);
++
+ /* Pixels written by the active backend -- the proof of life during bring-up. */
+ uint64_t psp_render_pixels(void);
+ /* Fragments depth-tested, rejected by the test, and depth pixels cleared.
+diff --git a/src/render_gl.c b/src/render_gl.c
+index 9daa517..0638320 100644
+--- a/src/render_gl.c
++++ b/src/render_gl.c
+@@ -141,6 +141,9 @@ typedef ptrdiff_t GLsizeiptr;
+     X(void,   BindTexture, (GLenum, GLuint)) \
+     X(void,   ActiveTexture, (GLenum)) \
+     X(void,   TexImage2D, (GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const void *)) \
++    X(void,   CompressedTexImage2D, (GLenum, GLint, GLenum, GLsizei, GLsizei, GLint, GLsizei, const void *)) \
++    X(void,   GetIntegerv, (GLenum, GLint *)) \
++    X(const unsigned char *, GetStringi, (GLenum, GLuint)) \
+     X(void,   TexParameteri, (GLenum, GLenum, GLint)) \
+     X(void,   GenFramebuffers, (GLsizei, GLuint *)) \
+     X(void,   DeleteFramebuffers, (GLsizei, const GLuint *)) \
+@@ -237,7 +240,9 @@ enum { C_FB_NEW = 1, C_FB_FREE, C_FB_BIND, C_TEX_NEW, C_TEX_FREE, C_DRAW, C_PRES
+ typedef struct { uint32_t op, size; } chead;
+ typedef struct { chead h; int32_t id, w, hgt; } c_fb_new;
+ typedef struct { chead h; int32_t id; } c_id;
+-typedef struct { chead h; int32_t id, w, hgt; uint32_t *pixels; } c_tex_new;   /* the render thread frees pixels */
++/* The render thread frees pixels. gl_fmt: 0 for RGBA8, else a compressed GL
++ * format of `bytes` bytes (a texture pack's picture). */
++typedef struct { chead h; int32_t id, w, hgt; uint32_t *pixels; uint32_t gl_fmt, bytes; } c_tex_new;
+ typedef struct { chead h; gstate s; uint32_t first, count; } c_draw;
+ /* fb >= 0: show that framebuffer (its first 480x272); else show `pixels`. */
+ typedef struct { chead h; int32_t fb; uint32_t *pixels; } c_present;
+@@ -356,8 +361,17 @@ typedef struct {
+     uint64_t clut_key, hash;
+     uint64_t checked, used;              /* g_flip of the last hash, and of the last use */
+     int      id;
++    int      repl;                       /* PSP_REPLACE_*: what the replacer said at its last upload */
++    /* PPSSPP's maxSeenV: a texture 512 or more high drawn in through mode
++     * (2D) is hashed over the rows its draws reach (at least 272), since games
++     * declare 512 for a 480x272 picture; texture packs are keyed that way. 0:
++     * not known yet; tex_h once a draw went further or was not 2D. */
++    int      seen_v;                     /* the picture still stands for all tex_h rows */
+ } gtex;
+ 
++static psp_texture_replacer volatile g_replacer;    /* psp_render_gl_set_replacer */
++void psp_render_gl_set_replacer(psp_texture_replacer fn) { g_replacer = fn; }
++
+ #define MAX_TEX 1024
+ static gtex g_tex[MAX_TEX];
+ static int  g_ntex, g_next_tex = 1;
+@@ -397,7 +411,37 @@ static uint64_t clut_key(const psp_draw_state *st) {
+     return hash_bytes(st->clut, 1024) ^ (params * 0x9E3779B97F4A7C15ull);
+ }
+ 
++/* A texture pack's picture for this texture, uploaded if the host has it
++ * ready: 1 if it was. t->repl says what the host answered. */
++static int tex_replace(gtex *t, const psp_draw_state *st) {
++    psp_texture_replacer rep = g_replacer;
++    t->repl = PSP_REPLACE_NONE;
++    if (!rep) return 0;
++    int rw = 0, rh = 0;
++    uint32_t *rpx = NULL, gl_fmt = 0, bytes = 0;
++    const int hh = t->seen_v > 0 && t->seen_v < st->tex_h ? t->seen_v : st->tex_h;
++    t->repl = rep(st->tex_addr, st->tex_bw, st->tex_w, hh, st->tex_fmt, st->tex_swizzle, &rw, &rh, &rpx,
++                  &gl_fmt, &bytes);
++    if (t->repl != PSP_REPLACE_READY) return 0;
++    if (!rpx || rw <= 0 || rh <= 0 || (gl_fmt && !bytes)) {                          /* said ready, gave nothing */
++        free(rpx);
++        t->repl = PSP_REPLACE_NONE;
++        return 0;
++    }
++    c_tex_new *c = (c_tex_new *)cmd_add(C_TEX_NEW, sizeof *c);
++    c->id = t->id;
++    c->w = rw;
++    c->hgt = rh;
++    c->pixels = rpx;
++    c->gl_fmt = gl_fmt;
++    c->bytes = bytes;
++    g_uploads++;
++    g_upload_bytes += gl_fmt ? bytes : (uint64_t)rw * (uint64_t)rh * 4;
++    return 1;
++}
++
+ static void tex_upload(gtex *t, const psp_draw_state *st) {
++    if (tex_replace(t, st)) return;
+     uint32_t *px = (uint32_t *)malloc((size_t)st->tex_w * (size_t)st->tex_h * 4);
+     if (!px) return;
+     for (int y = 0; y < st->tex_h; y++)
+@@ -414,8 +458,16 @@ static void tex_upload(gtex *t, const psp_draw_state *st) {
+ 
+ /* The cached texture for the current state: found, checked against memory
+  * once per frame (or when it is bound anew and small), re-decoded when the
+- * memory changed. Returns its id, or 0 for "no texture". */
+-static int tex_lookup(const psp_draw_state *st) {
++ * memory changed. Returns its id, or 0 for "no texture". max_v: how far down
++ * this draw reaches, in rows, for a through-mode draw (else -1). */
++static void seen_v_update(gtex *t, const psp_draw_state *st, int max_v) {
++    if (st->tex_h < 512) return;
++    if (max_v < 0) t->seen_v = st->tex_h;
++    else if (t->seen_v == 0 && max_v > 0) t->seen_v = max_v > 272 ? max_v : 272;
++    else if (max_v > t->seen_v) t->seen_v = st->tex_h;
++}
++
++static int tex_lookup(const psp_draw_state *st, int max_v) {
+     if (st->tex_fmt > PSP_TPSM_T32 || st->tex_w <= 0 || st->tex_h <= 0 || st->tex_bw <= 0) return 0;
+     const uint64_t ck = clut_key(st);
+     gtex *t = NULL;
+@@ -447,11 +499,23 @@ static int tex_lookup(const psp_draw_state *st) {
+         t->id = g_next_tex++;
+         t->hash = mem ? hash_bytes(mem, span) : 0;
+         t->checked = g_flip;
++        seen_v_update(t, st, max_v);
+         tex_upload(t, st);
+-    } else if (t->checked != g_flip || (idx != g_last_tex && span <= 32768)) {
+-        const uint64_t h = mem ? hash_bytes(mem, span) : t->hash;
+-        t->checked = g_flip;
+-        if (h != t->hash) { t->hash = h; tex_upload(t, st); }
++    } else {
++        const int seen = t->seen_v;
++        seen_v_update(t, st, max_v);
++        if (t->seen_v != seen && g_replacer) {
++            /* Hashed over more rows now: another key, so the pack is asked again. */
++            t->checked = g_flip;
++            tex_upload(t, st);
++        } else if (t->checked != g_flip || (idx != g_last_tex && span <= 32768)) {
++            const uint64_t h = mem ? hash_bytes(mem, span) : t->hash;
++            const int was_checked = t->checked == g_flip;
++            t->checked = g_flip;
++            if (h != t->hash) { t->hash = h; tex_upload(t, st); }
++            /* A replacement still loading: asked again once a frame until it is there. */
++            else if (t->repl == PSP_REPLACE_PENDING && !was_checked) tex_replace(t, st);
++        }
+     }
+     t->used = g_flip;
+     g_last_tex = idx;
+@@ -569,11 +633,24 @@ static void gl_draw(int prim, const psp_vertex *v, int count, const psp_draw_sta
+                 us = 1.0f / (float)src->w; vs = 1.0f / (float)src->h;
+                 uo = (float)ox; vo = (float)oy;
+                 s.wrap_s = s.wrap_t = GL_CLAMP_TO_EDGE;
+-            } else if ((s.tex_id = tex_lookup(st)) != 0) {
+-                s.tex_kind = 1;
+-                us = 1.0f / (float)st->tex_w; vs = 1.0f / (float)st->tex_h;
+-                s.wrap_s = st->tex_clamp_u ? GL_CLAMP_TO_EDGE : GL_REPEAT;
+-                s.wrap_t = st->tex_clamp_v ? GL_CLAMP_TO_EDGE : GL_REPEAT;
++            } else {
++                /* Through mode (2D: no w) on a tall texture: how far down it reaches. */
++                int max_v = -1;
++                if (st->tex_h >= 512) {
++                    float mv = 0;
++                    int through = 1;
++                    for (int i = 0; i < count && through; i++) {
++                        if (v[i].w != 0.0f) through = 0;
++                        if (v[i].v > mv) mv = v[i].v;
++                    }
++                    if (through) max_v = (int)ceilf(mv);
++                }
++                if ((s.tex_id = tex_lookup(st, max_v)) != 0) {
++                    s.tex_kind = 1;
++                    us = 1.0f / (float)st->tex_w; vs = 1.0f / (float)st->tex_h;
++                    s.wrap_s = st->tex_clamp_u ? GL_CLAMP_TO_EDGE : GL_REPEAT;
++                    s.wrap_t = st->tex_clamp_v ? GL_CLAMP_TO_EDGE : GL_REPEAT;
++                }
+             }
+             if (s.tex_kind) {
+                 s.mode[0] |= MODE_TEX | (st->tex_alpha ? MODE_TEXALPHA : 0) | (st->tex_double ? MODE_DOUBLE : 0);
+@@ -898,9 +975,40 @@ static int load_gl(void) {
+     return missing ? -1 : 0;
+ }
+ 
++/* The compressed formats this GL takes (PSP_GL_ASTC4x4 | PSP_GL_BC7), for
++ * replacements a host transcodes (texture packs). -1 until the GL is up. */
++static volatile int g_cformats = -1;
++int psp_render_gl_compressed_formats(void) { return g_cformats; }
++
++static void find_formats(void) {
++    GLint n = 0;
++    int f = 0;
++    glGetIntegerv(0x821D /* GL_NUM_EXTENSIONS */, &n);
++    for (GLint i = 0; i < n; i++) {
++        const char *e = (const char *)glGetStringi(0x1F03 /* GL_EXTENSIONS */, (GLuint)i);
++        if (!e) continue;
++        if (!strcmp(e, "GL_KHR_texture_compression_astc_ldr")) f |= PSP_GL_ASTC4x4;
++        if (!strcmp(e, "GL_ARB_texture_compression_bptc") || !strcmp(e, "GL_EXT_texture_compression_bptc")) f |= PSP_GL_BC7;
++    }
++    g_cformats = f;
++}
++
++static GLuint new_compressed(int w, int h, GLenum fmt, GLsizei bytes, const void *data) {
++    GLuint t;
++    glGenTextures(1, &t);
++    glBindTexture(GL_TEXTURE_2D, t);
++    glCompressedTexImage2D(GL_TEXTURE_2D, 0, fmt, w, h, 0, bytes, data);
++    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
++    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
++    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
++    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
++    return t;
++}
++
+ static int setup(void) {
+     if (g_host.init(g_host.user) != 0) return -1;
+     if (load_gl() != 0) return -1;
++    find_formats();
+     g_prog = program(VS_DRAW, FS_DRAW);
+     g_blit = program(VS_BLIT, FS_BLIT);
+     if (!g_prog || !g_blit) return -1;
+@@ -1170,7 +1278,10 @@ static void play(gframe *f, int what, const gbuf *vtx) {
+         case C_TEX_NEW: {
+             c_tex_new *c = (c_tex_new *)h;
+             g_rtex = (GLuint *)grow(g_rtex, &g_nrtex, c->id, sizeof *g_rtex);
+-            if (!g_rtex[c->id]) g_rtex[c->id] = new_texture(c->w, c->hgt, c->pixels, GL_NEAREST);
++            if (c->gl_fmt) {                 /* a replacement, compressed (ASTC, BC7): a texture of its own */
++                if (g_rtex[c->id]) glDeleteTextures(1, &g_rtex[c->id]);
++                g_rtex[c->id] = new_compressed(c->w, c->hgt, (GLenum)c->gl_fmt, (GLsizei)c->bytes, c->pixels);
++            } else if (!g_rtex[c->id]) g_rtex[c->id] = new_texture(c->w, c->hgt, c->pixels, GL_NEAREST);
+             else {
+                 glBindTexture(GL_TEXTURE_2D, g_rtex[c->id]);
+                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, c->w, c->hgt, 0, GL_RGBA, GL_UNSIGNED_BYTE, c->pixels);

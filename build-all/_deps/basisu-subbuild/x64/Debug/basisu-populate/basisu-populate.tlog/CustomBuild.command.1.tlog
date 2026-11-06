@@ -1,0 +1,152 @@
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\BASISU-SUBBUILD\CMAKEFILES\AD3E77F30EEF7A97E34111AB28FFD7D8\BASISU-POPULATE-MKDIR.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -Dcfgdir=/Debug -P E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/basisu-populate-prefix/tmp/basisu-populate-mkdirs.cmake
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/basisu-populate-prefix/src/basisu-populate-stamp/Debug/basisu-populate-mkdir
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\BASISU-SUBBUILD\CMAKEFILES\AD3E77F30EEF7A97E34111AB28FFD7D8\BASISU-POPULATE-DOWNLOAD.RULE
+setlocal
+cd E:\Project\MHFU-Android\build-all\_deps
+if %errorlevel% neq 0 goto :cmEnd
+E:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE -P E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/basisu-populate-prefix/src/basisu-populate-stamp/download-basisu-populate.cmake
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE -P E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/basisu-populate-prefix/src/basisu-populate-stamp/verify-basisu-populate.cmake
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE -P E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/basisu-populate-prefix/src/basisu-populate-stamp/extract-basisu-populate.cmake
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/basisu-populate-prefix/src/basisu-populate-stamp/Debug/basisu-populate-download
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\BASISU-SUBBUILD\CMAKEFILES\AD3E77F30EEF7A97E34111AB28FFD7D8\BASISU-POPULATE-UPDATE.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/basisu-populate-prefix/src/basisu-populate-stamp/Debug/basisu-populate-update
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\BASISU-SUBBUILD\CMAKEFILES\AD3E77F30EEF7A97E34111AB28FFD7D8\BASISU-POPULATE-PATCH.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/basisu-populate-prefix/src/basisu-populate-stamp/Debug/basisu-populate-patch
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\BASISU-SUBBUILD\CMAKEFILES\AD3E77F30EEF7A97E34111AB28FFD7D8\BASISU-POPULATE-CONFIGURE.RULE
+setlocal
+cd E:\Project\MHFU-Android\build-all\_deps\basisu-build
+if %errorlevel% neq 0 goto :cmEnd
+E:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/basisu-populate-prefix/src/basisu-populate-stamp/Debug/basisu-populate-configure
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\BASISU-SUBBUILD\CMAKEFILES\AD3E77F30EEF7A97E34111AB28FFD7D8\BASISU-POPULATE-BUILD.RULE
+setlocal
+cd E:\Project\MHFU-Android\build-all\_deps\basisu-build
+if %errorlevel% neq 0 goto :cmEnd
+E:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/basisu-populate-prefix/src/basisu-populate-stamp/Debug/basisu-populate-build
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\BASISU-SUBBUILD\CMAKEFILES\AD3E77F30EEF7A97E34111AB28FFD7D8\BASISU-POPULATE-INSTALL.RULE
+setlocal
+cd E:\Project\MHFU-Android\build-all\_deps\basisu-build
+if %errorlevel% neq 0 goto :cmEnd
+E:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/basisu-populate-prefix/src/basisu-populate-stamp/Debug/basisu-populate-install
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\BASISU-SUBBUILD\CMAKEFILES\AD3E77F30EEF7A97E34111AB28FFD7D8\BASISU-POPULATE-TEST.RULE
+setlocal
+cd E:\Project\MHFU-Android\build-all\_deps\basisu-build
+if %errorlevel% neq 0 goto :cmEnd
+E:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/basisu-populate-prefix/src/basisu-populate-stamp/Debug/basisu-populate-test
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\BASISU-SUBBUILD\CMAKEFILES\634AB572318FB4B34AD4C7FE77971BAE\BASISU-POPULATE-COMPLETE.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E make_directory E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/CMakeFiles/Debug
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/CMakeFiles/Debug/basisu-populate-complete
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/basisu-populate-prefix/src/basisu-populate-stamp/Debug/basisu-populate-done
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\BASISU-SUBBUILD\CMAKEFILES\B5FEDD9C2D2C43667FA33903DC35A496\BASISU-POPULATE.RULE
+setlocal
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^E:\PROJECT\MHFU-ANDROID\BUILD-ALL\_DEPS\BASISU-SUBBUILD\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SE:/Project/MHFU-Android/build-all/_deps/basisu-subbuild -BE:/Project/MHFU-Android/build-all/_deps/basisu-subbuild --check-stamp-file E:/Project/MHFU-Android/build-all/_deps/basisu-subbuild/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

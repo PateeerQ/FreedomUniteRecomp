@@ -25,6 +25,9 @@ struct Config {
     int  volume = 100;                  // the game's master volume, percent (MHFU_VOLUME)
     int  mouse_sens = 100;              // the mouse camera's sensitivity, percent (MHFU_MOUSE_SENS)
     bool widescreen = false;            // fill the window (MHFU_WIDESCREEN)
+    bool texpack = true;                // a texture pack, when there is one (MHFU_TEXPACK=0 when off)
+    std::string texpack_dir;            // its folder; empty: <root>/textures/<game id>
+    std::string texpack_style;          // a style in its ADDONS/ (MHFU_TEXPACK_STYLE); empty: MAIN's own
     std::map<std::string, bool> mods;   // built-in mods by id (mod_<id>= in the ini); one not there is on
     bool fps60 = false;                 // the 60 fps mode (MHFU_FPS=60; in a room, as the room allows)
     std::string nick;                   // multiplayer name (--nick); empty: net.cfg's

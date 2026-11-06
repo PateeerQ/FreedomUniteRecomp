@@ -48,6 +48,7 @@
 #include "libfont.h"
 #include "lobby.h"
 #include "mods.h"
+#include "texpack.h"
 #include "utility.h"
 #include "window.h"
 
@@ -212,6 +213,9 @@ static void report(void) {
     /* The save manager (pointer at 0x09A44C60): +0x0C state (jump table at
      * 0x089321DC, run by 0x088BA870), +0x34 savedata result, +0x970 savedata
      * dialog active, +0x971 message dialog active, +0x978 memory stick inserted. */
+#if MHFU_TEXPACK
+    mhfu_texpack_report();
+#endif
     uint32_t sm = psp_read32(MHFU_ADDR_SAVE_MANAGER);
     if (sm) {
         printf("save manager       0x%08X  state %u  result 0x%08X  +0x9AC %u  +0x960:", sm,
@@ -647,6 +651,9 @@ int main(int argc, char **argv) {
         }
     }
     mhfu_mods_boot();             /* the built-in code mods (mods.c), with the EBOOT in memory */
+#if MHFU_TEXPACK
+    mhfu_texpack_init(g_root);    /* a texture pack in <root>/textures/<game id>, or MHFU_TEXPACK */
+#endif
     printf("free user memory   %u KB\n", psp_sysmem_free() / 1024);
 
     /* Boot thread: stack from the top of memory, a zeroed $k0 block at its top

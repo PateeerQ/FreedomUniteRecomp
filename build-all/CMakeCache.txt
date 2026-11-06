@@ -265,6 +265,10 @@ FETCHCONTENT_FULLY_DISCONNECTED:BOOL=OFF
 FETCHCONTENT_QUIET:BOOL=ON
 
 //When not empty, overrides where to find pre-populated content
+// for basisu
+FETCHCONTENT_SOURCE_DIR_BASISU:PATH=
+
+//When not empty, overrides where to find pre-populated content
 // for imgui
 FETCHCONTENT_SOURCE_DIR_IMGUI:PATH=
 
@@ -280,8 +284,15 @@ FETCHCONTENT_SOURCE_DIR_RCHEEVOS:PATH=
 // for SDL3
 FETCHCONTENT_SOURCE_DIR_SDL3:PATH=
 
+//When not empty, overrides where to find pre-populated content
+// for stb
+FETCHCONTENT_SOURCE_DIR_STB:PATH=
+
 //Enables UPDATE_DISCONNECTED behavior for all content population
 FETCHCONTENT_UPDATES_DISCONNECTED:BOOL=OFF
+
+//Enables UPDATE_DISCONNECTED behavior just for population of basisu
+FETCHCONTENT_UPDATES_DISCONNECTED_BASISU:BOOL=OFF
 
 //Enables UPDATE_DISCONNECTED behavior just for population of imgui
 FETCHCONTENT_UPDATES_DISCONNECTED_IMGUI:BOOL=OFF
@@ -294,6 +305,9 @@ FETCHCONTENT_UPDATES_DISCONNECTED_RCHEEVOS:BOOL=OFF
 
 //Enables UPDATE_DISCONNECTED behavior just for population of SDL3
 FETCHCONTENT_UPDATES_DISCONNECTED_SDL3:BOOL=OFF
+
+//Enables UPDATE_DISCONNECTED behavior just for population of stb
+FETCHCONTENT_UPDATES_DISCONNECTED_STB:BOOL=OFF
 
 //Git command line client
 GIT_EXECUTABLE:FILEPATH=C:/Program Files/Git/cmd/git.exe
@@ -378,6 +392,9 @@ MHFU_RELAY:STRING=
 
 //The SDL3 window instead of the Win32 one
 MHFU_SDL_WINDOW:BOOL=OFF
+
+//Texture packs (PPSSPP's textures.ini, PNG and KTX2)
+MHFU_TEXPACK:BOOL=ON
 
 //Record every recompiled function entry
 MHFU_TRACE:BOOL=ON
