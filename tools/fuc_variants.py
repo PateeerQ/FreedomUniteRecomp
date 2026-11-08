@@ -196,6 +196,18 @@ def main():
         base, code, body = ov
         name = body[32:64].split(b'\0')[0].decode('ascii', 'replace')
         opts = config_bytes_read(eboot_read, start)
+        # The seeds this overlay already has (its DATA.BIN copy's, the run-time copy's
+        # found before): every variant needs them too (issue #5: game_task with both
+        # options on missed 0x09B63C00, a seed of the default variant only).
+        hashes = {databin.fnv1a(bytes(body[:0x40 + code]))}
+        for bits in itertools.product((0, 1), repeat=len(opts)):
+            m = Machine(eboot_read, bytearray(body), dict(zip(opts, bits))).run(start)
+            hashes.add(databin.fnv1a(bytes(m.ovl[:0x40 + code])))
+        inherited = set()
+        for h0 in hashes:
+            sp = os.path.join(seed_dir, 'ov%08X.txt' % h0)
+            if os.path.exists(sp):
+                inherited |= {int(l.split()[0], 16) for l in open(sp) if l.strip() and not l.startswith('#')}
         seen = set()
         for bits in itertools.product((0, 1), repeat=len(opts)):
             m = Machine(eboot_read, bytearray(body), dict(zip(opts, bits))).run(start)
@@ -207,7 +219,8 @@ def main():
             if not os.path.exists(path):
                 open(path, 'wb').write(m.ovl)
                 written += 1
-            seeds = sorted({t for s, t in m.hooks for t in back if s < t <= s + 0x100 and m.in_ovl(t, 4)})
+            seeds = sorted({t for s, t in m.hooks for t in back if s < t <= s + 0x100 and m.in_ovl(t, 4)}
+                           | {t for t in inherited if m.in_ovl(t, 4)})
             for s, t in m.hooks:
                 if MODLOAD <= t < MODLOAD_END:
                     eboot_seeds.add(t)
@@ -220,7 +233,8 @@ def main():
                 if new:
                     with open(sp, 'a') as sf:
                         if not have:
-                            sf.write('# tools/fuc_variants.py: where MODLOAD\'s hooks return into %s\n' % name)
+                            sf.write('# tools/fuc_variants.py: %s seeds (its other copies\', and where MODLOAD\'s '
+                                     'hooks return)\n' % name)
                         for s in new:
                             sf.write('%08X\n' % s)
             print('file %d %-16s options %s = %s -> %08X, %d hooks' % (
