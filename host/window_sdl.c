@@ -485,9 +485,15 @@ static int ui_ctx(void) {
     if (psp_read8(MHFU_ADDR_MENU_OPEN)) return UI_MENU;
     /* a window is open: the hunter is held (that bit also drops while running)
      * and a question, a message or a menu (prompt id 3 and up) is up */
-    if (lobby && !(psp_read8(MHFU_ADDR_HUNTER_FREE) & 0x04) &&
-        (psp_read8(MHFU_ADDR_YESNO) || psp_read8(MHFU_ADDR_MESSAGE) || psp_read8(MHFU_ADDR_UI_PROMPT) >= 3))
+    static int in_window;                               /* kept while the hunter stays held: the
+                                                         * message flag blinks between a dialog's lines */
+    const int held = lobby && !(psp_read8(MHFU_ADDR_HUNTER_FREE) & 0x04);
+    if (held && (in_window || psp_read8(MHFU_ADDR_YESNO) || psp_read8(MHFU_ADDR_MESSAGE) ||
+                 psp_read8(MHFU_ADDR_UI_PROMPT) >= 3)) {
+        in_window = 1;
         return UI_WINDOW;
+    }
+    in_window = 0;
     if (psp_read32(MHFU_ADDR_TALK_TARGET)) return UI_TALK;
     int kind, dest;
     if (lobby && obj_now(&kind, &dest)) return UI_OBJ;
@@ -502,16 +508,19 @@ static int g_uictx;                                     /* ui_ctx_settled(), onc
 static int g_obj_kind, g_obj_dest;                      /* with UI_OBJ: what is in reach */
 /* ui_ctx() once it has held for UI_SETTLE_MS: the flags flicker for a frame or
  * two (walking past an NPC, a prompt redrawn), and the buttons blinked with them. */
-#define UI_SETTLE_MS 250
+#define UI_SETTLE_MS 150
+static int g_ui_pending;                                /* a change is waiting to settle: wake soon */
 static int ui_ctx_settled(void) {
     static int settled = UI_PLAY, pending = -1;
     static uint64_t since;
     const int now_ctx = ui_ctx();
     const uint64_t now = SDL_GetTicks();
+    g_ui_pending = 0;
     if (now_ctx == settled) { pending = -1; return settled; }
     if (g_edit || g_style != STYLE_MOBILE) { pending = -1; return settled = now_ctx; }
     if (now_ctx != pending) { pending = now_ctx; since = now; }
-    else if (now - since >= UI_SETTLE_MS) { settled = now_ctx; pending = -1; }
+    else if (now - since >= UI_SETTLE_MS) { settled = now_ctx; pending = -1; return settled; }
+    g_ui_pending = 1;
     return settled;
 }
 /* A door's second choice (0 none): the Gathering Hall's entrance also takes
@@ -1893,6 +1902,7 @@ void mhfu_window_chat(const char *nick, const char *text, int self) {
 /* ---- composing the overlay (on the loop's thread) --------------------------------------- */
 
 static char g_fps_text[96] = "FPS --";
+#define COMPOSE_MS 33                                   /* the overlay's quickest redraw */
 
 static int compose(void) {
     if (!g_gl) return 0;
@@ -2348,9 +2358,10 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
 
     uint64_t next_stats = 0, next_title = 0;
     int moving = 0, quit = 0;
+    uint64_t last_compose = 0;
     while (!quit) {
         SDL_Event e;
-        if (SDL_WaitEventTimeout(&e, moving ? 16 : 100)) {
+        if (SDL_WaitEventTimeout(&e, moving ? 16 : g_ui_pending ? 30 : 100)) {
             do {
                 if (e.type == g_ev_window) { make_window(); continue; }
                 if (e.type == g_ev_wake) {
@@ -2508,7 +2519,13 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
         }
         if (ui_ctx_settled() != g_uictx) moving = 1;   /* a menu opened, an NPC came near: other buttons
                                                    * (settled: a flag that flickers must not redraw every frame) */
-        if (moving && g_window) moving = compose();
+        /* At most ~30 overlays a second: each is the whole screen drawn on the
+         * CPU, and a finger on the stick sends over a hundred motion events a
+         * second, which kept this thread busier than the game's (lag, 2026-11-09). */
+        if (moving && g_window && SDL_GetTicks() - last_compose >= COMPOSE_MS) {
+            moving = compose();
+            last_compose = SDL_GetTicks();
+        }
         if (g_window && now >= next_title) {
             char status[128], title[200];
             mhfu_lobby_status(status, sizeof status);
