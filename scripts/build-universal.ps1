@@ -35,7 +35,7 @@ Write-Host "Building: $($targets -join ', ')" -ForegroundColor Cyan
 # CMake's warnings go to stderr, which Windows PowerShell takes for an error
 # under 'Stop': relaxed while it runs, the exit code decides.
 $ErrorActionPreference = 'Continue'
-cmake -S $repo -B $BuildDir -DMHFU_UNIVERSAL=ON
+cmake -S $repo -B $BuildDir -DMHFU_UNIVERSAL=ON -DMHFU_TRACE=LITE
 if ($LASTEXITCODE) { throw "cmake configure failed" }
 cmake --build $BuildDir --config $Config --target @targets
 if ($LASTEXITCODE) { throw "build failed" }
