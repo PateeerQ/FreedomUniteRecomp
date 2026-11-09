@@ -111,5 +111,19 @@
 #define MHFU_ADDR_TALK_TARGET   (MHFU_ADDR_WEAPON_CLASS + 0x10Cu)
 #define MHFU_ADDR_UI_PROMPT     (MHFU_ADDR_WEAPON_CLASS + (0x099713F5u - 0x090B3628u))
 #define MHFU_ADDR_MENU_OPEN     (MHFU_ADDR_WEAPON_CLASS + (0x09999C70u - 0x090B3628u))
+/* From 19 FUComplete dumps in the village and the Gathering Halls (2026-11-09,
+ * work/fuc/memdump 13:53-14:07), checked against the EU ones of the same day:
+ * - u32 +0x36C: the object the hunter can use (door, quest gate, item box,
+ *   chair, quest board), else 0: a 24-byte entry of the stage's, u16 at +2 its
+ *   kind (1 door, 2 quest gate, 3 training, 7 item box, 8 chair, 9 quest
+ *   board), u16 at +0x16 a door's destination (4 the Gathering Hall, 5 out of it)
+ * - u8 +0x42C: bit 0x04 set while the hunter is free, clear while a dialog or
+ *   window is open (not the Start menu)
+ * - u8 -0x2C8: 1 while a Yes/No question is asked
+ * - u8 +0x8E0695: not 0 while a message waits for Next (or Close) */
+#define MHFU_ADDR_OBJ_TARGET    (MHFU_ADDR_WEAPON_CLASS + 0x36Cu)
+#define MHFU_ADDR_HUNTER_FREE   (MHFU_ADDR_WEAPON_CLASS + 0x42Cu)
+#define MHFU_ADDR_YESNO         (MHFU_ADDR_WEAPON_CLASS - 0x2C8u)
+#define MHFU_ADDR_MESSAGE       (MHFU_ADDR_WEAPON_CLASS + 0x8E0695u)
 
 #endif
