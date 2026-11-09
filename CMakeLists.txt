@@ -37,6 +37,34 @@ if(MSVC)
     target_compile_options(psprecomp PRIVATE /Zi)
 endif()
 
+# Profile-guided optimisation (clang: Android; scripts/pgo-android.ps1). GEN builds a
+# host that counts every branch and writes files/pgo/*.profraw on the phone; USE
+# rebuilds with the merged profile: hot code laid out together, branches the way
+# they go. The recompiled code is ~250 MB a release, so where its hot part sits
+# matters to the phone's caches. A profile only fits the release it was made from
+# (static functions are named with their file); several merged into one serve each.
+set(MHFU_PGO "OFF" CACHE STRING "Profile-guided optimisation (clang): OFF, GEN or USE")
+set_property(CACHE MHFU_PGO PROPERTY STRINGS OFF GEN USE)
+set(MHFU_PGO_PROFILE "${CMAKE_CURRENT_SOURCE_DIR}/work/pgo/mhfu.profdata" CACHE FILEPATH "MHFU_PGO=USE's merged profile")
+string(TOUPPER "${MHFU_PGO}" MHFU_PGO_MODE)
+set(MHFU_PGO_FLAGS "")
+if(MHFU_PGO_MODE STREQUAL "GEN")
+    set(MHFU_PGO_FLAGS -fprofile-generate)
+elseif(MHFU_PGO_MODE STREQUAL "USE")
+    if(NOT EXISTS "${MHFU_PGO_PROFILE}")
+        message(FATAL_ERROR "MHFU_PGO=USE: no profile at ${MHFU_PGO_PROFILE} (scripts/pgo-android.ps1 -Merge)")
+    endif()
+    set(MHFU_PGO_FLAGS "-fprofile-use=${MHFU_PGO_PROFILE}" -Wno-profile-instr-unprofiled
+        -Wno-profile-instr-out-of-date -Wno-profile-instr-missing -Wno-backend-plugin)
+endif()
+if(MHFU_PGO_FLAGS)
+    if(MSVC OR NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
+        message(FATAL_ERROR "MHFU_PGO needs clang (the Android NDK)")
+    endif()
+    message(STATUS "PGO: ${MHFU_PGO_MODE} ${MHFU_PGO_FLAGS}")
+    target_compile_options(psprecomp PRIVATE ${MHFU_PGO_FLAGS})
+endif()
+
 # --- tools ------------------------------------------------------------------------
 
 # Wraps an overlay the host saved as an ELF for allegrexrecomp (setup.ps1 runs it).
@@ -119,7 +147,11 @@ if(ANDROID OR MHFU_TEXPACK)
 endif()
 option(MHFU_UNIVERSAL "A host for every region set up in work/ (mhfu_host_<region>)" OFF)
 option(MHFU_RCHEEVOS "RetroAchievements in game (rcheevos)" ON)
-option(MHFU_TRACE "Record every recompiled function entry" ON)
+# Function-entry tracing for crash reports. FULL: every entry, label and stack
+# check through a call (bring-up). LITE: the entry ring only, one inline store per
+# function (the release builds and Android). OFF: nothing. ON = FULL (old caches).
+set(MHFU_TRACE "LITE" CACHE STRING "Recompiled-code tracing: FULL, LITE or OFF")
+set_property(CACHE MHFU_TRACE PROPERTY STRINGS FULL LITE OFF)
 if(ANDROID OR NOT WIN32)
     set(MHFU_SDL_WINDOW_DEFAULT ON)
 else()
@@ -154,7 +186,7 @@ endif()
 # What every host shares, made once.
 set(MHFU_HOST_SOURCES host/main.c host/achievements.c host/chat.c host/hle_mhfu.c host/input.c host/keys.c
     host/stats.c host/libfont.c host/utility.c host/adhoc.c host/lobby.c host/mods.c host/audio.c host/atrac.c
-    host/mpeg.c host/prof.c host/chnnlsv.c)
+    host/mpeg.c host/prof.c host/chnnlsv.c host/perfhint.c)
 set(MHFU_HOST_DEPS_READY OFF)
 
 # The PSP's KIRK crypto engine (PPSSPP's ext/libkirk, GPL v3): decrypts save data
@@ -335,8 +367,18 @@ function(mhfu_add_host target gen_dir ovl_dir)
     endif()
     # Function-entry tracing: the report then names the last function reached and
     # dumps the recent call trail. Slower, but bring-up needs it.
-    if(MHFU_TRACE)
+    string(TOUPPER "${MHFU_TRACE}" trace_mode)
+    if(trace_mode STREQUAL "FULL" OR trace_mode STREQUAL "ON")
         target_compile_definitions(${target} PRIVATE PSPRECOMP_TRACE)
+    elseif(trace_mode STREQUAL "LITE")
+        target_compile_definitions(${target} PRIVATE PSPRECOMP_TRACE_LITE)
+    endif()
+    if(MHFU_PGO_FLAGS)
+        target_compile_options(${target} PRIVATE ${MHFU_PGO_FLAGS})
+        if(MHFU_PGO_MODE STREQUAL "GEN")
+            target_link_options(${target} PRIVATE -fprofile-generate)
+            target_compile_definitions(${target} PRIVATE MHFU_PGO_GEN=1)
+        endif()
     endif()
     set_target_properties(${target} PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
     # Generated code is machine output: no warnings, and build it in parallel.
