@@ -15,6 +15,7 @@
 #include "window.h"
 #include "region.h"
 #include "achievements.h"
+#include "about.h"
 
 #if MHFU_SDL_WINDOW
 
@@ -28,6 +29,7 @@
 #include "lobby.h"
 #include "mods.h"
 #include "net/client.h"
+#include "perfhint.h"
 #include "stats.h"
 #if MHFU_TEXPACK
 #include "texpack.h"
@@ -568,13 +570,12 @@ static int group_shown(int g) {
     if (lobby_now()) {
         if (g == G_FACE || g == G_R) return 0;
         if (g == G_L) return g_uictx == UI_PLAY && mhfu_adhoc_in_group();
-        if (g == G_RUN) return g_uictx != UI_MENU && g_uictx != UI_WINDOW;   /* hidden only while Yes and No show */
     }
     const int m = mobile_now();
     if (g == G_FACE || g == G_DPAD) return !m;
     if (!m) return g != G_ATTACK && g != G_ROLL && g != G_ITEM && g != G_RUN;
     if (g == G_R) return 0;                            /* Run, the pad and the weapon buttons have it */
-    if (g == G_RUN) return g_edit;                     /* the lobby's Run; placed in the editor */
+    if (g == G_RUN) return 0;                          /* running is the stick at its edge (lobby) */
     return 1;
 }
 
@@ -809,10 +810,12 @@ static int target_pending(void) {
 }
 
 /* The PSP state of every finger, into what the game reads. */
+#define STICK_RUN 0.95f                        /* how far out the stick runs, of its radius */
+static int g_stick_run;                        /* it does now: its outline glows */
 static void touch_update(float w, float h) {
     const layout L = layout_for(w, h);
     uint32_t b = 0;
-    int ax = -1, ay = -1, rheld = 0, sd = 0, atk = 0;
+    int ax = -1, ay = -1, rheld = 0, sd = 0, atk = 0, run = 0;
     float rx = 0, ry = 0;
     for (int i = 0; i < FINGERS; i++) {
         const finger *f = &g_fingers[i];
@@ -824,6 +827,9 @@ static void touch_update(float w, float h) {
             if (m > 1) { dx /= m; dy /= m; }
             ax = (int)(128 + dx * 127);
             ay = (int)(128 + dy * 127);
+            /* In the lobby the stick pushed to its edge runs (holds R): no
+             * Run button there (Muhammad, 2026-11-09). */
+            if (m >= STICK_RUN && lobby_now()) { b |= PSP_CTRL_RTRIGGER; run = 1; }
         } else if (f->elem == T_ATTACK) {
             const float r = attack_r(&L);
             float dx = (f->x - L.x[G_ATTACK]) / r, dy = (f->y - L.y[G_ATTACK]) / r;
@@ -869,6 +875,7 @@ static void touch_update(float w, float h) {
     if (g_target_tap_until && SDL_GetTicks() < g_target_tap_until) b |= PSP_CTRL_LTRIGGER | PSP_CTRL_DOWN;
     else g_target_tap_until = 0;
     g_touch_buttons = b;
+    g_stick_run = run;
     g_skill_down = sd;
     g_attack_held = atk;
     g_touch_ax = ax;
@@ -1204,6 +1211,15 @@ static void draw_vpad(canvas *c, float s) {
             { -90, PSP_CTRL_UP, 0, -1 }, { 0, PSP_CTRL_RIGHT, 1, 0 }, { 90, PSP_CTRL_DOWN, 0, 1 }, { 180, PSP_CTRL_LEFT, -1, 0 } };
         for (int i = 0; i < 4; i++) {
             const int lit = (g_touch_buttons & arcs[i].bit) != 0;
+            if (lit)                                    /* the part held: filled in, the rest plain */
+                for (float a = arcs[i].deg - 45; a < arcs[i].deg + 45; a += 4) {
+                    const float r0 = a * 3.14159265f / 180, r1 = (a + 4) * 3.14159265f / 180;
+                    segment(c, S(scx + cosf(r0) * mid), S(scy + sinf(r0) * mid), S(scx + cosf(r1) * mid),
+                            S(scy + sinf(r1) * mid), S(band), on);
+                }
+        }
+        for (int i = 0; i < 4; i++) {
+            const int lit = (g_touch_buttons & arcs[i].bit) != 0;
             const float d = (45.0f + 90.0f * i) * 3.14159265f / 180;      /* the line between two parts */
             segment(c, S(scx + cosf(d) * sr * PAD_INNER), S(scy + sinf(d) * sr * PAD_INNER), S(scx + cosf(d) * sr),
                     S(scy + sinf(d) * sr), t * 0.8f, line);
@@ -1212,7 +1228,10 @@ static void draw_vpad(canvas *c, float s) {
         }
         ring(c, S(scx), S(scy), S(sr), t, line);
         disc(c, S(scx), S(scy), S(sr * PAD_INNER), va(12, 9, 6, 120));
-        ring(c, S(scx), S(scy), S(sr * PAD_INNER), t * 0.8f, line);
+        if (g_stick_run) {                              /* running: the well's outline glows */
+            ring(c, S(scx), S(scy), S(sr * PAD_INNER + t * 1.5f), t * 3.0f, va(255, 214, 120, 110));
+            ring(c, S(scx), S(scy), S(sr * PAD_INNER), t * 1.8f, va(255, 224, 140, 255));
+        } else ring(c, S(scx), S(scy), S(sr * PAD_INNER), t * 0.8f, line);
         const float travel = sr * PAD_INNER * 0.55f, knob = sr * PAD_INNER * 0.48f;
         float kx = scx, ky = scy;
         if (g_touch_ax >= 0) { kx += (g_touch_ax - 128) / 127.0f * travel; ky += (g_touch_ay - 128) / 127.0f * travel; }
@@ -1221,7 +1240,10 @@ static void draw_vpad(canvas *c, float s) {
         ring(c, S(kx), S(ky), S(knob), t, line);
     } else {
         disc(c, S(scx), S(scy), S(sr), fillc);
-        ring(c, S(scx), S(scy), S(sr), t, line);
+        if (g_stick_run) {
+            ring(c, S(scx), S(scy), S(sr + t * 1.5f), t * 3.0f, va(255, 214, 120, 110));
+            ring(c, S(scx), S(scy), S(sr), t * 1.8f, va(255, 224, 140, 255));
+        } else ring(c, S(scx), S(scy), S(sr), t, line);
         float kx = scx, ky = scy;
         if (g_touch_ax >= 0) { kx += (g_touch_ax - 128) / 127.0f * sr; ky += (g_touch_ay - 128) / 127.0f * sr; }
         disc(c, S(kx), S(ky), S(sr * 0.45f), g_touch_ax >= 0 ? on : va(236, 194, 104, 90));
@@ -1482,15 +1504,18 @@ static void draw_editor(canvas *c, float s) {
                   g_edit_sel >= 0 ? "Drag to move it; Smaller and Bigger resize it" : "Touch a control to move or resize it");
 }
 
-/* ---- the in-game menu: a settings screen ------------------------------------------------
+/* ---- the in-game menu: the hunter's settings board -----------------------------------------
  *
  * Opened by a swipe in from the left edge, Back (or F1), or the menu button.
- * A panel over the whole game: the sections as tabs on the left (Display,
- * Controls, Online, Mods, System), the chosen section's settings in the
- * middle (a switch, a value that a tap moves on, - and + buttons, or an arrow
- * for what opens something), and on the right what the picked setting does.
- * A tap changes a setting at once; a drag scrolls the list; the X, Back or a
- * tap outside the panel closes it. Online and the update check are Android
+ * A sheet over the whole game in the PC launcher's colours (dark leather,
+ * oiled wood, tarnished brass, gold, ember): the sections as tabs along the
+ * top (Display, Controls, Online, Achievements, Mods, System) and the
+ * section's settings as cards in a grid, each showing its value and how it
+ * changes (a switch, the choices as dots, - and +, or an arrow for what opens
+ * something). A tap on a card changes it at once; the footer says what the
+ * last one touched does. Achievements is the RetroAchievements set: progress,
+ * a filter and every achievement with its badge. A drag scrolls; the X, Back
+ * or Back again closes. Online, sign-in and the update check are Android
  * dialogs (MhfuActivity, over JNI): they need text fields. */
 
 enum { M_NET, M_ACH, M_VPAD, M_STYLE, M_PAD, M_EDIT, M_OPACITY, M_SKILLS, M_FPS, M_RES, M_SMOOTH, M_WIDE, M_CHEATS, M_TEXPACK, M_TEXSTYLE, M_TEXINSTALL, M_MOD0, M_MOD1, M_MOD2, M_SAVES, M_FILES, M_CRASH, M_UPDATE, M_ABOUT, M_EXIT };
@@ -1498,22 +1523,21 @@ enum { K_TOGGLE, K_CYCLE, K_STEP, K_ACTION };
 typedef struct { int id, kind, restart; const char *text, *help; } menu_item;
 
 static const menu_item k_tab_display[] = {
-    { M_RES, K_STEP, 1, "Resolution", "The 3D picture's size, a multiple of the PSP's 480x272. Higher is sharper but slower on weak phones." },
+    { M_RES, K_STEP, 1, "Resolution", "The 3D picture's size, a multiple of the PSP's 480x272. Higher is sharper but slower on weak phones. Applies at the next start." },
     { M_SMOOTH, K_TOGGLE, 0, "60 FPS (beta)", "Runs the game at 60 frames a second. In a room, the room plays at its slowest player's rate." },
     { M_FPS, K_TOGGLE, 0, "Show FPS", "Shows the frame rate in the top-left corner, and the ping while you are in a room." },
 };
 static const menu_item k_tab_controls[] = {
     { M_VPAD, K_CYCLE, 0, "Virtual gamepad", "Automatic hides the on-screen buttons while a controller is connected. On always shows them, Off never." },
-    { M_STYLE, K_CYCLE, 0, "Button style", "Mobile: the buttons follow what you can do (an attack pad, Dodge and Sheathe with the weapon out, Yes and No in menus). Legacy PSP: the PSP's buttons everywhere." },
+    { M_STYLE, K_CYCLE, 0, "Button style", "Mobile: the buttons follow what you can do (an attack pad with the weapon out, Yes and No in menus). Legacy PSP: the PSP's buttons everywhere." },
     { M_PAD, K_CYCLE, 0, "Stick and d-pad", "Combined: one round control, the stick in the middle and the d-pad as a ring around it. Separate: the two apart. Mobile style only." },
-    { M_EDIT, K_ACTION, 0, "Edit button layout", "Move and resize every on-screen button: touch one to pick it, drag it, and make it smaller or bigger." },
     { M_OPACITY, K_STEP, 0, "Button opacity", "How solid the on-screen buttons are." },
-    { M_SKILLS, K_TOGGLE, 0, "Weapon buttons", "A column of buttons for your weapon's moves (guard, aim, charge, demon mode, spirit) while it is drawn." },
+    { M_SKILLS, K_TOGGLE, 0, "Weapon buttons", "Buttons for your weapon's moves (guard, aim, charge, demon mode, spirit) while it is drawn." },
+    { M_EDIT, K_ACTION, 0, "Edit button layout", "Move and resize every on-screen button: touch one to pick it, drag it, and make it smaller or bigger." },
 };
 #ifdef __ANDROID__
 static const menu_item k_tab_online[] = {
     { M_NET, K_ACTION, 0, "Multiplayer", "Create a room or join one with its code, over the internet or the same Wi-Fi. No port forwarding." },
-    { M_ACH, K_ACTION, 0, "RetroAchievements", "Sign in to RetroAchievements to earn achievements while you play (softcore)." },
 };
 #endif
 static const menu_item k_tab_mods[] = {
@@ -1523,8 +1547,8 @@ static const menu_item k_tab_mods[] = {
     { M_MOD1, K_TOGGLE, 0, "Damage Numbers", "Shows the damage of every hit as numbers over the monster." },
     { M_MOD2, K_TOGGLE, 0, "Gathering Nodes", "Shows an icon over gathering, mining and bug-catching spots." },
 #if MHFU_TEXPACK
-    { M_TEXPACK, K_TOGGLE, 1, "Texture pack", "Uses the installed texture pack (PPSSPP's format) in place of the game's own textures." },
-    { M_TEXSTYLE, K_CYCLE, 1, "Pack style", "Some packs come in styles (button icons, layouts). A tap picks the next one." },
+    { M_TEXPACK, K_TOGGLE, 1, "Texture pack", "Uses the installed texture pack (PPSSPP's format) in place of the game's own textures. Applies at the next start." },
+    { M_TEXSTYLE, K_CYCLE, 1, "Pack style", "Some packs come in styles (button icons, layouts). A tap picks the next one. Applies at the next start." },
 #endif
 #if MHFU_TEXPACK && defined(__ANDROID__)
     { M_TEXINSTALL, K_ACTION, 0, "Install texture pack", "Pick a folder that holds a texture pack (with its textures.ini) to copy it into the app, or remove the one installed." },
@@ -1550,6 +1574,7 @@ static const menu_tab k_tabs[] = {
 #ifdef __ANDROID__
     TAB("Online", k_tab_online),
 #endif
+    { "Achievements", NULL, 0 },
     TAB("Mods", k_tab_mods), TAB("System", k_tab_system),
 };
 #undef TAB
@@ -1557,11 +1582,12 @@ static const menu_tab k_tabs[] = {
 #define MENU_MS   220
 
 static uint64_t g_menu_t0;                 /* when it last started opening or closing */
-static int      g_mtab = 0, g_msel = 0;    /* the section shown; the setting picked in it */
-static float    g_menu_scroll;             /* how far the list is scrolled up, window pixels */
-static int      g_mdrag_on, g_mdragged;    /* a finger on the panel; it moved enough to scroll */
+static int      g_mtab = 0, g_msel = -1;   /* the section shown; the card last touched in it */
+static float    g_menu_scroll;             /* how far the cards are scrolled up, window pixels */
+static int      g_mdrag_on, g_mdragged;    /* a finger on the sheet; it moved enough to scroll */
 static SDL_FingerID g_mdrag_id;
 static float    g_mdown_x, g_mdown_y, g_mdown_scroll;
+static int      g_menu_busy;               /* something on the page is still arriving: draw again */
 
 #ifdef __ANDROID__
 #include <jni.h>
@@ -1590,7 +1616,7 @@ static void menu_set(int open) {
     if (open) touch_release_all();
 }
 
-/* How far the panel is in, 0..1; *moving while it slides. */
+/* How far the sheet is in, 0..1; *moving while it slides. */
 static float menu_progress(int *moving) {
     const uint64_t t = SDL_GetTicks() - g_menu_t0;
     float f = t >= MENU_MS ? 1.0f : (float)t / MENU_MS;
@@ -1607,18 +1633,16 @@ static const char *menu_value(int id) {
     case M_SKILLS: return g_skills_on ? "On" : "Off";
     case M_STYLE: return g_style == STYLE_MOBILE ? "Mobile" : "Legacy PSP";
     case M_PAD: return g_pad_combined ? "Combined" : "Separate";
-    case M_SMOOTH: return !MHFU_HAS_FPS60 ? "Not in this build" : !g_fps60 ? "Off" : mhfu_fps_target() >= 60 ? "On" : "Room at 30";
+    case M_SMOOTH: return !MHFU_HAS_FPS60 ? "Not in this build" : !g_fps60 ? "Off" : mhfu_fps_target() >= 60 ? "On" : "On, room at 30";
     case M_WIDE: return mhfu_mod_widescreen() ? "On" : "Off";
 #if MHFU_TEXPACK
     case M_TEXPACK:
-        if (g_texpack != g_texpack_started) return "Restart";
         if (!g_texpack) return "Off";
-        return mhfu_texpack_textures() > 0 ? "On" : "None installed";
+        return g_texpack != g_texpack_started || mhfu_texpack_textures() > 0 ? "On" : "None installed";
     case M_TEXSTYLE: {
         static char v[300];
         if (!mhfu_texpack_styles()) return mhfu_texpack_textures() > 0 ? "Only one" : "-";
-        snprintf(v, sizeof v, "%s%s", g_texstyle[0] ? g_texstyle : "Pack default",
-                 strcmp(g_texstyle, g_texstyle_started) ? ", restart" : "");
+        snprintf(v, sizeof v, "%s", g_texstyle[0] ? g_texstyle : "Pack default");
         for (char *p = v; *p; p++) if (*p == '/') *p = ' ';
         return v;
     }
@@ -1627,14 +1651,14 @@ static const char *menu_value(int id) {
         return id - M_MOD0 >= mhfu_mod_count() ? "Not built in" : mhfu_mod_on(id - M_MOD0) ? "On" : "Off";
     case M_CHEATS: {
         static char v[24];
-        if (!mhfu_cheats_active()) return "Off";
+        if (!mhfu_cheats_active()) return "None on";
         snprintf(v, sizeof v, mhn_client_online() ? "%d on (paused)" : "%d on", mhfu_cheats_active());
         return v;
     }
     case M_RES: {
         static char r[40];
         const int want = g_res_setting ? g_res_setting : g_scale;
-        snprintf(r, sizeof r, "%dx (%dp)", want, PSP_H * want);
+        snprintf(r, sizeof r, "%dx  %dp", want, PSP_H * want);
         return r;
     }
     case M_NET: {
@@ -1647,16 +1671,20 @@ static const char *menu_value(int id) {
         else snprintf(v, sizeof v, "%s", code);
         return v;
     }
-    case M_ACH: {
-        const char *u = mhfu_ach_user();
-        return u[0] ? u : "Off";
-    }
     case M_OPACITY: {
         static char pct[8];
         snprintf(pct, sizeof pct, "%d%%", g_vpad_alpha);
         return pct;
     }
-    default: return "";
+    case M_EDIT: return "Open editor";
+    case M_SAVES: return "Choose folder";
+    case M_FILES: return "Pick folder";
+    case M_CRASH: return "Copy";
+    case M_UPDATE: return "Check now";
+    case M_ABOUT: return "v" MHFU_VERSION;
+    case M_TEXINSTALL: return "Pick folder";
+    case M_EXIT: return "";
+    default: return "Open";
     }
 }
 
@@ -1675,7 +1703,25 @@ static int menu_on(int id) {
     }
 }
 
-/* Whether a setting differs from what the game started with (shown with *). */
+/* How many choices a cycling setting has (0: unknown), and which one is on. */
+static int menu_choices(int id, int *at) {
+    *at = 0;
+    switch (id) {
+    case M_VPAD: *at = g_vpad_mode; return 3;
+    case M_STYLE: *at = g_style == STYLE_MOBILE; return 2;
+    case M_PAD: *at = !g_pad_combined; return 2;
+#if MHFU_TEXPACK
+    case M_TEXSTYLE: {
+        const int n = mhfu_texpack_styles();
+        for (int k = 0; k < n; k++) if (!strcmp(g_texstyle, mhfu_texpack_style(k))) *at = k + 1;
+        return n ? n + 1 : 0;
+    }
+#endif
+    default: return 0;
+    }
+}
+
+/* Whether a setting differs from what the game started with. */
 static int menu_pending(int id) {
     switch (id) {
     case M_RES: return g_res_setting && g_res_setting != g_scale;
@@ -1687,28 +1733,36 @@ static int menu_pending(int id) {
     }
 }
 
-/* Where everything is, in window pixels; oy moves the panel down (the slide). */
+/* ---- where everything is, in window pixels ---- */
+
 typedef struct {
-    float x, y, w, h, head, pad;           /* the panel and its title bar */
-    float cx, cy, cs;                      /* the close button */
-    float tx, ty, tw, th, tgap;            /* the tabs */
-    float lx, ly, lw, lh, row;             /* the list */
-    float dx, dy, dw, dh;                  /* the description */
+    float mx, hh, fh;                      /* side margin, header and footer heights */
+    float tx, tw, tabpx;                   /* the tabs: first x, each one's width, text size */
+    float clx, cly, clr;                   /* the close button (round) */
+    float cx, cy, cw, ch;                  /* the content */
+    int   cols;                            /* cards per row */
+    float gap, cardh;
 } menu_geom;
 
-static menu_geom menu_layout(float w, float h, float oy) {
+static menu_geom menu_layout(float w, float h) {
     menu_geom g;
-    g.x = w * 0.03f; g.y = h * 0.04f + oy; g.w = w - 2 * g.x; g.h = h - 2 * h * 0.04f;
-    g.head = h * 0.13f;
-    g.pad = h * 0.03f;
-    g.cs = g.head * 0.70f;
-    g.cx = g.x + g.w - g.pad - g.cs;
-    g.cy = g.y + (g.head - g.cs) / 2;
-    const float top = g.y + g.head, bottom = g.y + g.h - g.pad;
-    g.tx = g.x + g.pad; g.ty = top; g.tw = fminf(g.w * 0.17f, h * 0.42f); g.th = h * 0.10f; g.tgap = h * 0.012f;
-    g.dw = fminf(g.w * 0.25f, h * 0.62f); g.dx = g.x + g.w - g.pad - g.dw; g.dy = top; g.dh = bottom - top;
-    g.lx = g.tx + g.tw + g.pad * 0.6f; g.lw = g.dx - g.pad * 0.6f - g.lx; g.ly = top; g.lh = bottom - top;
-    g.row = h * 0.105f;
+    g.mx = fmaxf(w * 0.035f, h * 0.05f);
+    g.hh = h * 0.15f;
+    g.fh = h * 0.12f;
+    g.clr = g.hh * 0.30f;
+    g.clx = w - g.mx - g.clr;
+    g.cly = g.hh * 0.52f;
+    g.tx = g.mx;
+    const float avail = g.clx - g.clr - h * 0.04f - g.tx;
+    g.tw = fminf(avail / MENU_TABS, h * 0.36f);
+    g.tabpx = fminf(h * 0.036f, (g.tw - h * 0.03f) / 6.4f);
+    g.cx = g.mx;
+    g.cy = g.hh + h * 0.035f;
+    g.cw = w - 2 * g.mx;
+    g.ch = h - g.fh - h * 0.015f - g.cy;
+    g.cols = w / h >= 1.9f ? 3 : 2;
+    g.gap = h * 0.028f;
+    g.cardh = h * 0.215f;
     return g;
 }
 
@@ -1716,167 +1770,424 @@ static const menu_tab *menu_cur(void) {
     if (g_mtab < 0 || g_mtab >= MENU_TABS) g_mtab = 0;
     return &k_tabs[g_mtab];
 }
+static int menu_on_ach(void) { return menu_cur()->items == NULL; }
 
+static void card_rect(const menu_geom *g, int i, int cols, float cardh, float top, float *x, float *y, float *cw) {
+    *cw = (g->cw - (cols - 1) * g->gap) / cols;
+    *x = g->cx + (i % cols) * (*cw + g->gap);
+    *y = top + (i / cols) * (cardh + g->gap);
+}
+
+/* The - and + buttons of a stepped card. */
+static void card_steps(const menu_geom *g, float x, float y, float cw, float *mxb, float *pxb, float *by, float *bs) {
+    *bs = g->cardh * 0.36f;
+    *by = y + g->cardh - *bs - g->cardh * 0.13f;
+    *pxb = x + cw - g->cardh * 0.13f - *bs;
+    *mxb = *pxb - *bs - g->cardh * 0.10f;
+}
+
+/* ---- the achievements page's data ---- */
+
+#define ACH_MAX 400
+static mhfu_ach_item *g_ach;
+static mhfu_ach_game  g_ach_game;
+static int            g_ach_n, g_ach_filter, g_ach_sel = -1;
+static uint64_t       g_ach_at, g_ach_seen;    /* last refresh; when the page was opened */
+
+static void ach_refresh(void) {
+    if (g_ach_at && SDL_GetTicks() - g_ach_at < 1500) return;
+    g_ach_at = SDL_GetTicks();
+    if (!g_ach) g_ach = (mhfu_ach_item *)calloc(ACH_MAX, sizeof *g_ach);
+    if (!g_ach) return;
+    g_ach_n = mhfu_ach_items(&g_ach_game, g_ach, ACH_MAX);
+}
+
+/* The achievements the filter lets through, as indices into g_ach. */
+static int ach_visible(int *idx) {
+    int n = 0;
+    for (int i = 0; i < g_ach_n; i++)
+        if (g_ach_filter == 0 || (g_ach_filter == 1) == (g_ach[i].unlocked != 0)) idx[n++] = i;
+    return n;
+}
+
+/* Badges, decoded once and scaled to the size they are drawn at. */
+typedef struct { unsigned id; int size; uint32_t *px; uint64_t tried; } badge_pic;
+#define BADGES 256
+static badge_pic g_badges[BADGES];
+static int       g_nbadges;
+
+static const uint32_t *badge_get(const mhfu_ach_item *a, int size) {
+    badge_pic *b = NULL;
+    for (int i = 0; i < g_nbadges; i++) if (g_badges[i].id == a->id && g_badges[i].size == size) { b = &g_badges[i]; break; }
+    if (!b) {
+        if (g_nbadges == BADGES) {
+            for (int i = 0; i < g_nbadges; i++) free(g_badges[i].px);
+            g_nbadges = 0;
+        }
+        b = &g_badges[g_nbadges++];
+        memset(b, 0, sizeof *b);
+        b->id = a->id;
+        b->size = size;
+    }
+    if (b->px) return b->px;
+    if (b->tried && SDL_GetTicks() - b->tried < 2000) return NULL;
+    b->tried = SDL_GetTicks();
+    int w, h, n;
+    unsigned char *img = stbi_load(a->badge, &w, &h, &n, 4);
+    if (!img) return NULL;
+    b->px = (uint32_t *)malloc((size_t)size * size * 4);
+    if (b->px)
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++) {
+                const unsigned char *p = img + ((size_t)(y * h / size) * w + (size_t)(x * w / size)) * 4;
+                b->px[y * size + x] = rgba(p[0], p[1], p[2], p[3]);
+            }
+    stbi_image_free(img);
+    return b->px;
+}
+
+static void blit_badge(canvas *c, int x0, int y0, int size, const uint32_t *px, int gray) {
+    for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++) {
+            uint32_t v = px[y * size + x];
+            if (gray) {
+                const int l = ((int)(v & 0xFF) * 3 + (int)(v >> 8 & 0xFF) * 6 + (int)(v >> 16 & 0xFF)) / 10 * 6 / 10;
+                v = rgba(l, l, l, (int)(v >> 24));
+            }
+            blend(c, x0 + x, y0 + y, v, 255);
+        }
+}
+
+/* The achievements page: the summary (fixed) and the cards under it. */
+static float ach_summary_h(float h) { return h * 0.22f; }
+static float ach_card_h(float h) { return h * 0.165f; }
+static void ach_filter_rect(const menu_geom *g, float h, int i, float *x, float *y, float *sw, float *sh) {
+    *sw = h * 0.20f; *sh = h * 0.072f;
+    *x = g->cx + g->cw - h * 0.03f - (3 - i) * *sw;
+    *y = g->cy + h * 0.03f;
+}
+static void ach_account_rect(const menu_geom *g, float h, float *x, float *y, float *bw, float *bh) {
+    float sx, sy, sw, sh;
+    ach_filter_rect(g, h, 0, &sx, &sy, &sw, &sh);
+    *x = sx; *bw = sw * 3; *bh = h * 0.062f;
+    *y = g->cy + ach_summary_h(h) - h * 0.03f - *bh;
+}
+/* The sign-in button of the signed-out page. */
+static void ach_signin_rect(const menu_geom *g, float h, float *x, float *y, float *bw, float *bh) {
+    *bw = h * 0.42f; *bh = h * 0.09f;
+    *x = g->cx + g->cw / 2 - *bw / 2;
+    *y = g->cy + g->ch * 0.62f;
+}
+
+static float menu_content_h(const menu_geom *g, float h) {
+    if (menu_on_ach()) {
+        static int idx[ACH_MAX];
+        const int n = g_ach_game.state == 2 ? ach_visible(idx) : 0, rows = (n + 1) / 2;
+        return rows ? rows * ach_card_h(h) + (rows - 1) * g->gap : 0;
+    }
+    const int rows = (menu_cur()->n + g->cols - 1) / g->cols;
+    return rows ? rows * g->cardh + (rows - 1) * g->gap : 0;
+}
+static float menu_view_h(const menu_geom *g, float h) {
+    return menu_on_ach() ? g->ch - ach_summary_h(h) - g->gap : g->ch;
+}
 static float menu_max_scroll(float w, float h) {
-    const menu_geom g = menu_layout(w, h, 0);
-    return fmaxf(0, menu_cur()->n * g.row - g.lh);
+    const menu_geom g = menu_layout(w, h);
+    return fmaxf(0, menu_content_h(&g, h) - menu_view_h(&g, h));
 }
 
-/* The - and + buttons of a stepped row whose top is y. */
-static void menu_steps(const menu_geom *g, float y, float *mx, float *px, float *by, float *bs) {
-    *bs = g->row * 0.66f;
-    *by = y + (g->row - *bs) / 2;
-    *px = g->lx + g->lw - g->pad * 0.5f - *bs;
-    *mx = *px - g->row * 2.6f - *bs;
-}
+/* ---- drawing ---- */
 
-/* In window pixels, onto the half-size canvas. */
 #define MS(v) ((int)((v) * s))
 static void wfill(canvas *c, float s, float x, float y, float w, float h, uint32_t col) {
     const int iw = MS(x + w) - MS(x), ih = MS(y + h) - MS(y);
     fill(c, MS(x), MS(y), iw < 1 && w > 0 ? 1 : iw, ih < 1 && h > 0 ? 1 : ih, col);
 }
-static void wframe(canvas *c, float s, float x, float y, float w, float h, uint32_t col, int studs) {
-    const int t = s >= 1 ? 2 : 1;
+static void wframe(canvas *c, float s, float x, float y, float w, float h, uint32_t col, int t) {
     frame_rect(c, MS(x), MS(y), MS(x + w) - MS(x), MS(y + h) - MS(y), t, col);
-    if (studs) {
-        const int r = (int)fmaxf(2, 4 * s);
-        diamond(c, MS(x), MS(y), r, col); diamond(c, MS(x + w), MS(y), r, col);
-        diamond(c, MS(x), MS(y + h), r, col); diamond(c, MS(x + w), MS(y + h), r, col);
+}
+/* A vertical gradient, in bands (cheap enough for the CPU canvas). */
+static void wgrad(canvas *c, float s, float x, float y, float w, float h, uint32_t top, uint32_t bot) {
+    const int y0 = MS(y), y1 = MS(y + h), n = y1 - y0 > 0 ? y1 - y0 : 1;
+    for (int j = y0; j < y1; j++) {
+        const int t = (j - y0) * 255 / n;
+        uint32_t col = 0;
+        for (int k = 0; k < 32; k += 8)
+            col |= (uint32_t)(((int)(top >> k & 0xFF) * (255 - t) + (int)(bot >> k & 0xFF) * t) / 255) << k;
+        fill(c, MS(x), j, MS(x + w) - MS(x), 1, col);
     }
+}
+
+/* The launcher's colours (launcher/main.cpp). */
+#define C_BG     rgba(23, 19, 15, 255)
+#define C_SIDE   rgba(15, 12, 9, 255)
+#define C_PANEL  rgba(34, 27, 21, 255)
+#define C_FRAME  rgba(139, 107, 59, 255)
+#define C_GOLD   rgba(238, 195, 102, 255)
+#define C_TEXT   rgba(252, 247, 237, 255)
+#define C_DIM    rgba(202, 189, 166, 255)
+#define C_EMBER  rgba(153, 56, 23, 255)
+#define C_EMBER2 rgba(204, 92, 33, 255)
+#define C_OK     rgba(168, 216, 126, 255)
+#define C_WARN   rgba(244, 193, 90, 255)
+static uint32_t alpha_of(uint32_t col, int a) { return (col & 0xFFFFFFu) | (uint32_t)a << 24; }
+
+static void draw_card(canvas *c, float s, const menu_geom *g, float h, const menu_item *it, float x, float y, float cw, int sel) {
+    const float ch = g->cardh, p = h * 0.03f;
+    const int exit_card = it->id == M_EXIT;
+    if (exit_card) wgrad(c, s, x, y, cw, ch, C_EMBER2, rgba(110, 38, 14, 255));
+    else wgrad(c, s, x, y, cw, ch, rgba(44, 35, 27, 250), rgba(30, 24, 18, 250));
+    wframe(c, s, x, y, cw, ch, sel ? C_GOLD : alpha_of(C_FRAME, 150), sel ? 2 : 1);
+    if (sel) {
+        const int r = (int)fmaxf(2, h * 0.007f * s);
+        diamond(c, MS(x), MS(y), r, C_GOLD); diamond(c, MS(x + cw), MS(y), r, C_GOLD);
+        diamond(c, MS(x), MS(y + ch), r, C_GOLD); diamond(c, MS(x + cw), MS(y + ch), r, C_GOLD);
+    }
+    const int lpx = (int)(h * 0.033f * s), vpx = (int)(h * 0.047f * s);
+    if (exit_card) {
+        text_centered(c, (x + cw / 2) * s, (y + ch / 2) * s, (int)(h * 0.05f * s), C_TEXT, "EXIT GAME");
+        return;
+    }
+    if (it->kind == K_ACTION) wfill(c, s, x, y, h * 0.008f, ch, C_EMBER2);
+    text(c, MS(x + p), MS(y + p + h * 0.03f), lpx, C_DIM, it->text, MS(cw - 2 * p - h * 0.12f));
+    if (it->restart && menu_pending(it->id)) {              /* applies at the next start */
+        const int tpx = (int)(h * 0.024f * s);
+        const char *tag = "RESTART";
+        const float tw = text_width(tag, tpx) / s + h * 0.025f, th = h * 0.04f, tx = x + cw - p - tw, ty = y + p * 0.8f;
+        wfill(c, s, tx, ty, tw, th, alpha_of(C_WARN, 40));
+        wframe(c, s, tx, ty, tw, th, C_WARN, 1);
+        text_centered(c, (tx + tw / 2) * s, (ty + th / 2) * s, tpx, C_WARN, tag);
+    }
+    const float base = y + ch - p - h * 0.012f, mid = y + ch - p - h * 0.03f;
+    const char *v = menu_value(it->id);
+    const int on = menu_on(it->id);
+    if (it->kind == K_TOGGLE && on >= 0) {
+        const float sw = h * 0.12f, sh = h * 0.06f, sx = x + cw - p - sw, sy = mid - sh / 2;
+        round_rect(c, sx * s, sy * s, sw * s, sh * s, sh / 2 * s, on ? rgba(76, 118, 50, 255) : C_SIDE, 1.5f * s, on ? C_GOLD : C_FRAME);
+        disc(c, (on ? sx + sw - sh / 2 : sx + sh / 2) * s, mid * s, sh * 0.36f * s, on ? C_TEXT : rgba(120, 104, 84, 255));
+        text(c, MS(x + p), MS(base), vpx, on ? C_OK : C_DIM, v, MS(cw - 3 * p - sw));
+    } else if (it->kind == K_STEP) {
+        float mxb, pxb, by, bs;
+        card_steps(g, x, y, cw, &mxb, &pxb, &by, &bs);
+        for (int b = 0; b < 2; b++) {
+            const float bx = b ? pxb : mxb, bcx = bx + bs / 2, bcy = by + bs / 2;
+            wgrad(c, s, bx, by, bs, bs, rgba(62, 48, 33, 255), rgba(40, 31, 22, 255));
+            wframe(c, s, bx, by, bs, bs, C_FRAME, 1);
+            segment(c, (bcx - bs * 0.24f) * s, bcy * s, (bcx + bs * 0.24f) * s, bcy * s, 2.6f * s, C_GOLD);
+            if (b) segment(c, bcx * s, (bcy - bs * 0.24f) * s, bcx * s, (bcy + bs * 0.24f) * s, 2.6f * s, C_GOLD);
+        }
+        text(c, MS(x + p), MS(base), vpx, C_GOLD, v, MS(mxb - x - 2 * p));
+    } else if (it->kind == K_CYCLE) {
+        int at;
+        const int n = menu_choices(it->id, &at);
+        float dx = x + cw - p;
+        for (int k = n - 1; k >= 0; k--) {                  /* the choices, the one on lit */
+            const float r = h * 0.011f;
+            dx -= r * 2.6f;
+            if (k == at) disc(c, (dx + r) * s, mid * s, r * 1.1f * s, C_GOLD);
+            else ring(c, (dx + r) * s, mid * s, r * 0.85f * s, 1.4f * s, C_FRAME);
+        }
+        text(c, MS(x + p), MS(base), vpx, C_GOLD, v, MS(dx - x - 2 * p));
+    } else if (it->kind == K_TOGGLE) {                     /* cannot be changed here */
+        text(c, MS(x + p), MS(base), (int)(h * 0.040f * s), C_DIM, v, MS(cw - 2 * p));
+    } else {
+        /* opens something: the value, and an arrow */
+        const float ax = x + cw - p - h * 0.01f, ar = h * 0.018f;
+        segment(c, (ax - ar) * s, (mid - ar * 1.4f) * s, ax * s, mid * s, 2.6f * s, C_GOLD);
+        segment(c, ax * s, mid * s, (ax - ar) * s, (mid + ar * 1.4f) * s, 2.6f * s, C_GOLD);
+        text(c, MS(x + p), MS(base), (int)(h * 0.040f * s), C_TEXT, v,
+             MS(cw - 3 * p - ar * 2));
+    }
+}
+
+static void draw_button(canvas *c, float s, float h, float x, float y, float bw, float bh, const char *label, int ember, int on) {
+    if (ember) wgrad(c, s, x, y, bw, bh, C_EMBER2, C_EMBER);
+    else if (on) wgrad(c, s, x, y, bw, bh, alpha_of(C_GOLD, 90), alpha_of(C_GOLD, 40));
+    else wgrad(c, s, x, y, bw, bh, rgba(52, 40, 28, 255), rgba(36, 28, 20, 255));
+    wframe(c, s, x, y, bw, bh, on || ember ? C_GOLD : C_FRAME, 1);
+    text_centered(c, (x + bw / 2) * s, (y + bh / 2) * s, (int)(h * 0.032f * s), on ? C_GOLD : C_TEXT, label);
+}
+
+static void draw_achievements(canvas *c, float s, const menu_geom *g, float w, float h, float oy) {
+    (void)w;
+    ach_refresh();
+    const float p = h * 0.03f;
+    if (g_ach_game.state != 2) {
+        /* signed out, or the set still loading */
+        const float bx = g->cx + g->cw * 0.18f, bw = g->cw * 0.64f, by = g->cy + oy + g->ch * 0.08f, bh = g->ch * 0.8f;
+        wgrad(c, s, bx, by, bw, bh, rgba(44, 35, 27, 250), rgba(30, 24, 18, 250));
+        wframe(c, s, bx, by, bw, bh, alpha_of(C_FRAME, 160), 1);
+        text_centered(c, (bx + bw / 2) * s, (by + bh * 0.2f) * s, (int)(h * 0.055f * s), C_GOLD, "RetroAchievements");
+        char unsup[300];
+        snprintf(unsup, sizeof unsup,
+                 "This release (%s) is not supported by RetroAchievements. Only Monster Hunter Freedom Unite (Europe) "
+                 "has achievements.", g_ach_game.title);
+        const char *msg = g_ach_game.state == 3 ? unsup
+                        : g_ach_game.state == 1 ? "Loading the achievement set..."
+                                                : "Sign in to earn achievements while you play and to see your hunter record here.";
+        text_wrapped(c, MS(bx + p * 2), MS(by + bh * 0.38f), (int)(h * 0.034f * s), (int)(h * 0.034f * s * 1.35f), C_DIM, msg,
+                     MS(bw - p * 4), 4);
+        if (g_ach_game.state == 1) g_menu_busy |= SDL_GetTicks() - g_ach_seen < 30000;
+#ifdef __ANDROID__
+        if (g_ach_game.state == 0) {
+            float x, y, bw2, bh2;
+            ach_signin_rect(g, h, &x, &y, &bw2, &bh2);
+            draw_button(c, s, h, x, y + oy, bw2, bh2, "SIGN IN", 1, 0);
+        }
+#else
+        if (g_ach_game.state == 0)
+            text_centered(c, (bx + bw / 2) * s, (by + bh * 0.8f) * s, (int)(h * 0.03f * s), C_DIM, "Sign in on the launcher's Achievements page.");
+#endif
+        return;
+    }
+    /* the summary: the set, the count, the points, a progress bar; the filter and the account */
+    const float sy = g->cy + oy, sh = ach_summary_h(h);
+    wgrad(c, s, g->cx, sy, g->cw, sh, rgba(48, 38, 28, 250), rgba(30, 24, 18, 250));
+    wframe(c, s, g->cx, sy, g->cw, sh, alpha_of(C_FRAME, 170), 1);
+    float fx, fy, fw, fh;
+    ach_filter_rect(g, h, 0, &fx, &fy, &fw, &fh);
+    const float lw = fx - g->cx - 3 * p;
+    text(c, MS(g->cx + p), MS(sy + p + h * 0.05f), (int)(h * 0.052f * s), C_GOLD, g_ach_game.title, MS(lw));
+    char line[160];
+    snprintf(line, sizeof line, "%u of %u unlocked  \xC2\xB7  %u of %u points  \xC2\xB7  %s", g_ach_game.unlocked, g_ach_game.total,
+             g_ach_game.points, g_ach_game.points_total, mhfu_ach_user());
+    text(c, MS(g->cx + p), MS(sy + p + h * 0.11f), (int)(h * 0.032f * s), C_DIM, line, MS(lw));
+    const float pby = sy + sh - p - h * 0.022f, frac = g_ach_game.total ? (float)g_ach_game.unlocked / g_ach_game.total : 0;
+    wfill(c, s, g->cx + p, pby, lw, h * 0.022f, C_SIDE);
+    if (frac > 0) wgrad(c, s, g->cx + p, pby, lw * frac, h * 0.022f, C_GOLD, rgba(190, 140, 60, 255));
+    wframe(c, s, g->cx + p, pby, lw, h * 0.022f, alpha_of(C_FRAME, 180), 1);
+    static const char *const flt[3] = { "All", "Unlocked", "Locked" };
+    for (int i = 0; i < 3; i++) {
+        ach_filter_rect(g, h, i, &fx, &fy, &fw, &fh);
+        draw_button(c, s, h, fx, fy + oy, fw, fh, flt[i], 0, i == g_ach_filter);
+    }
+#ifdef __ANDROID__
+    float ax, ay, aw, ah;
+    ach_account_rect(g, h, &ax, &ay, &aw, &ah);
+    draw_button(c, s, h, ax, ay + oy, aw, ah, "Account", 0, 0);
+#endif
+    /* the achievements, two to a row */
+    static int idx[ACH_MAX];
+    const int n = ach_visible(idx);
+    const float ly = sy + sh + g->gap, lh = menu_view_h(g, h), ach = ach_card_h(h), cw = (g->cw - g->gap) / 2;
+    g_clip0 = MS(ly);
+    g_clip1 = MS(ly + lh);
+    int missing = 0;
+    for (int k = 0; k < n; k++) {
+        const mhfu_ach_item *a = &g_ach[idx[k]];
+        const float x = g->cx + (k % 2) * (cw + g->gap), y = ly + (k / 2) * (ach + g->gap) - g_menu_scroll;
+        if (y + ach < ly || y > ly + lh) continue;
+        const int sel = idx[k] == g_ach_sel;
+        wgrad(c, s, x, y, cw, ach, rgba(44, 35, 27, 250), rgba(30, 24, 18, 250));
+        wframe(c, s, x, y, cw, ach, sel ? C_GOLD : a->unlocked ? alpha_of(C_GOLD, 120) : alpha_of(C_FRAME, 130), sel ? 2 : 1);
+        const float bs = ach - 2 * p * 0.8f, bx = x + p * 0.8f, by = y + p * 0.8f;
+        const int bpx = MS(bs);
+        const uint32_t *pic = bpx > 0 ? badge_get(a, bpx) : NULL;
+        if (pic) blit_badge(c, MS(bx), MS(by), bpx, pic, !a->unlocked);
+        else {
+            missing = 1;
+            wfill(c, s, bx, by, bs, bs, C_SIDE);
+            diamond(c, MS(bx + bs / 2), MS(by + bs / 2), (int)(bs * 0.18f * s), C_FRAME);
+        }
+        wframe(c, s, bx - 1, by - 1, bs + 2, bs + 2, a->unlocked ? C_GOLD : C_FRAME, 1);
+        const float tx = bx + bs + p * 0.8f, tw = x + cw - p - tx;
+        char pts[24];
+        snprintf(pts, sizeof pts, "%u pts", a->points);
+        const int ppx = (int)(h * 0.028f * s);
+        const float pw = text_width(pts, ppx) / s;
+        text(c, MS(x + cw - p - pw), MS(y + p + h * 0.026f), ppx, C_DIM, pts, 0);
+        text(c, MS(tx), MS(y + p + h * 0.03f), (int)(h * 0.034f * s), a->unlocked ? C_GOLD : C_TEXT, a->title, MS(tw - pw - p));
+        text_wrapped(c, MS(tx), MS(y + p + h * 0.075f), (int)(h * 0.027f * s), (int)(h * 0.027f * s * 1.3f), C_DIM, a->desc,
+                     MS(tw), 2);
+        const char *st = a->unlocked ? "UNLOCKED" : a->progress[0] ? a->progress : "Locked";
+        const int spx = (int)(h * 0.025f * s);
+        text(c, MS(x + cw - p) - text_width(st, spx), MS(y + ach - p * 0.7f), spx, a->unlocked ? C_OK : C_DIM, st, 0);
+    }
+    g_clip0 = 0;
+    g_clip1 = 1 << 30;
+    if (!n)
+        text_centered(c, (g->cx + g->cw / 2) * s, (ly + lh * 0.3f) * s, (int)(h * 0.034f * s), C_DIM,
+                      g_ach_filter == 1 ? "Nothing unlocked yet. Go hunt!" : "Nothing here.");
+    if (missing) g_menu_busy |= SDL_GetTicks() - g_ach_seen < 20000;   /* badges still coming */
 }
 
 static void draw_menu(canvas *c, float s, float prog) {
     const float w = c->w / s, h = c->h / s;
-    const menu_geom g = menu_layout(w, h, -(1 - prog) * h * 0.08f);
+    const menu_geom g = menu_layout(w, h);
     const menu_tab *tab = menu_cur();
-    if (g_msel >= tab->n) g_msel = 0;
-    const uint32_t gold = rgba(236, 194, 104, 255), brass = rgba(126, 98, 54, 255), white = rgba(252, 247, 237, 255),
-                   dim = rgba(170, 150, 130, 255), panel = rgba(58, 26, 20, (int)(238 * prog)),
-                   inner = rgba(36, 16, 12, (int)(225 * prog));
-    /* the game dimmed around the panel; the panel itself */
-    wfill(c, s, 0, 0, w, g.y, rgba(0, 0, 0, (int)(150 * prog)));
-    wfill(c, s, 0, g.y + g.h, w, h - g.y - g.h, rgba(0, 0, 0, (int)(150 * prog)));
-    wfill(c, s, 0, g.y, g.x, g.h, rgba(0, 0, 0, (int)(150 * prog)));
-    wfill(c, s, g.x + g.w, g.y, w - g.x - g.w, g.h, rgba(0, 0, 0, (int)(150 * prog)));
-    wfill(c, s, g.x, g.y, g.w, g.h, panel);
-    wframe(c, s, g.x, g.y, g.w, g.h, gold, 1);
-    wframe(c, s, g.x + 4, g.y + 4, g.w - 8, g.h - 8, rgba(126, 98, 54, 160), 0);
-    /* the title bar: SETTINGS * section, and the close button */
-    const int tpx = (int)(h * 0.045f * s);
-    const float tby = g.y + g.head * 0.5f + h * 0.016f;
-    text(c, MS(g.x + g.pad), MS(tby), tpx, gold, "SETTINGS", 0);
-    const float sx = g.x + g.pad + text_width("SETTINGS", tpx) / s + h * 0.03f;
-    diamond(c, MS(sx), MS(g.y + g.head * 0.5f), (int)(h * 0.009f * s), gold);
-    text(c, MS(sx + h * 0.03f), MS(tby), tpx, white, tab->name, 0);
-    wfill(c, s, g.x + g.pad, g.y + g.head - h * 0.018f, g.w - 2 * g.pad, 1.2f, rgba(126, 98, 54, 200));
-    wfill(c, s, g.cx, g.cy, g.cs, g.cs, inner);
-    wframe(c, s, g.cx, g.cy, g.cs, g.cs, gold, 1);
-    const float k = g.cs * 0.26f, mx = g.cx + g.cs / 2, my = g.cy + g.cs / 2;
-    segment(c, (mx - k) * s, (my - k) * s, (mx + k) * s, (my + k) * s, 3.0f * s, white);
-    segment(c, (mx - k) * s, (my + k) * s, (mx + k) * s, (my - k) * s, 3.0f * s, white);
-    /* the tabs */
-    const int fpx = (int)(h * 0.040f * s);
+    const float oy = (1 - prog) * h * 0.05f;              /* rises into place */
+    const int a = (int)(240 * prog);
+    g_menu_busy = 0;
+    fill(c, 0, 0, c->w, c->h, alpha_of(C_BG, a));
+    /* the header: a darker band, the tabs, the close button */
+    wgrad(c, s, 0, 0, w, g.hh, alpha_of(C_SIDE, a), alpha_of(rgba(19, 15, 11, 255), a));
+    wfill(c, s, 0, g.hh - 1.5f, w, 1.5f, alpha_of(C_FRAME, (int)(200 * prog)));
+    wfill(c, s, 0, g.hh + 3, w, 1, alpha_of(C_FRAME, (int)(60 * prog)));
+    const int tpx = (int)(g.tabpx * s);
     for (int i = 0; i < MENU_TABS; i++) {
-        const float y = g.ty + i * (g.th + g.tgap);
+        const float x = g.tx + i * g.tw;
         const int on = i == g_mtab;
-        wfill(c, s, g.tx, y, g.tw, g.th, on ? rgba(176, 124, 40, (int)(245 * prog)) : inner);
-        wframe(c, s, g.tx, y, g.tw, g.th, on ? gold : brass, 1);
-        if (on) diamond(c, MS(g.tx + h * 0.025f), MS(y + g.th / 2), (int)(h * 0.008f * s), white);
-        text(c, MS(g.tx + h * 0.045f), MS(y + g.th / 2 + h * 0.014f), fpx, white, k_tabs[i].name, MS(g.tw - h * 0.06f));
+        if (on) {
+            wgrad(c, s, x, g.hh * 0.18f, g.tw, g.hh * 0.82f - 1.5f, alpha_of(C_GOLD, 0), alpha_of(C_GOLD, 55));
+            wfill(c, s, x + g.tw * 0.12f, g.hh - 4.5f, g.tw * 0.76f, 3.5f, C_GOLD);
+            diamond(c, MS(x + g.tw / 2), MS(g.hh - 2.5f), (int)fmaxf(2, h * 0.007f * s), C_GOLD);
+        }
+        text_centered(c, (x + g.tw / 2) * s, g.hh * 0.55f * s, tpx, on ? C_GOLD : C_DIM, k_tabs[i].name);
+        if (i) wfill(c, s, x, g.hh * 0.35f, 1, g.hh * 0.35f, alpha_of(C_FRAME, 90));
     }
-    /* the list */
-    const float maxs = fmaxf(0, tab->n * g.row - g.lh);
+    disc(c, g.clx * s, g.cly * s, g.clr * s, rgba(40, 31, 22, 255));
+    ring(c, g.clx * s, g.cly * s, g.clr * s, 1.8f * s, C_GOLD);
+    const float k = g.clr * 0.36f;
+    segment(c, (g.clx - k) * s, (g.cly - k) * s, (g.clx + k) * s, (g.cly + k) * s, 3.0f * s, C_TEXT);
+    segment(c, (g.clx - k) * s, (g.cly + k) * s, (g.clx + k) * s, (g.cly - k) * s, 3.0f * s, C_TEXT);
+
+    /* the page */
+    const float maxs = menu_max_scroll(w, h);
     g_menu_scroll = fminf(fmaxf(g_menu_scroll, 0), maxs);
-    wfill(c, s, g.lx, g.ly, g.lw, g.lh, rgba(36, 16, 12, (int)(120 * prog)));
-    g_clip0 = MS(g.ly);
-    g_clip1 = MS(g.ly + g.lh);
-    for (int i = 0; i < tab->n; i++) {
-        const menu_item *it = &tab->items[i];
-        const float y = g.ly + i * g.row - g_menu_scroll, mid = y + g.row / 2, base = mid + h * 0.014f;
-        if (y + g.row < g.ly || y > g.ly + g.lh) continue;
-        const int sel = i == g_msel;
-        if (sel) {
-            wfill(c, s, g.lx, y, g.lw, g.row, rgba(176, 124, 40, (int)(235 * prog)));
-            wframe(c, s, g.lx, y, g.lw, g.row, gold, 0);
-            diamond(c, MS(g.lx + h * 0.02f), MS(mid), (int)(h * 0.008f * s), white);
+    const char *help = NULL;
+    char help_buf[400];
+    if (menu_on_ach()) {
+        draw_achievements(c, s, &g, w, h, oy);
+        if (g_ach_sel >= 0 && g_ach_sel < g_ach_n) {
+            snprintf(help_buf, sizeof help_buf, "%s: %s", g_ach[g_ach_sel].title, g_ach[g_ach_sel].desc);
+            help = help_buf;
+        } else
+            help = "Unlocked in softcore while you play; an unlock shows in the corner with a chime. Cheats pause it.";
+    } else {
+        g_clip0 = MS(g.cy);
+        g_clip1 = MS(g.cy + g.ch);
+        for (int i = 0; i < tab->n; i++) {
+            float x, y, cw;
+            card_rect(&g, i, g.cols, g.cardh, g.cy + oy - g_menu_scroll, &x, &y, &cw);
+            if (y + g.cardh < g.cy || y > g.cy + g.ch) continue;
+            draw_card(c, s, &g, h, &tab->items[i], x, y, cw, i == g_msel);
         }
-        const uint32_t col = it->id == M_EXIT ? rgba(240, 150, 130, 255) : white;
-        char label[96];
-        snprintf(label, sizeof label, "%s%s", it->text, it->restart && menu_pending(it->id) ? " *" : "");
-        text(c, MS(g.lx + h * 0.045f), MS(base), fpx, col, label, MS(g.lw * 0.5f));
-        const float right = g.lx + g.lw - g.pad * 0.5f;
-        const char *v = menu_value(it->id);
-        if (it->kind == K_TOGGLE && menu_on(it->id) >= 0) {
-            const int on = menu_on(it->id);
-            const float sw = g.row * 0.95f, sh = g.row * 0.46f, swx = right - sw, swy = mid - sh / 2;
-            wfill(c, s, swx, swy, sw, sh, on ? rgba(84, 128, 52, 255) : rgba(30, 14, 10, 255));
-            wframe(c, s, swx, swy, sw, sh, on ? gold : brass, 0);
-            const float kx = on ? swx + sw - sh * 0.5f : swx + sh * 0.5f;
-            wfill(c, s, kx - sh * 0.36f, mid - sh * 0.36f, sh * 0.72f, sh * 0.72f, on ? gold : rgba(120, 100, 80, 255));
-            diamond(c, MS(kx), MS(mid), (int)(sh * 0.16f * s), rgba(60, 40, 20, 255));
-            if (strcmp(v, "On") && strcmp(v, "Off"))             /* "Room at 30", "Restart" ... */
-                text(c, MS(swx - h * 0.02f) - text_width(v, fpx), MS(base), fpx, dim, v, 0);
-        } else if (it->kind == K_STEP) {
-            float mxb, pxb, by, bs;
-            menu_steps(&g, y, &mxb, &pxb, &by, &bs);
-            for (int b = 0; b < 2; b++) {
-                const float bx = b ? pxb : mxb, bcx = bx + bs / 2, bcy = by + bs / 2;
-                wfill(c, s, bx, by, bs, bs, rgba(30, 14, 10, 255));
-                wframe(c, s, bx, by, bs, bs, gold, 1);
-                segment(c, (bcx - bs * 0.25f) * s, bcy * s, (bcx + bs * 0.25f) * s, bcy * s, 2.6f * s, white);
-                if (b) segment(c, bcx * s, (bcy - bs * 0.25f) * s, bcx * s, (bcy + bs * 0.25f) * s, 2.6f * s, white);
-            }
-            const float vc = (mxb + bs + pxb) / 2;
-            text(c, MS(vc) - text_width(v, fpx) / 2, MS(base), fpx, white, v, 0);
-        } else {
-            float vr = right;
-            if (it->kind == K_CYCLE || it->kind == K_ACTION) {   /* a chevron: more values, or it opens something */
-                const float ax = right - h * 0.012f, ar = h * 0.012f;
-                if (it->kind == K_CYCLE) {
-                    segment(c, (ax - ar * 2) * s, (mid - ar) * s, (ax - ar) * s, mid * s, 2.2f * s, gold);
-                    segment(c, (ax - ar) * s, mid * s, (ax - ar * 2) * s, (mid + ar) * s, 2.2f * s, gold);
-                    segment(c, (ax - ar * 0.6f) * s, (mid - ar) * s, (ax + ar * 0.4f) * s, mid * s, 2.2f * s, gold);
-                    segment(c, (ax + ar * 0.4f) * s, mid * s, (ax - ar * 0.6f) * s, (mid + ar) * s, 2.2f * s, gold);
-                } else {
-                    segment(c, (ax - ar) * s, (mid - ar * 1.4f) * s, ax * s, mid * s, 2.4f * s, gold);
-                    segment(c, ax * s, mid * s, (ax - ar) * s, (mid + ar * 1.4f) * s, 2.4f * s, gold);
-                }
-                vr = right - h * 0.05f;
-            }
-            if (*v) text(c, MS(vr) - text_width(v, fpx), MS(base), fpx, sel ? white : gold, v, MS(g.lw * 0.42f));
-        }
-        if (!sel && i + 1 < tab->n) wfill(c, s, g.lx + h * 0.02f, y + g.row - 1, g.lw - h * 0.04f, 1.0f, rgba(126, 98, 54, 110));
+        g_clip0 = 0;
+        g_clip1 = 1 << 30;
+        if (g_msel >= 0 && g_msel < tab->n) help = tab->items[g_msel].help;
+        else help = "Tap a card to change it. Changes are kept at once.";
     }
-    g_clip0 = 0;
-    g_clip1 = 1 << 30;
-    if (maxs > 0) {                                       /* where in the list: a gold bar */
-        const float bar = g.lh * g.lh / (g.lh + maxs), by = g.ly + (g.lh - bar) * g_menu_scroll / maxs;
-        wfill(c, s, g.lx + g.lw + g.pad * 0.2f, by, 3, bar, gold);
+    if (maxs > 0) {                                       /* where in the list: a brass bar at the edge */
+        const float top = menu_on_ach() ? g.cy + ach_summary_h(h) + g.gap : g.cy, vh = menu_view_h(&g, h);
+        const float bar = vh * vh / (vh + maxs), by = top + (vh - bar) * g_menu_scroll / maxs;
+        wfill(c, s, w - g.mx * 0.5f, by + oy, 3, bar, alpha_of(C_FRAME, 220));
     }
-    /* what the picked setting does */
-    wfill(c, s, g.dx, g.dy, g.dw, g.dh, inner);
-    wframe(c, s, g.dx, g.dy, g.dw, g.dh, brass, 1);
-    const float dp = h * 0.025f;
-    if (tab->n) {
-        const menu_item *it = &tab->items[g_msel];
-        text(c, MS(g.dx + dp), MS(g.dy + dp + h * 0.04f), (int)(h * 0.042f * s), gold, it->text, MS(g.dw - 2 * dp));
-        wfill(c, s, g.dx + dp, g.dy + dp + h * 0.065f, g.dw - 2 * dp, 1.2f, rgba(126, 98, 54, 200));
-        const int hp = (int)(h * 0.034f * s);
-        text_wrapped(c, MS(g.dx + dp), MS(g.dy + dp + h * 0.12f), hp, (int)(hp * 1.32f), rgba(225, 212, 195, 255), it->help,
-                     MS(g.dw - 2 * dp), 12);
-    }
-    int restart = 0;
-    for (int i = 0; i < tab->n; i++) restart |= tab->items[i].restart;
-    const int npx = (int)(h * 0.030f * s);
-    if (restart) {
-        wfill(c, s, g.dx + dp, g.dy + g.dh - h * 0.075f, g.dw - 2 * dp, 1.0f, rgba(126, 98, 54, 160));
-        text(c, MS(g.dx + dp), MS(g.dy + g.dh - dp), npx, dim, "* Restart required", 0);
-    }
+    /* the footer: what the last card touched does */
+    const float fy = h - g.fh;
+    wfill(c, s, 0, fy, w, g.fh, alpha_of(C_SIDE, a));
+    wfill(c, s, 0, fy, w, 1.5f, alpha_of(C_FRAME, (int)(200 * prog)));
+    diamond(c, MS(g.mx + h * 0.01f), MS(fy + g.fh * 0.36f), (int)(h * 0.008f * s), C_GOLD);
+    const int hpx = (int)(h * 0.030f * s);
+    const char *brand = "FREEDOM UNITE  \xC2\xB7  v" MHFU_VERSION;
+    const int bpx = (int)(h * 0.026f * s);
+    const float bw = text_width(brand, bpx) / s;
+    text(c, MS(w - g.mx - bw), MS(fy + g.fh * 0.36f + h * 0.01f), bpx, alpha_of(C_FRAME, 255), brand, 0);
+    text_wrapped(c, MS(g.mx + h * 0.035f), MS(fy + g.fh * 0.36f + h * 0.011f), hpx, (int)(hpx * 1.3f), C_DIM, help,
+                 MS(w - 3 * g.mx - bw - h * 0.035f), 2);
 }
 #undef MS
 
-/* What a tap on a setting does; dir is -1 or +1 for the - and + buttons, 0 for a tap on the row. */
+/* What a tap on a setting does; dir is -1 or +1 for the - and + buttons, 0 for a tap on the card. */
 static void menu_act(const menu_item *it, int dir) {
     switch (it->id) {
     case M_VPAD: g_vpad_mode = (g_vpad_mode + 1) % 3; settings_save(); break;
@@ -1906,15 +2217,13 @@ static void menu_act(const menu_item *it, int dir) {
         settings_save();
         break;
     case M_RES: {
-        if (!dir) break;
-        const int want = (g_res_setting ? g_res_setting : g_scale) + dir;
-        if (want >= 1 && want <= 4) { g_res_setting = want; settings_save(); }
+        const int want = (g_res_setting ? g_res_setting : g_scale) + (dir ? dir : 0);
+        if (dir && want >= 1 && want <= 4) { g_res_setting = want; settings_save(); }
         break;
     }
     case M_OPACITY: {
-        if (!dir) break;
         const int a = g_vpad_alpha + dir * 25;
-        if (a >= 25 && a <= 100) { g_vpad_alpha = a; settings_save(); }
+        if (dir && a >= 25 && a <= 100) { g_vpad_alpha = a; settings_save(); }
         break;
     }
     case M_EDIT: menu_set(0); edit_open(); break;
@@ -1939,37 +2248,77 @@ static void menu_act(const menu_item *it, int dir) {
     }
 }
 
-/* A tap with the panel open. */
-static void menu_tap(float px, float py, float w, float h) {
-    const menu_geom g = menu_layout(w, h, 0);
-    const float slop = h * 0.015f;
-    if (px < g.x || px >= g.x + g.w || py < g.y || py >= g.y + g.h) { menu_set(0); return; }   /* outside: close */
-    if (px >= g.cx - slop && px < g.cx + g.cs + slop && py >= g.cy - slop && py < g.cy + g.cs + slop) { menu_set(0); return; }
-    if (px >= g.tx && px < g.tx + g.tw)
-        for (int i = 0; i < MENU_TABS; i++) {
-            const float y = g.ty + i * (g.th + g.tgap);
-            if (py >= y && py < y + g.th + g.tgap) {
-                if (i != g_mtab) { g_mtab = i; g_msel = 0; g_menu_scroll = 0; }
-                return;
-            }
-        }
-    const menu_tab *tab = menu_cur();
-    if (px < g.lx || px >= g.lx + g.lw || py < g.ly || py >= g.ly + g.lh) return;
-    const int i = (int)((py - g.ly + g_menu_scroll) / g.row);
-    if (i < 0 || i >= tab->n) return;
-    const menu_item *it = &tab->items[i];
-    g_msel = i;
-    int dir = 0;
-    if (it->kind == K_STEP) {
-        float mxb, pxb, by, bs;
-        menu_steps(&g, g.ly + i * g.row - g_menu_scroll, &mxb, &pxb, &by, &bs);
-        if (px >= mxb - slop && px < mxb + bs + slop) dir = -1;
-        else if (px >= pxb - slop && px < pxb + bs + slop) dir = 1;
-    }
-    menu_act(it, dir);
+static int in_rect(float px, float py, float x, float y, float w, float h, float slop) {
+    return px >= x - slop && px < x + w + slop && py >= y - slop && py < y + h + slop;
 }
 
-/* A finger with the panel open: a tap picks, a drag scrolls the list. */
+/* A tap on the achievements page. */
+static void ach_tap(const menu_geom *g, float px, float py, float h) {
+    if (g_ach_game.state == 0) {
+#ifdef __ANDROID__
+        float x, y, bw, bh;
+        ach_signin_rect(g, h, &x, &y, &bw, &bh);
+        if (in_rect(px, py, x, y, bw, bh, h * 0.01f)) { menu_set(0); android_call("openAchievements"); }
+#endif
+        return;
+    }
+    if (g_ach_game.state != 2) return;
+    for (int i = 0; i < 3; i++) {
+        float x, y, fw, fh;
+        ach_filter_rect(g, h, i, &x, &y, &fw, &fh);
+        if (in_rect(px, py, x, y, fw, fh, h * 0.008f)) { g_ach_filter = i; g_menu_scroll = 0; g_ach_sel = -1; return; }
+    }
+#ifdef __ANDROID__
+    float ax, ay, aw, ah;
+    ach_account_rect(g, h, &ax, &ay, &aw, &ah);
+    if (in_rect(px, py, ax, ay, aw, ah, h * 0.008f)) { menu_set(0); android_call("openAchievements"); return; }
+#endif
+    static int idx[ACH_MAX];
+    const int n = ach_visible(idx);
+    const float ly = g->cy + ach_summary_h(h) + g->gap, ach = ach_card_h(h), cw = (g->cw - g->gap) / 2;
+    if (py < ly || py >= ly + menu_view_h(g, h)) return;
+    for (int k = 0; k < n; k++) {
+        const float x = g->cx + (k % 2) * (cw + g->gap), y = ly + (k / 2) * (ach + g->gap) - g_menu_scroll;
+        if (in_rect(px, py, x, y, cw, ach, 0)) { g_ach_sel = idx[k]; return; }
+    }
+}
+
+/* A tap with the sheet open. */
+static void menu_tap(float px, float py, float w, float h) {
+    const menu_geom g = menu_layout(w, h);
+    const float dx = px - g.clx, dy = py - g.cly;
+    if (dx * dx + dy * dy <= (g.clr * 1.5f) * (g.clr * 1.5f)) { menu_set(0); return; }
+    if (py < g.hh) {
+        const int i = (int)floorf((px - g.tx) / g.tw);
+        if (px >= g.tx && i >= 0 && i < MENU_TABS && i != g_mtab) {
+            g_mtab = i; g_msel = -1; g_menu_scroll = 0; g_ach_sel = -1;
+            if (menu_on_ach()) { g_ach_at = 0; g_ach_seen = SDL_GetTicks(); }
+        }
+        return;
+    }
+    if (menu_on_ach()) { ach_tap(&g, px, py, h); return; }
+    if (py < g.cy || py >= g.cy + g.ch) return;
+    const menu_tab *tab = menu_cur();
+    for (int i = 0; i < tab->n; i++) {
+        float x, y, cw;
+        card_rect(&g, i, g.cols, g.cardh, g.cy - g_menu_scroll, &x, &y, &cw);
+        if (!in_rect(px, py, x, y, cw, g.cardh, 0)) continue;
+        const menu_item *it = &tab->items[i];
+        g_msel = i;
+        int dir = 0;
+        if (it->kind == K_STEP) {
+            float mxb, pxb, by, bs;
+            card_steps(&g, x, y, cw, &mxb, &pxb, &by, &bs);
+            const float slop = h * 0.02f;
+            if (in_rect(px, py, mxb, by, bs, bs, slop)) dir = -1;
+            else if (in_rect(px, py, pxb, by, bs, bs, slop)) dir = 1;
+        }
+        menu_act(it, dir);
+        return;
+    }
+}
+
+/* A finger with the sheet open: a tap picks, a drag scrolls. */
 static void menu_touch(const SDL_Event *e, float px, float py, float w, float h) {
     switch (e->type) {
     case SDL_EVENT_FINGER_DOWN:
@@ -2178,6 +2527,7 @@ static int overlay_sig_now(overlay_sig *g) {
     g->vis = vpad_visible();
     SDL_GetWindowSizeInPixels(g_window, &g->w, &g->h);
     g->buttons = g_touch_buttons;
+    g->rheld |= g_stick_run << 1;
     return 1;
 }
 
@@ -2247,7 +2597,7 @@ static int compose(void) {
         SDL_UnlockMutex(g_lock);
         psp_render_gl_overlay_scaled(c.px, c.w, c.h, ww, wh);
         free(c.px);
-        return showing || box || sliding;
+        return showing || box || sliding || (g_menu_open && g_menu_busy);
     }
     const int fpx = (int)(14 * g_ui), fw = fps ? text_width(line, fpx) + (int)(10 * g_ui) : 0, fh = fps ? fpx + (int)(8 * g_ui) : 0;
     const int tw = (int)(440 * g_ui), th = (int)(116 * g_ui);
@@ -2364,6 +2714,7 @@ static int gl_init(void *user) {
 static void *gl_proc(void *user, const char *name) { (void)user; return (void *)SDL_GL_GetProcAddress(name); }
 static void gl_swap(void *user) {
     (void)user;
+    mhfu_perfhint_thread();              /* the render thread joins the ADPF session */
     /* Android replaces the window's surface when the screen turns or the app
      * comes back; the context has to be made current on it again, here on the
      * render thread (SDL would do it on the thread that pumps events). */
