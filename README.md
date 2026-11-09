@@ -75,7 +75,7 @@ Both check for updates by themselves (the launcher on PC, the app at start or fr
 
 ## Status
 
-Version **0.4.2**. The game boots, plays its movies, creates and saves a character, and runs the village,
+Version **0.4.3**. The game boots, plays its movies, creates and saves a character, and runs the village,
 the Gathering Hall and quests in 3D at its own 30 fps, or 60 in 60 FPS mode, with sound, music, keyboard,
 controllers and touch buttons. Quests have been played start to finish, alone and together through a room, on
 PC and on Android (Poco X7 Pro).
