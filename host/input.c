@@ -24,6 +24,8 @@
 #include "chat.h"
 #include "gamepad.h"
 #include "input.h"
+#include "lobby.h"
+#include "perfhint.h"
 #include "mods.h"
 #include "window.h"
 
@@ -144,7 +146,17 @@ static void hle_ReadBufferPositive(void) {
     if (!count) count = 1;
 
     if (g_pacing) pace();
+    mhfu_perfhint_frame(mhfu_fps60() ? 60 : 30);   /* Android: the frame's length to ADPF */
     uint64_t frame = g_frame++;
+#ifdef MHFU_PGO_GEN
+    {   /* PGO training build: the counts so far, every minute or so (main.c names the file) */
+        extern int __llvm_profile_write_file(void);
+        if (frame % 2000 == 1999) {
+            int r = __llvm_profile_write_file();
+            printf("pgo: profile written at frame %llu (%d)\n", (unsigned long long)frame, r);
+        }
+    }
+#endif
     mhfu_ach_frame();                    /* RetroAchievements: once a game frame */
     uint8_t ax = 128, ay = 128;
     uint32_t buttons = script_buttons(frame) | mhfu_window_buttons(&ax, &ay);
