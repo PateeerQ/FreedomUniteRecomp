@@ -449,6 +449,83 @@ void mhfu_ach_logout(void) {
 
 const char *mhfu_ach_user(void) { return g_user; }
 
+#if defined(_WIN32) || defined(__ANDROID__)
+/* The badges for the menu's list, one after another on a thread of their own. */
+typedef struct { int n; char (*url)[512]; char (*name)[16]; } badge_job;
+THREAD(badges_thread) {
+    badge_job *j = (badge_job *)arg;
+    char path[700];
+    for (int i = 0; i < j->n; i++) fetch_badge(j->url[i], j->name[i], path, sizeof path);
+    free(j->url); free(j->name); free(j);
+    THREAD_END;
+}
+#endif
+
+int mhfu_ach_items(mhfu_ach_game *game, mhfu_ach_item *out, int cap) {
+    memset(game, 0, sizeof *game);
+    if (!g_rc || !g_user[0]) return 0;
+    game->state = 1;
+    if (!rc_client_is_game_loaded(g_rc)) return 0;
+    const rc_client_game_t *g = rc_client_get_game_info(g_rc);
+    rc_client_user_game_summary_t s;
+    rc_client_get_user_game_summary(g_rc, &s);
+    game->state = 2;
+    snprintf(game->title, sizeof game->title, "%s", g && g->title ? g->title : "Monster Hunter Freedom Unite");
+    game->unlocked = s.num_unlocked_achievements;
+    game->total = s.num_core_achievements;
+    game->points = s.points_unlocked;
+    game->points_total = s.points_core;
+    rc_client_achievement_list_t *l = rc_client_create_achievement_list(g_rc, RC_CLIENT_ACHIEVEMENT_CATEGORY_CORE,
+                                                                        RC_CLIENT_ACHIEVEMENT_LIST_GROUPING_LOCK_STATE);
+    if (!l) return 0;
+    int n = 0, all = 0;
+    for (uint32_t b = 0; b < l->num_buckets; b++) all += (int)l->buckets[b].num_achievements;
+#if defined(_WIN32) || defined(__ANDROID__)
+    static uint32_t fetched_for;       /* the game whose badges are fetched */
+    badge_job *job = NULL;
+    if (g && fetched_for != g->id && all > 0) {
+        fetched_for = g->id;
+        job = (badge_job *)calloc(1, sizeof *job);
+        if (job) {
+            job->url = calloc((size_t)all, sizeof *job->url);
+            job->name = calloc((size_t)all, sizeof *job->name);
+            if (!job->url || !job->name) { free(job->url); free(job->name); free(job); job = NULL; }
+        }
+    }
+#endif
+    /* unlocked first: the buckets with something unlocked, then the rest */
+    for (int pass = 0; pass < 2; pass++)
+        for (uint32_t b = 0; b < l->num_buckets; b++) {
+            const rc_client_achievement_bucket_t *k = &l->buckets[b];
+            for (uint32_t i = 0; i < k->num_achievements; i++) {
+                const rc_client_achievement_t *a = k->achievements[i];
+                const int got = a->unlocked != RC_CLIENT_ACHIEVEMENT_UNLOCKED_NONE;
+                if (got != !pass) continue;
+#if defined(_WIN32) || defined(__ANDROID__)
+                if (job && job->n < all) {
+                    rc_client_achievement_get_image_url(a, RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED, job->url[job->n], 512);
+                    snprintf(job->name[job->n], 16, "%s", a->badge_name);
+                    job->n++;
+                }
+#endif
+                if (n >= cap) continue;
+                mhfu_ach_item *o = &out[n++];
+                o->id = a->id;
+                o->points = a->points;
+                o->unlocked = got;
+                snprintf(o->title, sizeof o->title, "%s", a->title ? a->title : "");
+                snprintf(o->desc, sizeof o->desc, "%s", a->description ? a->description : "");
+                snprintf(o->progress, sizeof o->progress, "%s", a->measured_progress);
+                snprintf(o->badge, sizeof o->badge, "%s/badge_%s.png", g_cache, a->badge_name);
+            }
+        }
+    rc_client_destroy_achievement_list(l);
+#if defined(_WIN32) || defined(__ANDROID__)
+    if (job && spawn(badges_thread, job) != 0) { free(job->url); free(job->name); free(job); }
+#endif
+    return n;
+}
+
 void mhfu_ach_frame(void) {
     /* MHFU_TEST_TOAST=1: a sample unlock at the 300th frame, for the look. */
     static int frame, test = -1;
@@ -495,5 +572,11 @@ void mhfu_ach_frame(void) {}
 void mhfu_ach_login(const char *user, const char *token) { (void)user; (void)token; }
 void mhfu_ach_logout(void) {}
 const char *mhfu_ach_user(void) { return ""; }
+#include <string.h>
+int mhfu_ach_items(mhfu_ach_game *game, mhfu_ach_item *out, int cap) {
+    (void)out; (void)cap;
+    memset(game, 0, sizeof *game);
+    return 0;
+}
 
 #endif
