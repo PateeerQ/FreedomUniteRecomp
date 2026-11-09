@@ -98,6 +98,7 @@
 #define MHFU_EBOOT_FILE "ULJM05500_FUC_EBOOT.BIN"   /* not the JP one's: both in one app's folder */
 #else
 #define MHFU_EBOOT_FILE MHFU_GAME_ID "_EBOOT.BIN"
+#endif
 
 /* What the hunter can do now, for the touch buttons (window_sdl.c). Found in
  * EU memory dumps (2026-11-09: far, near an NPC, near the quest gate, the Start
@@ -110,6 +111,5 @@
 #define MHFU_ADDR_TALK_TARGET   (MHFU_ADDR_WEAPON_CLASS + 0x10Cu)
 #define MHFU_ADDR_UI_PROMPT     (MHFU_ADDR_WEAPON_CLASS + (0x099713F5u - 0x090B3628u))
 #define MHFU_ADDR_MENU_OPEN     (MHFU_ADDR_WEAPON_CLASS + (0x09999C70u - 0x090B3628u))
-#endif
 
 #endif
