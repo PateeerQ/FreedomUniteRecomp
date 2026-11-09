@@ -120,7 +120,7 @@ void mhfu_prof_report(void) {
     HANDLE proc = GetCurrentProcess();
     SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES);
     const int sym = SymInitialize(proc, NULL, TRUE);
-    printf("profile: %.1f s of wall time\n", wall);
+    printf("profile: %.1f s of wall time, %d threads watched\n", wall, g_nth);
     for (int i = 0; i < g_nth; i++) {
         pthread_rec *t = g_th[i];
         const double cpu = (double)(cpu_of(t->h) - t->cpu0) / 1e7;
