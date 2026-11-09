@@ -1,0 +1,351 @@
+diff --git a/include/psprecomp/render.h b/include/psprecomp/render.h
+index f736934..d576f8f 100644
+--- a/include/psprecomp/render.h
++++ b/include/psprecomp/render.h
+@@ -80,6 +80,7 @@ typedef struct {
+     int      clut_shift;     /* CMODE bits 2-6 */
+     int      clut_mask;      /* CMODE bits 8-15 */
+     int      clut_start;     /* CMODE bits 16-20, in units of 16 entries */
++    uint32_t clut_version;   /* changes whenever a CLOAD changed `clut`'s bytes */
+ 
+     int      blend;          /* ABE */
+     int      blend_src, blend_dst, blend_op;   /* ALPHA */
+diff --git a/src/hle/ge.c b/src/hle/ge.c
+index 202bbec..f780f7b 100644
+--- a/src/hle/ge.c
++++ b/src/hle/ge.c
+@@ -444,20 +444,76 @@ static void view_dir(float out[3]) {
+  * says so. Specular is added straight into the colour; the GE can instead keep
+  * it as a secondary colour added after texturing (LIGHTMODE), which this does
+  * not model. */
++/* What every vertex of one draw shares, prepared once by light_prepare() at
++ * the start of draw_prim (it was redone per vertex: the colours turned into
++ * floats, the view and light directions normalised): the same numbers, so the
++ * same results. */
++static struct {
++    float ambient[4], emissive[3], material[4], diffuse[4], specular[4];
++    float lac[4][3], ldc[4][3], lsc[4][3];
++    float dir[4][3];                    /* directional lights: L, normalised */
++    float spot[4][3];                   /* spot lights: their direction, normalised */
++    float V[3];
++    int n, idx[4];
++} g_lc;
++
++static void light_prepare(void) {
++    for (int i = 0; i < 4; i++) {
++        g_lc.ambient[i] = ch(g_lt.ambient, i);
++        g_lc.material[i] = ch(g_material, i);
++        g_lc.diffuse[i] = ch(g_lt.diffuse, i);
++        g_lc.specular[i] = ch(g_lt.specular, i);
++        if (i < 3) g_lc.emissive[i] = ch(g_lt.emissive, i);
++    }
++    view_dir(g_lc.V);
++    g_lc.n = 0;
++    for (int l = 0; l < 4; l++) {
++        if (!g_lt.on[l]) continue;
++        g_lc.idx[g_lc.n++] = l;
++        for (int i = 0; i < 3; i++) {
++            g_lc.lac[l][i] = ch(g_lt.lac[l], i);
++            g_lc.ldc[l][i] = ch(g_lt.ldc[l], i);
++            g_lc.lsc[l][i] = ch(g_lt.lsc[l], i);
++            g_lc.dir[l][i] = g_lt.pos[l][i];
++            g_lc.spot[l][i] = g_lt.dir[l][i];
++        }
++        if (g_lt.type[l] == 0) normalize3(g_lc.dir[l], 0.0f);
++        if (g_lt.type[l] >= 2) normalize3(g_lc.spot[l], 0.0f);
++    }
++}
++
++/* light_vector() with the prepared directions. */
++static float light_vector_c(int l, const float wpos[3], float L[3]) {
++    if (g_lt.type[l] == 0) { L[0] = g_lc.dir[l][0]; L[1] = g_lc.dir[l][1]; L[2] = g_lc.dir[l][2]; return 1.0f; }
++    for (int i = 0; i < 3; i++) L[i] = g_lt.pos[l][i] - wpos[i];
++    const float d2 = dot3(L, L), d = sqrtf(d2);
++    if (d > 0.0f) { L[0] /= d; L[1] /= d; L[2] /= d; }
++    else { L[0] = L[1] = 0.0f; L[2] = 1.0f; }
++    const float den = g_lt.att[l][0] + g_lt.att[l][1] * d + g_lt.att[l][2] * d2;
++    float scale = den > 0.0f ? 1.0f / den : 0.0f;
++    if (!(scale > 0.0f)) scale = 0.0f; else if (scale > 1.0f) scale = 1.0f;
++    if (g_lt.type[l] >= 2) {
++        const float angle = dot3(g_lc.spot[l], L);
++        scale = angle >= g_lt.spot_cut[l] ? scale * light_pow(angle, g_lt.spot_exp[l]) : 0.0f;
++    }
++    return scale;
++}
++
+ static uint32_t light_vertex(const float wpos[3], const float wn[3], uint32_t vcol, int has_color) {
+     const int upd = has_color ? g_lt.mat_update : 0;
+-    const uint32_t amb_c = (upd & 1) ? vcol : g_material;
+-    const uint32_t dif_c = (upd & 2) ? vcol : g_lt.diffuse;
+-    const uint32_t spc_c = (upd & 4) ? vcol : g_lt.specular;
++    float vc[4];
++    if (upd) for (int i = 0; i < 4; i++) vc[i] = ch(vcol, i);
++    const float *amb_c = (upd & 1) ? vc : g_lc.material;
++    const float *dif_c = (upd & 2) ? vc : g_lc.diffuse;
++    const float *spc_c = (upd & 4) ? vc : g_lc.specular;
+     float s0[4], s1[3] = { 0, 0, 0 };
+     for (int i = 0; i < 4; i++)
+-        s0[i] = ch(g_lt.ambient, i) * ch(amb_c, i) + (i < 3 ? ch(g_lt.emissive, i) : 0.0f);
+-    float V[3];
+-    view_dir(V);
+-    for (int l = 0; l < 4; l++) {
+-        if (!g_lt.on[l]) continue;
++        s0[i] = g_lc.ambient[i] * amb_c[i] + (i < 3 ? g_lc.emissive[i] : 0.0f);
++    const float *V = g_lc.V;
++    for (int k = 0; k < g_lc.n; k++) {
++        const int l = g_lc.idx[k];
+         float L[3];
+-        const float scale = light_vector(l, wpos, L);
++        const float scale = light_vector_c(l, wpos, L);
+         float ldot = dot3(L, wn);
+         if (g_lt.comp[l] == 2) ldot = light_pow(ldot, g_lt.spec_exp);
+         const float diffuse = ldot > 0.0f ? ldot : 0.0f;
+@@ -466,10 +522,10 @@ static uint32_t light_vertex(const float wpos[3], const float wn[3], uint32_t vc
+             normalize3(H, 1.0f);
+             const float sp = light_pow(dot3(H, wn), g_lt.spec_exp);
+             if (sp > 0.0f)
+-                for (int i = 0; i < 3; i++) s1[i] += ch(g_lt.lsc[l], i) * ch(spc_c, i) * sp * scale;
++                for (int i = 0; i < 3; i++) s1[i] += g_lc.lsc[l][i] * spc_c[i] * sp * scale;
+         }
+         for (int i = 0; i < 3; i++)
+-            s0[i] += (ch(g_lt.lac[l], i) * ch(amb_c, i) + ch(g_lt.ldc[l], i) * ch(dif_c, i) * diffuse) * scale;
++            s0[i] += (g_lc.lac[l][i] * amb_c[i] + g_lc.ldc[l][i] * dif_c[i] * diffuse) * scale;
+     }
+     uint32_t out = 0;
+     for (int i = 0; i < 4; i++) {
+@@ -674,67 +730,90 @@ static inline float vrf(uint32_t a) {
+ #define psp_read32  vr32
+ #define psp_read_f32 vrf
+ 
++/* One vertex's components: from `hp` (the vertex in host memory, checked once
++ * by read_vertex) when there is one, else through the readers above. */
++static inline uint8_t  hr8(const uint8_t *hp, uint32_t a, uint32_t o) { return hp ? hp[o] : vr8(a + o); }
++static inline uint16_t hr16(const uint8_t *hp, uint32_t a, uint32_t o) {
++    if (!hp) return vr16(a + o);
++    uint16_t v; memcpy(&v, hp + o, 2); return v;
++}
++static inline uint32_t hr32(const uint8_t *hp, uint32_t a, uint32_t o) {
++    if (!hp) return vr32(a + o);
++    uint32_t v; memcpy(&v, hp + o, 4); return v;
++}
++static inline float hrf(const uint8_t *hp, uint32_t a, uint32_t o) {
++    if (!hp) return vrf(a + o);
++    float v; memcpy(&v, hp + o, 4); return v;
++}
++
+ /* Position, normal and texture coordinate of one morph record. */
+-static void read_record(uint32_t addr, uint32_t vtype, const vlayout *L, int through,
++static void read_record(const uint8_t *hp, uint32_t addr, uint32_t vtype, const vlayout *L, int through,
+                         float pos[3], float nrm[3], float uv[2]) {
+     uv[0] = uv[1] = 0;
+     if (L->tex_off >= 0) {
+-        uint32_t t = addr + (uint32_t)L->tex_off;
++        const uint32_t t = (uint32_t)L->tex_off;
+         switch (VT_TEX(vtype)) {
+-        case 1: uv[0] = psp_read8(t);  uv[1] = psp_read8(t + 1);
++        case 1: uv[0] = hr8(hp, addr, t);  uv[1] = hr8(hp, addr, t + 1);
+                 if (!through) { uv[0] /= 128.0f; uv[1] /= 128.0f; }
+                 break;
+-        case 2: uv[0] = psp_read16(t); uv[1] = psp_read16(t + 2);
++        case 2: uv[0] = hr16(hp, addr, t); uv[1] = hr16(hp, addr, t + 2);
+                 if (!through) { uv[0] /= 32768.0f; uv[1] /= 32768.0f; }
+                 break;
+-        default: uv[0] = psp_read_f32(t); uv[1] = psp_read_f32(t + 4); break;
++        default: uv[0] = hrf(hp, addr, t); uv[1] = hrf(hp, addr, t + 4); break;
+         }
+     }
+ 
+     nrm[0] = nrm[1] = 0; nrm[2] = 1;
+     if (L->norm_off >= 0) {
+-        const uint32_t n = addr + (uint32_t)L->norm_off;
++        const uint32_t n = (uint32_t)L->norm_off;
+         switch (VT_NORMAL(vtype)) {
+-        case 1:  for (int i = 0; i < 3; i++) nrm[i] = (float)(int8_t)psp_read8(n + (uint32_t)i) / 128.0f; break;
+-        case 2:  for (int i = 0; i < 3; i++) nrm[i] = (float)(int16_t)psp_read16(n + (uint32_t)i * 2) / 32768.0f; break;
+-        default: for (int i = 0; i < 3; i++) nrm[i] = psp_read_f32(n + (uint32_t)i * 4); break;
++        case 1:  for (int i = 0; i < 3; i++) nrm[i] = (float)(int8_t)hr8(hp, addr, n + (uint32_t)i) / 128.0f; break;
++        case 2:  for (int i = 0; i < 3; i++) nrm[i] = (float)(int16_t)hr16(hp, addr, n + (uint32_t)i * 2) / 32768.0f; break;
++        default: for (int i = 0; i < 3; i++) nrm[i] = hrf(hp, addr, n + (uint32_t)i * 4); break;
+         }
+     }
+ 
+-    const uint32_t a = addr + (uint32_t)L->pos_off;
++    const uint32_t a = (uint32_t)L->pos_off;
+     switch (VT_POS(vtype)) {
+     case 1:   /* 8-bit */
+-        for (int i = 0; i < 3; i++) pos[i] = (float)(int8_t)psp_read8(a + (uint32_t)i);
++        for (int i = 0; i < 3; i++) pos[i] = (float)(int8_t)hr8(hp, addr, a + (uint32_t)i);
+         if (!through) for (int i = 0; i < 3; i++) pos[i] /= 128.0f;
+         break;
+     case 2:   /* 16-bit; through-mode depth is unsigned */
+-        for (int i = 0; i < 3; i++) pos[i] = (float)(int16_t)psp_read16(a + (uint32_t)i * 2);
+-        if (through) pos[2] = (float)psp_read16(a + 4);
++        for (int i = 0; i < 3; i++) pos[i] = (float)(int16_t)hr16(hp, addr, a + (uint32_t)i * 2);
++        if (through) pos[2] = (float)hr16(hp, addr, a + 4);
+         else for (int i = 0; i < 3; i++) pos[i] /= 32768.0f;
+         break;
+     default:  /* float */
+-        for (int i = 0; i < 3; i++) pos[i] = psp_read_f32(a + (uint32_t)i * 4);
++        for (int i = 0; i < 3; i++) pos[i] = hrf(hp, addr, a + (uint32_t)i * 4);
+         break;
+     }
+ }
+ 
+ /* Skinning: position and normal become the weighted sums of the bone matrices
+  * applied to them. Bones are 4x3, column by column like the world matrix. */
+-static void skin(uint32_t addr, uint32_t vtype, const vlayout *L, float pos[3], float nrm[3]) {
++/* Whether this draw uses normals at all (lighting, or texture coordinates made
++ * from them); without, skinning and the world transform skip them. */
++static int g_need_nrm = 1;
++
++static void skin(const uint8_t *hp, uint32_t addr, uint32_t vtype, const vlayout *L, float pos[3], float nrm[3]) {
+     float op[3] = { 0, 0, 0 }, on[3] = { 0, 0, 0 };
+     for (int b = 0; b < L->w_n; b++) {
+-        const uint32_t wa = addr + (uint32_t)(L->w_off + b * L->w_sz);
++        const uint32_t wo = (uint32_t)(L->w_off + b * L->w_sz);
+         float w;
+         switch (VT_WEIGHT(vtype)) {
+-        case 1:  w = (float)psp_read8(wa) / 128.0f; break;
+-        case 2:  w = (float)psp_read16(wa) / 32768.0f; break;
+-        default: w = psp_read_f32(wa); break;
++        case 1:  w = (float)hr8(hp, addr, wo) / 128.0f; break;
++        case 2:  w = (float)hr16(hp, addr, wo) / 32768.0f; break;
++        default: w = hrf(hp, addr, wo); break;
+         }
+         if (w == 0.0f) continue;
+         float tp[3], tn[3];
+         mul43(g_xf.bone + b * 12, pos, 1.0f, tp);
+-        mul43(g_xf.bone + b * 12, nrm, 0.0f, tn);
+-        for (int r = 0; r < 3; r++) { op[r] += w * tp[r]; on[r] += w * tn[r]; }
++        for (int r = 0; r < 3; r++) op[r] += w * tp[r];
++        if (g_need_nrm) {
++            mul43(g_xf.bone + b * 12, nrm, 0.0f, tn);
++            for (int r = 0; r < 3; r++) on[r] += w * tn[r];
++        }
+     }
+     for (int r = 0; r < 3; r++) { pos[r] = op[r]; nrm[r] = on[r]; }
+ }
+@@ -752,17 +831,17 @@ static void read_vertex(uint32_t addr, uint32_t vtype, const vlayout *L, cvertex
+     /* Through mode reads 8/16-bit values as integers; transformed mode reads
+      * them as fixed point, signed for positions. */
+     const int through = (int)VT_THROUGH(vtype);
++    const uint8_t *hp = vptr(addr, (uint32_t)L->stride);     /* the whole vertex, checked once */
+     uint32_t col = g_material;
+     if (L->col_off >= 0) {
+         if (VT_COLOR(vtype) == 7)
+-            col = psp_read32(addr + (uint32_t)L->col_off);
++            col = hr32(hp, addr, (uint32_t)L->col_off);
+         else    /* 4, 5, 6: 565, 5551, 4444 -- the texture formats, numbered from 4 */
+-            col = psp_color_expand(psp_read16(addr + (uint32_t)L->col_off),
+-                                   (int)VT_COLOR(vtype) - 4);
++            col = psp_color_expand(hr16(hp, addr, (uint32_t)L->col_off), (int)VT_COLOR(vtype) - 4);
+     }
+ 
+     float pos[3], nrm[3], uv[2];
+-    read_record(addr, vtype, L, through, pos, nrm, uv);
++    read_record(hp, addr, vtype, L, through, pos, nrm, uv);
+     if (L->morphs > 1) {
+         /* Morph targets blend position, normal and texture coordinate by the
+          * MW weights; colour comes from the first record. */
+@@ -770,7 +849,7 @@ static void read_vertex(uint32_t addr, uint32_t vtype, const vlayout *L, cvertex
+         for (int i = 0; i < 3; i++) { pos[i] *= g_xf.morph[0]; nrm[i] *= g_xf.morph[0]; }
+         uv[0] *= g_xf.morph[0]; uv[1] *= g_xf.morph[0];
+         for (int m = 1; m < L->morphs; m++) {
+-            read_record(addr + (uint32_t)(m * L->one), vtype, L, through, p, n, t);
++            read_record(hp ? hp + m * L->one : NULL, addr + (uint32_t)(m * L->one), vtype, L, through, p, n, t);
+             for (int i = 0; i < 3; i++) { pos[i] += p[i] * g_xf.morph[m]; nrm[i] += n[i] * g_xf.morph[m]; }
+             uv[0] += t[0] * g_xf.morph[m]; uv[1] += t[1] * g_xf.morph[m];
+         }
+@@ -790,13 +869,15 @@ static void read_vertex(uint32_t addr, uint32_t vtype, const vlayout *L, cvertex
+         return;
+     }
+ 
+-    if (L->w_n) skin(addr, vtype, L, pos, nrm);
++    if (L->w_n) skin(hp, addr, vtype, L, pos, nrm);
+     if (g_lt.reverse_normal) { nrm[0] = -nrm[0]; nrm[1] = -nrm[1]; nrm[2] = -nrm[2]; }
+ 
+-    float wpos[3], vpos[3], wn[3];
++    float wpos[3], vpos[3], wn[3] = { 0, 0, 1 };
+     mul43(g_xf.world, pos, 1.0f, wpos);
+-    mul43(g_xf.world, nrm, 0.0f, wn);
+-    normalize3(wn, 1.0f);
++    if (g_need_nrm) {
++        mul43(g_xf.world, nrm, 0.0f, wn);
++        normalize3(wn, 1.0f);
++    }
+     world_to_clip(wpos, vpos, out->c);
+ 
+     if (g_lt.enable) out->v.rgba = light_vertex(wpos, wn, col, L->col_off >= 0);
+@@ -1055,6 +1136,8 @@ static void draw_prim(uint32_t type, uint32_t count) {
+     g_vhi = g_ge.vaddr + hi * (uint32_t)stride;
+     g_vhost = g_vhi > g_vlo ? (const uint8_t *)psp_mem_ptr(g_vlo, g_vhi - g_vlo) : NULL;
+ 
++    if (g_lt.enable && !VT_THROUGH(vtype)) light_prepare();
++    g_need_nrm = g_lt.enable || g_xf.uv_mode == 2 || (g_xf.uv_mode == 1 && g_xf.uv_proj >= 2);
+     int behind = 0;
+     if (isize && hi - lo <= 65536) {
+         /* Indexed: each vertex the indices name is transformed once, however
+@@ -1394,7 +1477,15 @@ static void run_list(ge_queue *q) {
+         case GE_CLOAD: {
+             uint32_t n = (arg & 0x3F) * 32u;
+             if (n > sizeof g_clut) n = sizeof g_clut;
+-            for (uint32_t i = 0; i < n; i++) g_clut[i] = psp_read8(g_cbp + i);
++            /* Most CLOADs load the palette already there: the backends rehash
++             * it only when clut_version moves. */
++            const uint8_t *src = n ? (const uint8_t *)psp_mem_ptr(g_cbp, n) : NULL;
++            if (src) {
++                if (memcmp(g_clut, src, n) != 0) { memcpy(g_clut, src, n); g_ds.clut_version++; }
++            } else {
++                for (uint32_t i = 0; i < n; i++) g_clut[i] = psp_read8(g_cbp + i);
++                g_ds.clut_version++;
++            }
+             break;
+         }
+         case GE_CMODE:
+diff --git a/src/render_gl.c b/src/render_gl.c
+index e188c06..301f60d 100644
+--- a/src/render_gl.c
++++ b/src/render_gl.c
+@@ -408,7 +408,17 @@ static uint64_t clut_key(const psp_draw_state *st) {
+     if (st->tex_fmt < PSP_TPSM_T4 || !st->clut) return 0;
+     const uint64_t params = (uint64_t)st->clut_fmt | (uint64_t)st->clut_shift << 2 |
+                             (uint64_t)st->clut_mask << 8 | (uint64_t)st->clut_start << 16;
+-    return hash_bytes(st->clut, 1024) ^ (params * 0x9E3779B97F4A7C15ull);
++    /* Hashed again only when a CLOAD changed the palette (clut_version): it
++     * was hashed for every draw with a paletted texture. */
++    static uint64_t last_h;
++    static uint32_t last_ver;
++    static const uint8_t *last_p;
++    if (!last_p || st->clut != last_p || st->clut_version != last_ver) {
++        last_h = hash_bytes(st->clut, 1024);
++        last_p = st->clut;
++        last_ver = st->clut_version;
++    }
++    return last_h ^ (params * 0x9E3779B97F4A7C15ull);
+ }
+ 
+ /* A texture pack's picture for this texture, uploaded if the host has it
+@@ -472,13 +482,16 @@ static int tex_lookup(const psp_draw_state *st, int max_v) {
+     const uint64_t ck = clut_key(st);
+     gtex *t = NULL;
+     int idx = -1;
+-    for (int i = 0; i < g_ntex; i++) {
+-        gtex *e = &g_tex[i];
+-        if (e->addr == st->tex_addr && e->fmt == st->tex_fmt && e->w == st->tex_w && e->h == st->tex_h &&
+-            e->bw == st->tex_bw && e->swizzle == st->tex_swizzle && e->clut_key == ck) {
+-            t = e; idx = i; break;
+-        }
+-    }
++#define TEX_SAME(e) ((e)->addr == st->tex_addr && (e)->fmt == st->tex_fmt && (e)->w == st->tex_w && \
++                     (e)->h == st->tex_h && (e)->bw == st->tex_bw && (e)->swizzle == st->tex_swizzle && \
++                     (e)->clut_key == ck)
++    if (g_last_tex >= 0 && g_last_tex < g_ntex && TEX_SAME(&g_tex[g_last_tex])) {   /* most draws: the previous one's */
++        idx = g_last_tex;
++        t = &g_tex[idx];
++    } else
++        for (int i = 0; i < g_ntex; i++)
++            if (TEX_SAME(&g_tex[i])) { t = &g_tex[i]; idx = i; break; }
++#undef TEX_SAME
+     const uint32_t span = tex_span(st);
+     const uint8_t *mem = (const uint8_t *)psp_mem_ptr(st->tex_addr, span);
+     if (!t) {

@@ -1460,55 +1460,84 @@ static void draw_editor(canvas *c, float s) {
                   g_edit_sel >= 0 ? "Drag to move it; Smaller and Bigger resize it" : "Touch a control to move or resize it");
 }
 
-/* ---- the in-game menu: a drawer from the left ------------------------------------------
+/* ---- the in-game menu: a settings screen ------------------------------------------------
  *
- * As in Bloodborne-Android: swipe in from the left edge, press Back (or F1),
- * or tap the menu button; the panel slides over the left of the game, the
- * rest dims, and a tap outside closes it. Rows are grouped (Game, Online,
- * Controls, App), the setting's name on the left and its value on the right;
- * when they do not fit, a drag scrolls them. Online and the update check are
- * Android dialogs (MhfuActivity, over JNI): they need text fields. */
+ * Opened by a swipe in from the left edge, Back (or F1), or the menu button.
+ * A panel over the whole game: the sections as tabs on the left (Display,
+ * Controls, Online, Mods, System), the chosen section's settings in the
+ * middle (a switch, a value that a tap moves on, - and + buttons, or an arrow
+ * for what opens something), and on the right what the picked setting does.
+ * A tap changes a setting at once; a drag scrolls the list; the X, Back or a
+ * tap outside the panel closes it. Online and the update check are Android
+ * dialogs (MhfuActivity, over JNI): they need text fields. */
 
-enum { R_HEAD, R_ITEM };
-enum { M_RESUME, M_NET, M_ACH, M_VPAD, M_STYLE, M_PAD, M_EDIT, M_OPACITY, M_SKILLS, M_FPS, M_RES, M_SMOOTH, M_WIDE, M_CHEATS, M_TEXPACK, M_TEXSTYLE, M_TEXINSTALL, M_MOD0, M_MOD1, M_MOD2, M_SAVES, M_FILES, M_CRASH, M_UPDATE, M_ABOUT, M_EXIT };
-typedef struct { int kind, id; const char *text; } menu_row;
-static const menu_row k_menu[] = {
-    { R_HEAD, -1, "GAME" },     { R_ITEM, M_RESUME, "Back to game" },
+enum { M_NET, M_ACH, M_VPAD, M_STYLE, M_PAD, M_EDIT, M_OPACITY, M_SKILLS, M_FPS, M_RES, M_SMOOTH, M_WIDE, M_CHEATS, M_TEXPACK, M_TEXSTYLE, M_TEXINSTALL, M_MOD0, M_MOD1, M_MOD2, M_SAVES, M_FILES, M_CRASH, M_UPDATE, M_ABOUT, M_EXIT };
+enum { K_TOGGLE, K_CYCLE, K_STEP, K_ACTION };
+typedef struct { int id, kind, restart; const char *text, *help; } menu_item;
+
+static const menu_item k_tab_display[] = {
+    { M_RES, K_STEP, 1, "Resolution", "The 3D picture's size, a multiple of the PSP's 480x272. Higher is sharper but slower on weak phones." },
+    { M_SMOOTH, K_TOGGLE, 0, "60 FPS (beta)", "Runs the game at 60 frames a second. In a room, the room plays at its slowest player's rate." },
+    { M_FPS, K_TOGGLE, 0, "Show FPS", "Shows the frame rate in the top-left corner, and the ping while you are in a room." },
+};
+static const menu_item k_tab_controls[] = {
+    { M_VPAD, K_CYCLE, 0, "Virtual gamepad", "Automatic hides the on-screen buttons while a controller is connected. On always shows them, Off never." },
+    { M_STYLE, K_CYCLE, 0, "Button style", "Mobile: the buttons follow what you can do (an attack pad, Dodge and Sheathe with the weapon out, Yes and No in menus). Legacy PSP: the PSP's buttons everywhere." },
+    { M_PAD, K_CYCLE, 0, "Stick and d-pad", "Combined: one round control, the stick in the middle and the d-pad as a ring around it. Separate: the two apart. Mobile style only." },
+    { M_EDIT, K_ACTION, 0, "Edit button layout", "Move and resize every on-screen button: touch one to pick it, drag it, and make it smaller or bigger." },
+    { M_OPACITY, K_STEP, 0, "Button opacity", "How solid the on-screen buttons are." },
+    { M_SKILLS, K_TOGGLE, 0, "Weapon buttons", "A column of buttons for your weapon's moves (guard, aim, charge, demon mode, spirit) while it is drawn." },
+};
 #ifdef __ANDROID__
-    { R_HEAD, -1, "ONLINE" },   { R_ITEM, M_NET, "Multiplayer" }, { R_ITEM, M_ACH, "RetroAchievements" },
+static const menu_item k_tab_online[] = {
+    { M_NET, K_ACTION, 0, "Multiplayer", "Create a room or join one with its code, over the internet or the same Wi-Fi. No port forwarding." },
+    { M_ACH, K_ACTION, 0, "RetroAchievements", "Sign in to RetroAchievements to earn achievements while you play (softcore)." },
+};
 #endif
-    { R_HEAD, -1, "CONTROLS" }, { R_ITEM, M_VPAD, "Virtual gamepad" }, { R_ITEM, M_STYLE, "Button style" },
-    { R_ITEM, M_PAD, "Stick and d-pad" },
-    { R_ITEM, M_EDIT, "Edit button layout" },
-    { R_ITEM, M_OPACITY, "Button opacity" }, { R_ITEM, M_SKILLS, "Weapon buttons" },
-    { R_HEAD, -1, "DISPLAY" },  { R_ITEM, M_RES, "Resolution" }, { R_ITEM, M_SMOOTH, "60 FPS (beta)" },
-    { R_ITEM, M_FPS, "Show FPS" },
-    { R_HEAD, -1, "MODS" },     { R_ITEM, M_WIDE, "Widescreen" },
+static const menu_item k_tab_mods[] = {
+    { M_WIDE, K_TOGGLE, 0, "Widescreen", "Widens the 3D view to the screen's shape; menus and the HUD keep the PSP's shape in the middle." },
     /* the built-in mods (mods.c), in mhfu_builtin_mods' order */
-    { R_ITEM, M_MOD0, "Target Camera" }, { R_ITEM, M_MOD1, "Damage Numbers" }, { R_ITEM, M_MOD2, "Gathering Nodes" },
+    { M_MOD0, K_TOGGLE, 0, "Target Camera", "Locks the camera on a large monster and shows a crosshair. The Target button locks on; slide it to switch." },
+    { M_MOD1, K_TOGGLE, 0, "Damage Numbers", "Shows the damage of every hit as numbers over the monster." },
+    { M_MOD2, K_TOGGLE, 0, "Gathering Nodes", "Shows an icon over gathering, mining and bug-catching spots." },
 #if MHFU_TEXPACK
-    { R_ITEM, M_TEXPACK, "Texture pack" }, { R_ITEM, M_TEXSTYLE, "Pack style" },
+    { M_TEXPACK, K_TOGGLE, 1, "Texture pack", "Uses the installed texture pack (PPSSPP's format) in place of the game's own textures." },
+    { M_TEXSTYLE, K_CYCLE, 1, "Pack style", "Some packs come in styles (button icons, layouts). A tap picks the next one." },
 #endif
 #if MHFU_TEXPACK && defined(__ANDROID__)
-    { R_ITEM, M_TEXINSTALL, "Install texture pack" },
+    { M_TEXINSTALL, K_ACTION, 0, "Install texture pack", "Pick a folder that holds a texture pack (with its textures.ini) to copy it into the app, or remove the one installed." },
 #endif
 #ifdef __ANDROID__
-    { R_ITEM, M_CHEATS, "Cheats" },
+    { M_CHEATS, K_ACTION, 0, "Cheats", "Turn CWCheat codes on or off, or fetch the CWCheat database. Cheats pause in rooms, and achievements do not unlock while one is on." },
 #endif
-    { R_HEAD, -1, "APP" },
-#ifdef __ANDROID__
-    { R_ITEM, M_SAVES, "Save folder" },
-    { R_ITEM, M_FILES, "Change game files" }, { R_ITEM, M_CRASH, "Copy crash log" },
-    { R_ITEM, M_UPDATE, "Check for updates" }, { R_ITEM, M_ABOUT, "About" },
-#endif
-    { R_ITEM, M_EXIT, "Exit game" },
 };
-#define MENU_ROWS (int)(sizeof k_menu / sizeof k_menu[0])
+static const menu_item k_tab_system[] = {
+#ifdef __ANDROID__
+    { M_SAVES, K_ACTION, 0, "Save folder", "A folder of your own that your saves are kept in step with, so they outlive the app." },
+    { M_FILES, K_ACTION, 0, "Change game files", "Pick another folder with the game's disc and EBOOT. The game restarts; your saves are kept." },
+    { M_CRASH, K_ACTION, 0, "Copy crash log", "Copies the last crash's log, to paste into a bug report." },
+    { M_UPDATE, K_ACTION, 0, "Check for updates", "Looks for a newer release on GitHub and installs it." },
+    { M_ABOUT, K_ACTION, 0, "About", "The version, credits and licences." },
+#endif
+    { M_EXIT, K_ACTION, 0, "Exit game", "Closes the game. Save first: what is not saved is lost." },
+};
+typedef struct { const char *name; const menu_item *items; int n; } menu_tab;
+#define TAB(name, a) { name, a, (int)(sizeof a / sizeof a[0]) }
+static const menu_tab k_tabs[] = {
+    TAB("Display", k_tab_display), TAB("Controls", k_tab_controls),
+#ifdef __ANDROID__
+    TAB("Online", k_tab_online),
+#endif
+    TAB("Mods", k_tab_mods), TAB("System", k_tab_system),
+};
+#undef TAB
+#define MENU_TABS (int)(sizeof k_tabs / sizeof k_tabs[0])
 #define MENU_MS   220
 
 static uint64_t g_menu_t0;                 /* when it last started opening or closing */
-static float    g_menu_scroll;             /* how far the rows are scrolled up, window pixels */
-static int      g_mdrag_on, g_mdragged;    /* a finger on the drawer; it moved enough to scroll */
+static int      g_mtab = 0, g_msel = 0;    /* the section shown; the setting picked in it */
+static float    g_menu_scroll;             /* how far the list is scrolled up, window pixels */
+static int      g_mdrag_on, g_mdragged;    /* a finger on the panel; it moved enough to scroll */
 static SDL_FingerID g_mdrag_id;
 static float    g_mdown_x, g_mdown_y, g_mdown_scroll;
 
@@ -1535,10 +1564,11 @@ static void menu_set(int open) {
     const uint64_t now = SDL_GetTicks(), done = now - g_menu_t0 >= MENU_MS ? MENU_MS : now - g_menu_t0;
     g_menu_t0 = now - (MENU_MS - done);
     g_menu_open = open;
+    g_mdrag_on = 0;
     if (open) touch_release_all();
 }
 
-/* How far the drawer is out, 0..1; *moving while it slides. */
+/* How far the panel is in, 0..1; *moving while it slides. */
 static float menu_progress(int *moving) {
     const uint64_t t = SDL_GetTicks() - g_menu_t0;
     float f = t >= MENU_MS ? 1.0f : (float)t / MENU_MS;
@@ -1555,11 +1585,11 @@ static const char *menu_value(int id) {
     case M_SKILLS: return g_skills_on ? "On" : "Off";
     case M_STYLE: return g_style == STYLE_MOBILE ? "Mobile" : "Legacy PSP";
     case M_PAD: return g_pad_combined ? "Combined" : "Separate";
-    case M_SMOOTH: return !MHFU_HAS_FPS60 ? "Not in this build" : !g_fps60 ? "Off" : mhfu_fps_target() >= 60 ? "On" : "On (room at 30)";
+    case M_SMOOTH: return !MHFU_HAS_FPS60 ? "Not in this build" : !g_fps60 ? "Off" : mhfu_fps_target() >= 60 ? "On" : "Room at 30";
     case M_WIDE: return mhfu_mod_widescreen() ? "On" : "Off";
 #if MHFU_TEXPACK
     case M_TEXPACK:
-        if (g_texpack != g_texpack_started) return g_texpack ? "On, restart" : "Off, restart";
+        if (g_texpack != g_texpack_started) return "Restart";
         if (!g_texpack) return "Off";
         return mhfu_texpack_textures() > 0 ? "On" : "None installed";
     case M_TEXSTYLE: {
@@ -1582,7 +1612,7 @@ static const char *menu_value(int id) {
     case M_RES: {
         static char r[40];
         const int want = g_res_setting ? g_res_setting : g_scale;
-        snprintf(r, sizeof r, want == g_scale ? "%dx (%dp)" : "%dx (%dp), restart", want, PSP_H * want);
+        snprintf(r, sizeof r, "%dx (%dp)", want, PSP_H * want);
         return r;
     }
     case M_NET: {
@@ -1608,140 +1638,315 @@ static const char *menu_value(int id) {
     }
 }
 
-/* The drawer's width and its rows' heights, in window pixels. */
-static void menu_metrics(float w, float h, float *pw, float *head, float *row, float *top) {
-    *pw = fmaxf(fminf(w * 0.40f, h * 1.0f), h * 0.75f);
-    *head = h * 0.065f;
-    *row = h * 0.088f;
-    *top = h * 0.19f;
+/* A switch's state: 0 or 1, or -1 when it cannot be changed here. */
+static int menu_on(int id) {
+    switch (id) {
+    case M_FPS: return g_show_fps;
+    case M_SKILLS: return g_skills_on;
+    case M_SMOOTH: return MHFU_HAS_FPS60 ? g_fps60 : -1;
+    case M_WIDE: return mhfu_mod_widescreen() != 0;
+#if MHFU_TEXPACK
+    case M_TEXPACK: return g_texpack;
+#endif
+    case M_MOD0: case M_MOD1: case M_MOD2: return id - M_MOD0 >= mhfu_mod_count() ? -1 : mhfu_mod_on(id - M_MOD0) != 0;
+    default: return -1;
+    }
 }
 
-/* Where the rows end (the hint line is below), and how far they can scroll. */
-static float menu_bottom(float h) { return h * 0.92f; }
-static float menu_max_scroll(float h) {
-    float pw, head, row, top, all = 0;
-    menu_metrics(h, h, &pw, &head, &row, &top);
-    for (int i = 0; i < MENU_ROWS; i++) all += k_menu[i].kind == R_HEAD ? head : row;
-    return fmaxf(0, all - (menu_bottom(h) - top));
+/* Whether a setting differs from what the game started with (shown with *). */
+static int menu_pending(int id) {
+    switch (id) {
+    case M_RES: return g_res_setting && g_res_setting != g_scale;
+#if MHFU_TEXPACK
+    case M_TEXPACK: return g_texpack != g_texpack_started;
+    case M_TEXSTYLE: return strcmp(g_texstyle, g_texstyle_started) != 0;
+#endif
+    default: return 0;
+    }
+}
+
+/* Where everything is, in window pixels; oy moves the panel down (the slide). */
+typedef struct {
+    float x, y, w, h, head, pad;           /* the panel and its title bar */
+    float cx, cy, cs;                      /* the close button */
+    float tx, ty, tw, th, tgap;            /* the tabs */
+    float lx, ly, lw, lh, row;             /* the list */
+    float dx, dy, dw, dh;                  /* the description */
+} menu_geom;
+
+static menu_geom menu_layout(float w, float h, float oy) {
+    menu_geom g;
+    g.x = w * 0.03f; g.y = h * 0.04f + oy; g.w = w - 2 * g.x; g.h = h - 2 * h * 0.04f;
+    g.head = h * 0.13f;
+    g.pad = h * 0.03f;
+    g.cs = g.head * 0.70f;
+    g.cx = g.x + g.w - g.pad - g.cs;
+    g.cy = g.y + (g.head - g.cs) / 2;
+    const float top = g.y + g.head, bottom = g.y + g.h - g.pad;
+    g.tx = g.x + g.pad; g.ty = top; g.tw = fminf(g.w * 0.17f, h * 0.42f); g.th = h * 0.10f; g.tgap = h * 0.012f;
+    g.dw = fminf(g.w * 0.25f, h * 0.62f); g.dx = g.x + g.w - g.pad - g.dw; g.dy = top; g.dh = bottom - top;
+    g.lx = g.tx + g.tw + g.pad * 0.6f; g.lw = g.dx - g.pad * 0.6f - g.lx; g.ly = top; g.lh = bottom - top;
+    g.row = h * 0.105f;
+    return g;
+}
+
+static const menu_tab *menu_cur(void) {
+    if (g_mtab < 0 || g_mtab >= MENU_TABS) g_mtab = 0;
+    return &k_tabs[g_mtab];
+}
+
+static float menu_max_scroll(float w, float h) {
+    const menu_geom g = menu_layout(w, h, 0);
+    return fmaxf(0, menu_cur()->n * g.row - g.lh);
+}
+
+/* The - and + buttons of a stepped row whose top is y. */
+static void menu_steps(const menu_geom *g, float y, float *mx, float *px, float *by, float *bs) {
+    *bs = g->row * 0.66f;
+    *by = y + (g->row - *bs) / 2;
+    *px = g->lx + g->lw - g->pad * 0.5f - *bs;
+    *mx = *px - g->row * 1.7f - *bs;
+}
+
+/* In window pixels, onto the half-size canvas. */
+#define MS(v) ((int)((v) * s))
+static void wfill(canvas *c, float s, float x, float y, float w, float h, uint32_t col) {
+    fill(c, MS(x), MS(y), MS(x + w) - MS(x), MS(y + h) - MS(y), col);
+}
+static void wframe(canvas *c, float s, float x, float y, float w, float h, uint32_t col, int studs) {
+    const int t = s >= 1 ? 2 : 1;
+    frame_rect(c, MS(x), MS(y), MS(x + w) - MS(x), MS(y + h) - MS(y), t, col);
+    if (studs) {
+        const int r = (int)fmaxf(2, 4 * s);
+        diamond(c, MS(x), MS(y), r, col); diamond(c, MS(x + w), MS(y), r, col);
+        diamond(c, MS(x), MS(y + h), r, col); diamond(c, MS(x + w), MS(y + h), r, col);
+    }
 }
 
 static void draw_menu(canvas *c, float s, float prog) {
     const float w = c->w / s, h = c->h / s;
-    float pw, head, row, top;
-    menu_metrics(w, h, &pw, &head, &row, &top);
-    const float x0 = -(1 - prog) * pw;                    /* slides in from the left */
-    fill(c, 0, 0, c->w, c->h, rgba(0, 0, 0, (int)(140 * prog)));
-    const uint32_t gold = rgba(236, 194, 104, 255), brass = rgba(126, 98, 54, 255), wood = rgba(26, 20, 15, 248);
-    fill(c, (int)(x0 * s), 0, (int)(pw * s), c->h, wood);
-    /* a brass edge, double, with a stud at the middle */
-    fill(c, (int)((x0 + pw) * s) - (int)(2.5f * s), 0, (int)(2.5f * s), c->h, gold);
-    fill(c, (int)((x0 + pw) * s) - (int)(8 * s), 0, (int)(1 * s) + 1, c->h, brass);
-    diamond(c, (int)((x0 + pw) * s) - (int)(1 * s), c->h / 2, (int)(7 * s), gold);
-    /* the crest */
-    const float cx = x0 + pw * 0.08f;
-    text(c, (int)(cx * s), (int)(h * 0.085f * s), (int)(h * 0.030f * s), rgba(205, 192, 168, 255), "MONSTER HUNTER", 0);
-    text(c, (int)(cx * s), (int)(h * 0.145f * s), (int)(h * 0.052f * s), gold, "FREEDOM UNITE", 0);
-    segment(c, cx * s, h * 0.175f * s, (x0 + pw * 0.92f) * s, h * 0.175f * s, 1.2f * s, brass);
-    const float maxs = menu_max_scroll(h);
-    g_menu_scroll = fminf(fmaxf(g_menu_scroll, 0), maxs);
-    float y = top - g_menu_scroll;
-    g_clip0 = (int)(top * s);
-    g_clip1 = (int)(menu_bottom(h) * s);
-    if (maxs > 0) {                                       /* where in the list: a brass bar */
-        const float span = menu_bottom(h) - top, bar = span * span / (span + maxs);
-        const float by = top + (span - bar) * g_menu_scroll / maxs;
-        fill(c, (int)((x0 + pw * 0.965f) * s), (int)(by * s), (int)(3 * s) + 1, (int)(bar * s), rgba(126, 98, 54, 200));
+    const menu_geom g = menu_layout(w, h, -(1 - prog) * h * 0.08f);
+    const menu_tab *tab = menu_cur();
+    if (g_msel >= tab->n) g_msel = 0;
+    const uint32_t gold = rgba(236, 194, 104, 255), brass = rgba(126, 98, 54, 255), white = rgba(252, 247, 237, 255),
+                   dim = rgba(170, 150, 130, 255), panel = rgba(58, 26, 20, (int)(238 * prog)),
+                   inner = rgba(36, 16, 12, (int)(225 * prog));
+    /* the game dimmed around the panel; the panel itself */
+    wfill(c, s, 0, 0, w, g.y, rgba(0, 0, 0, (int)(150 * prog)));
+    wfill(c, s, 0, g.y + g.h, w, h - g.y - g.h, rgba(0, 0, 0, (int)(150 * prog)));
+    wfill(c, s, 0, g.y, g.x, g.h, rgba(0, 0, 0, (int)(150 * prog)));
+    wfill(c, s, g.x + g.w, g.y, w - g.x - g.w, g.h, rgba(0, 0, 0, (int)(150 * prog)));
+    wfill(c, s, g.x, g.y, g.w, g.h, panel);
+    wframe(c, s, g.x, g.y, g.w, g.h, gold, 1);
+    wframe(c, s, g.x + 4, g.y + 4, g.w - 8, g.h - 8, rgba(126, 98, 54, 160), 0);
+    /* the title bar: SETTINGS * section, and the close button */
+    const int tpx = (int)(h * 0.045f * s);
+    const float tby = g.y + g.head * 0.5f + h * 0.016f;
+    text(c, MS(g.x + g.pad), MS(tby), tpx, gold, "SETTINGS", 0);
+    const float sx = g.x + g.pad + text_width("SETTINGS", tpx) / s + h * 0.03f;
+    diamond(c, MS(sx), MS(g.y + g.head * 0.5f), (int)(h * 0.009f * s), gold);
+    text(c, MS(sx + h * 0.03f), MS(tby), tpx, white, tab->name, 0);
+    wfill(c, s, g.x + g.pad, g.y + g.head - h * 0.018f, g.w - 2 * g.pad, 1.2f, rgba(126, 98, 54, 200));
+    wfill(c, s, g.cx, g.cy, g.cs, g.cs, inner);
+    wframe(c, s, g.cx, g.cy, g.cs, g.cs, gold, 1);
+    const float k = g.cs * 0.26f, mx = g.cx + g.cs / 2, my = g.cy + g.cs / 2;
+    segment(c, (mx - k) * s, (my - k) * s, (mx + k) * s, (my + k) * s, 3.0f * s, white);
+    segment(c, (mx - k) * s, (my + k) * s, (mx + k) * s, (my - k) * s, 3.0f * s, white);
+    /* the tabs */
+    const int fpx = (int)(h * 0.040f * s);
+    for (int i = 0; i < MENU_TABS; i++) {
+        const float y = g.ty + i * (g.th + g.tgap);
+        const int on = i == g_mtab;
+        wfill(c, s, g.tx, y, g.tw, g.th, on ? rgba(176, 124, 40, (int)(245 * prog)) : inner);
+        wframe(c, s, g.tx, y, g.tw, g.th, on ? gold : brass, 1);
+        if (on) diamond(c, MS(g.tx + h * 0.025f), MS(y + g.th / 2), (int)(h * 0.008f * s), white);
+        text(c, MS(g.tx + h * 0.045f), MS(y + g.th / 2 + h * 0.014f), fpx, white, k_tabs[i].name, MS(g.tw - h * 0.06f));
     }
-    for (int i = 0; i < MENU_ROWS; i++) {
-        const menu_row *r = &k_menu[i];
-        if (r->kind == R_HEAD) {
-            text(c, (int)(cx * s), (int)((y + head * 0.72f) * s), (int)(h * 0.028f * s), gold, r->text, 0);
-            y += head;
-            continue;
+    /* the list */
+    const float maxs = fmaxf(0, tab->n * g.row - g.lh);
+    g_menu_scroll = fminf(fmaxf(g_menu_scroll, 0), maxs);
+    wfill(c, s, g.lx, g.ly, g.lw, g.lh, rgba(36, 16, 12, (int)(120 * prog)));
+    g_clip0 = MS(g.ly);
+    g_clip1 = MS(g.ly + g.lh);
+    for (int i = 0; i < tab->n; i++) {
+        const menu_item *it = &tab->items[i];
+        const float y = g.ly + i * g.row - g_menu_scroll, mid = y + g.row / 2, base = mid + h * 0.014f;
+        if (y + g.row < g.ly || y > g.ly + g.lh) continue;
+        const int sel = i == g_msel;
+        if (sel) {
+            wfill(c, s, g.lx, y, g.lw, g.row, rgba(176, 124, 40, (int)(235 * prog)));
+            wframe(c, s, g.lx, y, g.lw, g.row, gold, 0);
+            diamond(c, MS(g.lx + h * 0.02f), MS(mid), (int)(h * 0.008f * s), white);
         }
-        const int px = (int)(h * 0.040f * s);
-        const uint32_t col = r->id == M_EXIT ? rgba(236, 140, 120, 255) : rgba(252, 247, 237, 255);
-        diamond(c, (int)((cx + h * 0.012f) * s), (int)((y + row / 2) * s), (int)(h * 0.009f * s), brass);
-        text(c, (int)((cx + h * 0.04f) * s), (int)((y + row / 2 + h * 0.014f) * s), px, col, r->text, 0);
-        const char *v = menu_value(r->id);
-        if (*v) {
-            const int vw = text_width(v, px);
-            text(c, (int)((x0 + pw * 0.92f) * s) - vw, (int)((y + row / 2 + h * 0.014f) * s), px, gold, v, 0);
+        const uint32_t col = it->id == M_EXIT ? rgba(240, 150, 130, 255) : white;
+        char label[96];
+        snprintf(label, sizeof label, "%s%s", it->text, it->restart && menu_pending(it->id) ? " *" : "");
+        text(c, MS(g.lx + h * 0.045f), MS(base), fpx, col, label, MS(g.lw * 0.5f));
+        const float right = g.lx + g.lw - g.pad * 0.5f;
+        const char *v = menu_value(it->id);
+        if (it->kind == K_TOGGLE && menu_on(it->id) >= 0) {
+            const int on = menu_on(it->id);
+            const float sw = g.row * 0.95f, sh = g.row * 0.46f, swx = right - sw, swy = mid - sh / 2;
+            wfill(c, s, swx, swy, sw, sh, on ? rgba(84, 128, 52, 255) : rgba(30, 14, 10, 255));
+            wframe(c, s, swx, swy, sw, sh, on ? gold : brass, 0);
+            const float kx = on ? swx + sw - sh * 0.5f : swx + sh * 0.5f;
+            wfill(c, s, kx - sh * 0.36f, mid - sh * 0.36f, sh * 0.72f, sh * 0.72f, on ? gold : rgba(120, 100, 80, 255));
+            diamond(c, MS(kx), MS(mid), (int)(sh * 0.16f * s), rgba(60, 40, 20, 255));
+            if (strcmp(v, "On") && strcmp(v, "Off"))             /* "Room at 30", "Restart" ... */
+                text(c, MS(swx - h * 0.02f) - text_width(v, fpx), MS(base), fpx, dim, v, 0);
+        } else if (it->kind == K_STEP) {
+            float mxb, pxb, by, bs;
+            menu_steps(&g, y, &mxb, &pxb, &by, &bs);
+            for (int b = 0; b < 2; b++) {
+                const float bx = b ? pxb : mxb, bcx = bx + bs / 2, bcy = by + bs / 2;
+                wfill(c, s, bx, by, bs, bs, rgba(30, 14, 10, 255));
+                wframe(c, s, bx, by, bs, bs, gold, 1);
+                segment(c, (bcx - bs * 0.25f) * s, bcy * s, (bcx + bs * 0.25f) * s, bcy * s, 2.6f * s, white);
+                if (b) segment(c, bcx * s, (bcy - bs * 0.25f) * s, bcx * s, (bcy + bs * 0.25f) * s, 2.6f * s, white);
+            }
+            const float vc = (mxb + bs + pxb) / 2;
+            text(c, MS(vc) - text_width(v, fpx) / 2, MS(base), fpx, white, v, 0);
+        } else {
+            float vr = right;
+            if (it->kind == K_CYCLE || it->kind == K_ACTION) {   /* a chevron: more values, or it opens something */
+                const float ax = right - h * 0.012f, ar = h * 0.012f;
+                if (it->kind == K_CYCLE) {
+                    segment(c, (ax - ar * 2) * s, (mid - ar) * s, (ax - ar) * s, mid * s, 2.2f * s, gold);
+                    segment(c, (ax - ar) * s, mid * s, (ax - ar * 2) * s, (mid + ar) * s, 2.2f * s, gold);
+                    segment(c, (ax - ar * 0.6f) * s, (mid - ar) * s, (ax + ar * 0.4f) * s, mid * s, 2.2f * s, gold);
+                    segment(c, (ax + ar * 0.4f) * s, mid * s, (ax - ar * 0.6f) * s, (mid + ar) * s, 2.2f * s, gold);
+                } else {
+                    segment(c, (ax - ar) * s, (mid - ar * 1.4f) * s, ax * s, mid * s, 2.4f * s, gold);
+                    segment(c, ax * s, mid * s, (ax - ar) * s, (mid + ar * 1.4f) * s, 2.4f * s, gold);
+                }
+                vr = right - h * 0.05f;
+            }
+            if (*v) text(c, MS(vr) - text_width(v, fpx), MS(base), fpx, sel ? white : gold, v, MS(g.lw * 0.42f));
         }
-        segment(c, cx * s, (y + row) * s, (x0 + pw * 0.92f) * s, (y + row) * s, 1.0f * s, rgba(126, 98, 54, 140));
-        y += row;
+        if (!sel && i + 1 < tab->n) wfill(c, s, g.lx + h * 0.02f, y + g.row - 1, g.lw - h * 0.04f, 1.0f, rgba(126, 98, 54, 110));
     }
     g_clip0 = 0;
     g_clip1 = 1 << 30;
-    text(c, (int)(cx * s), (int)((h - h * 0.04f) * s), (int)(h * 0.026f * s), rgba(160, 148, 128, 255),
-         "Swipe from the left edge or press Back to open", 0);
+    if (maxs > 0) {                                       /* where in the list: a gold bar */
+        const float bar = g.lh * g.lh / (g.lh + maxs), by = g.ly + (g.lh - bar) * g_menu_scroll / maxs;
+        wfill(c, s, g.lx + g.lw + g.pad * 0.2f, by, 3, bar, gold);
+    }
+    /* what the picked setting does */
+    wfill(c, s, g.dx, g.dy, g.dw, g.dh, inner);
+    wframe(c, s, g.dx, g.dy, g.dw, g.dh, brass, 1);
+    const float dp = h * 0.025f;
+    if (tab->n) {
+        const menu_item *it = &tab->items[g_msel];
+        text(c, MS(g.dx + dp), MS(g.dy + dp + h * 0.04f), (int)(h * 0.042f * s), gold, it->text, MS(g.dw - 2 * dp));
+        wfill(c, s, g.dx + dp, g.dy + dp + h * 0.065f, g.dw - 2 * dp, 1.2f, rgba(126, 98, 54, 200));
+        const int hp = (int)(h * 0.034f * s);
+        text_wrapped(c, MS(g.dx + dp), MS(g.dy + dp + h * 0.12f), hp, (int)(hp * 1.32f), rgba(225, 212, 195, 255), it->help,
+                     MS(g.dw - 2 * dp), 12);
+    }
+    int restart = 0;
+    for (int i = 0; i < tab->n; i++) restart |= tab->items[i].restart;
+    const int npx = (int)(h * 0.030f * s);
+    if (restart) {
+        wfill(c, s, g.dx + dp, g.dy + g.dh - h * 0.075f, g.dw - 2 * dp, 1.0f, rgba(126, 98, 54, 160));
+        text(c, MS(g.dx + dp), MS(g.dy + g.dh - dp), npx, dim, "* Restart required", 0);
+    }
 }
+#undef MS
 
-/* A tap with the drawer open. */
-static void menu_tap(float px, float py, float w, float h) {
-    float pw, head, row, top;
-    menu_metrics(w, h, &pw, &head, &row, &top);
-    if (px > pw) { menu_set(0); return; }                /* outside: close */
-    if (py < top || py >= menu_bottom(h)) return;
-    float y = top - g_menu_scroll;
-    for (int i = 0; i < MENU_ROWS; i++) {
-        const menu_row *r = &k_menu[i];
-        const float rh = r->kind == R_HEAD ? head : row;
-        if (r->kind == R_ITEM && py >= y && py < y + rh) {
-            switch (r->id) {
-            case M_RESUME: menu_set(0); break;
-            case M_VPAD: g_vpad_mode = (g_vpad_mode + 1) % 3; settings_save(); break;
-            case M_STYLE: g_style = !g_style; touch_release_all(); settings_save(); break;
-            case M_PAD: g_pad_combined = !g_pad_combined; touch_release_all(); settings_save(); break;
-            case M_SKILLS: g_skills_on = !g_skills_on; touch_release_all(); settings_save(); break;
-            case M_FPS: g_show_fps = !g_show_fps; g_show_fps_init = g_show_fps; settings_save(); break;
-            case M_SMOOTH: g_fps60 = !g_fps60; mhfu_fps_set_preferred(g_fps60 ? 60 : 30); settings_save(); break;
-            case M_WIDE: g_wide = !mhfu_mod_widescreen(); mhfu_mod_set_widescreen(g_wide); settings_save(); break;
+/* What a tap on a setting does; dir is -1 or +1 for the - and + buttons, 0 for a tap on the row. */
+static void menu_act(const menu_item *it, int dir) {
+    switch (it->id) {
+    case M_VPAD: g_vpad_mode = (g_vpad_mode + 1) % 3; settings_save(); break;
+    case M_STYLE: g_style = !g_style; touch_release_all(); settings_save(); break;
+    case M_PAD: g_pad_combined = !g_pad_combined; touch_release_all(); settings_save(); break;
+    case M_SKILLS: g_skills_on = !g_skills_on; touch_release_all(); settings_save(); break;
+    case M_FPS: g_show_fps = !g_show_fps; g_show_fps_init = g_show_fps; settings_save(); break;
+    case M_SMOOTH:
+        if (!MHFU_HAS_FPS60) break;
+        g_fps60 = !g_fps60; mhfu_fps_set_preferred(g_fps60 ? 60 : 30); settings_save(); break;
+    case M_WIDE: g_wide = !mhfu_mod_widescreen(); mhfu_mod_set_widescreen(g_wide); settings_save(); break;
 #if MHFU_TEXPACK
-            case M_TEXPACK: g_texpack = !g_texpack; settings_save(); break;
-            case M_TEXSTYLE: {                     /* the next style; after the last, the pack's default */
-                const int n = mhfu_texpack_styles();
-                if (!n) break;
-                int at = -1;
-                for (int k = 0; k < n; k++) if (!strcmp(g_texstyle, mhfu_texpack_style(k))) at = k;
-                snprintf(g_texstyle, sizeof g_texstyle, "%s", at + 1 < n ? mhfu_texpack_style(at + 1) : "");
-                settings_save();
-                break;
-            }
+    case M_TEXPACK: g_texpack = !g_texpack; settings_save(); break;
+    case M_TEXSTYLE: {                     /* the next style; after the last, the pack's default */
+        const int n = mhfu_texpack_styles();
+        if (!n) break;
+        int at = -1;
+        for (int k = 0; k < n; k++) if (!strcmp(g_texstyle, mhfu_texpack_style(k))) at = k;
+        snprintf(g_texstyle, sizeof g_texstyle, "%s", at + 1 < n ? mhfu_texpack_style(at + 1) : "");
+        settings_save();
+        break;
+    }
 #endif
-            case M_MOD0: case M_MOD1: case M_MOD2:
-                mhfu_mod_set(r->id - M_MOD0, !mhfu_mod_on(r->id - M_MOD0));
-                settings_save();
-                break;
-            case M_RES: g_res_setting = (g_res_setting ? g_res_setting : g_scale) % 4 + 1; settings_save(); break;
-            case M_EDIT: menu_set(0); edit_open(); break;
+    case M_MOD0: case M_MOD1: case M_MOD2:
+        if (it->id - M_MOD0 >= mhfu_mod_count()) break;
+        mhfu_mod_set(it->id - M_MOD0, !mhfu_mod_on(it->id - M_MOD0));
+        settings_save();
+        break;
+    case M_RES: {
+        if (!dir) break;
+        const int want = (g_res_setting ? g_res_setting : g_scale) + dir;
+        if (want >= 1 && want <= 4) { g_res_setting = want; settings_save(); }
+        break;
+    }
+    case M_OPACITY: {
+        if (!dir) break;
+        const int a = g_vpad_alpha + dir * 25;
+        if (a >= 25 && a <= 100) { g_vpad_alpha = a; settings_save(); }
+        break;
+    }
+    case M_EDIT: menu_set(0); edit_open(); break;
 #ifdef __ANDROID__
-            case M_UPDATE: menu_set(0); android_call("checkUpdates"); break;
-            case M_CHEATS: menu_set(0); android_call("openCheats"); break;
-            case M_TEXINSTALL: menu_set(0); android_call("installTexturePack"); break;
-            case M_NET: menu_set(0); android_call("openMultiplayer"); break;
-            case M_ACH: menu_set(0); android_call("openAchievements"); break;
-            case M_ABOUT: menu_set(0); android_call("openAbout"); break;
-            case M_FILES: menu_set(0); android_call("changeGameFiles"); break;
-            case M_CRASH: menu_set(0); android_call("copyCrashLog"); break;
-            case M_SAVES: menu_set(0); android_call("chooseSaveFolder"); break;
+    case M_UPDATE: menu_set(0); android_call("checkUpdates"); break;
+    case M_CHEATS: menu_set(0); android_call("openCheats"); break;
+    case M_TEXINSTALL: menu_set(0); android_call("installTexturePack"); break;
+    case M_NET: menu_set(0); android_call("openMultiplayer"); break;
+    case M_ACH: menu_set(0); android_call("openAchievements"); break;
+    case M_ABOUT: menu_set(0); android_call("openAbout"); break;
+    case M_FILES: menu_set(0); android_call("changeGameFiles"); break;
+    case M_CRASH: menu_set(0); android_call("copyCrashLog"); break;
+    case M_SAVES: menu_set(0); android_call("chooseSaveFolder"); break;
 #endif
-            case M_OPACITY: g_vpad_alpha = g_vpad_alpha >= 100 ? 25 : g_vpad_alpha + 25; settings_save(); break;
-            case M_EXIT: {
-                SDL_Event e;
-                SDL_zero(e);
-                e.type = SDL_EVENT_WINDOW_CLOSE_REQUESTED;
-                SDL_PushEvent(&e);
-                break;
-            }
-            }
-            return;
-        }
-        y += rh;
+    case M_EXIT: {
+        SDL_Event e;
+        SDL_zero(e);
+        e.type = SDL_EVENT_WINDOW_CLOSE_REQUESTED;
+        SDL_PushEvent(&e);
+        break;
+    }
     }
 }
 
-/* A finger with the drawer open: a tap picks a row, a drag scrolls them. */
+/* A tap with the panel open. */
+static void menu_tap(float px, float py, float w, float h) {
+    const menu_geom g = menu_layout(w, h, 0);
+    const float slop = h * 0.015f;
+    if (px < g.x || px >= g.x + g.w || py < g.y || py >= g.y + g.h) { menu_set(0); return; }   /* outside: close */
+    if (px >= g.cx - slop && px < g.cx + g.cs + slop && py >= g.cy - slop && py < g.cy + g.cs + slop) { menu_set(0); return; }
+    if (px >= g.tx && px < g.tx + g.tw)
+        for (int i = 0; i < MENU_TABS; i++) {
+            const float y = g.ty + i * (g.th + g.tgap);
+            if (py >= y && py < y + g.th + g.tgap) {
+                if (i != g_mtab) { g_mtab = i; g_msel = 0; g_menu_scroll = 0; }
+                return;
+            }
+        }
+    const menu_tab *tab = menu_cur();
+    if (px < g.lx || px >= g.lx + g.lw || py < g.ly || py >= g.ly + g.lh) return;
+    const int i = (int)((py - g.ly + g_menu_scroll) / g.row);
+    if (i < 0 || i >= tab->n) return;
+    const menu_item *it = &tab->items[i];
+    g_msel = i;
+    int dir = 0;
+    if (it->kind == K_STEP) {
+        float mxb, pxb, by, bs;
+        menu_steps(&g, g.ly + i * g.row - g_menu_scroll, &mxb, &pxb, &by, &bs);
+        if (px >= mxb - slop && px < mxb + bs + slop) dir = -1;
+        else if (px >= pxb - slop && px < pxb + bs + slop) dir = 1;
+    }
+    menu_act(it, dir);
+}
+
+/* A finger with the panel open: a tap picks, a drag scrolls the list. */
 static void menu_touch(const SDL_Event *e, float px, float py, float w, float h) {
     switch (e->type) {
     case SDL_EVENT_FINGER_DOWN:
@@ -1754,7 +1959,7 @@ static void menu_touch(const SDL_Event *e, float px, float py, float w, float h)
     case SDL_EVENT_FINGER_MOTION:
         if (!g_mdrag_on || e->tfinger.fingerID != g_mdrag_id) return;
         if (fabsf(py - g_mdown_y) > h * 0.025f) g_mdragged = 1;
-        if (g_mdragged) g_menu_scroll = fminf(fmaxf(g_mdown_scroll - (py - g_mdown_y), 0), menu_max_scroll(h));
+        if (g_mdragged) g_menu_scroll = fminf(fmaxf(g_mdown_scroll - (py - g_mdown_y), 0), menu_max_scroll(w, h));
         break;
     case SDL_EVENT_FINGER_UP:
         if (!g_mdrag_on || e->tfinger.fingerID != g_mdrag_id) return;
