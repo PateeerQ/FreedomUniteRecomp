@@ -125,6 +125,19 @@
 #define MHFU_ADDR_HUNTER_FREE   (MHFU_ADDR_WEAPON_CLASS + 0x42Cu)
 #define MHFU_ADDR_YESNO         (MHFU_ADDR_WEAPON_CLASS - 0x2C8u)
 #define MHFU_ADDR_MESSAGE       (MHFU_ADDR_WEAPON_CLASS + 0x8E0695u)
+/* u8 -0x13: 1 while the hunter is in a scripted act: at the house's bed the
+ * save question, saving and "Exit Game?" (FUC dumps 22:13; the lobby's window
+ * flag stays 0 there), also seen while carving. */
+#define MHFU_ADDR_HUNTER_ACT    (MHFU_ADDR_WEAPON_CLASS - 0x13u)
+/* u8 +0xD2 and +0x176: in a quest 2 / 5 while the Supply Box menu is open, 10 /
+ * 10 at Abandon Quest, "Quest Retired" and the save question; 0 in 38 quest
+ * dumps without a window (FUC dumps 20:05, 20:58). */
+#define MHFU_ADDR_QUEST_WIN_A   (MHFU_ADDR_WEAPON_CLASS + 0xD2u)
+#define MHFU_ADDR_QUEST_WIN_B   (MHFU_ADDR_WEAPON_CLASS + 0x176u)
+/* u8 (game state, FUC 0x08B51445 = EU 0x08B55705 by the -0x42C0 rule): 2 on the
+ * screens after a quest (Take Reward, Send to Item Box, End, ...), 0 while
+ * playing (8 end-screen dumps 22:47 / 23:06 against 41 quest dumps). */
+#define MHFU_ADDR_QUEST_PHASE   (MHFU_ADDR_WEAPON_CLASS - 0x55DF23u)
 /* u8: not 0 while the game shows an object's prompt ("Enter", "Depart", ...);
  * the object pointer above can stay set when the hunter has walked away (EU
  * dumps). Not at the heap's usual distance: EU 0x09993C75 (two gate dumps
@@ -137,8 +150,23 @@
  * hold bit and the question/message flags are used there). */
 #if MHFU_REGION_JP || MHFU_REGION_FUC
 #define MHFU_ADDR_LOBBY_WINDOW  0x09B0AC40u
+/* The item box (lobby_task's memory, FUC dumps 20:25): u8 1 in a sub-menu,
+ * and u8 its kind (0 put in, 1 take out / combine, 2 change equipment, 4 the
+ * equipment sets). */
+#define MHFU_ADDR_BOX_SUB       0x09B154F8u
+#define MHFU_ADDR_BOX_KIND      0x09B154F0u
+#define MHFU_ADDR_BOX_MAIN      0x09B154F6u   /* the box menu's line: 0 put in .. 5 sell */
+#define MHFU_ADDR_BOX_DEEP      0x09B154F9u   /* 1: the list under a choice menu is open */
+/* The smithy (weapon/armour craft, lobby_task's memory; FUC dumps 21:28, 21:33):
+ * u8 0 its menu, 2 crafting, 5 attaching decorations. */
+#define MHFU_ADDR_CRAFT_SCREEN  0x09B0ACC4u
 #else
 #define MHFU_ADDR_LOBBY_WINDOW  0u
+#define MHFU_ADDR_BOX_SUB       0u
+#define MHFU_ADDR_BOX_KIND      0u
+#define MHFU_ADDR_BOX_MAIN      0u
+#define MHFU_ADDR_BOX_DEEP      0u
+#define MHFU_ADDR_CRAFT_SCREEN  0u
 #endif
 #if MHFU_REGION_JP || MHFU_REGION_FUC
 #define MHFU_ADDR_OBJ_PROMPT    0x0998F9DCu
