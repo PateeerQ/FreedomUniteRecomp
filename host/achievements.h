@@ -27,7 +27,7 @@ const char *mhfu_ach_user(void);
 
 /* The set, for the in-game menu's Achievements page. */
 typedef struct {
-    int state;                         /* 0 signed out, 1 loading, 2 loaded */
+    int state;                         /* 0 signed out, 1 loading, 2 loaded, 3 no set for this release (title = its name) */
     char title[128];
     unsigned unlocked, total, points, points_total;
 } mhfu_ach_game;

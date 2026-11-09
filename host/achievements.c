@@ -9,6 +9,7 @@
 #include "psprecomp/mem.h"
 #include "audio.h"
 #include "mods.h"
+#include "region.h"
 #include "window.h"
 
 #include "rc_client.h"
@@ -39,6 +40,7 @@ static rc_client_t *volatile g_rc;
 static char g_cache[600];
 static char g_agent[256];
 static char g_user[64];          /* the display name once signed in */
+static volatile int g_unsupported; /* the set did not load: RetroAchievements does not know this disc */
 
 /* A detached thread for `fn`. */
 #ifdef _WIN32
@@ -375,7 +377,16 @@ static void RC_CCONV on_loaded(int result, const char *error, rc_client_t *clien
     (void)userdata;
     if (result != RC_OK) {
         printf("achievements: could not load the game's set: %s\n", error ? error : "?");
+        g_unsupported = 1;
+#if MHFU_REGION_EU
         show("RETROACHIEVEMENTS", "No achievements", error ? error : "The game was not recognised.", NULL, NULL, 0);
+#else
+        /* RetroAchievements' set (game 3732) has only the Europe disc linked, and its
+         * memory addresses are the Europe ones: other releases have no set. */
+        show("RETROACHIEVEMENTS", "Not supported",
+             "RetroAchievements has no set for " MHFU_REGION_NAME
+             ": only Monster Hunter Freedom Unite (Europe) has achievements.", NULL, NULL, 0);
+#endif
         return;
     }
     const rc_client_game_t *g = rc_client_get_game_info(client);
@@ -436,6 +447,7 @@ void mhfu_ach_login(const char *user, const char *token) {
         rc_client_logout(g_rc);
         g_user[0] = 0;
     }
+    g_unsupported = 0;
     printf("achievements: signing in as %s\n", user);
     rc_client_begin_login_with_token(g_rc, user, token, on_login, NULL);
 }
@@ -465,7 +477,13 @@ int mhfu_ach_items(mhfu_ach_game *game, mhfu_ach_item *out, int cap) {
     memset(game, 0, sizeof *game);
     if (!g_rc || !g_user[0]) return 0;
     game->state = 1;
-    if (!rc_client_is_game_loaded(g_rc)) return 0;
+    if (!rc_client_is_game_loaded(g_rc)) {
+        if (g_unsupported) {
+            game->state = 3;
+            snprintf(game->title, sizeof game->title, "%s", MHFU_REGION_NAME);
+        }
+        return 0;
+    }
     const rc_client_game_t *g = rc_client_get_game_info(g_rc);
     rc_client_user_game_summary_t s;
     rc_client_get_user_game_summary(g_rc, &s);
