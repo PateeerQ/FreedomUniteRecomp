@@ -107,12 +107,12 @@
       <SupportJustMyCode></SupportJustMyCode>
       <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
       <UseFullPaths>false</UseFullPaths>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;MHFU_DEFAULT_RELAY="lunarpride.net:27313";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;MHFU_DEFAULT_RELAY="lunarpride.net:27313";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE_LITE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
     </ClCompile>
     <ResourceCompile>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;MHFU_DEFAULT_RELAY=\"lunarpride.net:27313\";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;MHFU_DEFAULT_RELAY=\"lunarpride.net:27313\";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE_LITE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\fuc\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\third_party\libkirk;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
@@ -177,14 +177,14 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <SupportJustMyCode></SupportJustMyCode>
       <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
       <UseFullPaths>false</UseFullPaths>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;MHFU_DEFAULT_RELAY="lunarpride.net:27313";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR="Release"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;MHFU_DEFAULT_RELAY="lunarpride.net:27313";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE_LITE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR="Release"</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <DebugInformationFormat>
       </DebugInformationFormat>
       <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
     </ClCompile>
     <ResourceCompile>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;MHFU_DEFAULT_RELAY=\"lunarpride.net:27313\";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;MHFU_DEFAULT_RELAY=\"lunarpride.net:27313\";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE_LITE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\fuc\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\third_party\libkirk;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
@@ -249,14 +249,14 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <SupportJustMyCode></SupportJustMyCode>
       <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
       <UseFullPaths>false</UseFullPaths>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;MHFU_DEFAULT_RELAY="lunarpride.net:27313";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;MHFU_DEFAULT_RELAY="lunarpride.net:27313";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE_LITE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <DebugInformationFormat>
       </DebugInformationFormat>
       <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
     </ClCompile>
     <ResourceCompile>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;MHFU_DEFAULT_RELAY=\"lunarpride.net:27313\";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;MHFU_DEFAULT_RELAY=\"lunarpride.net:27313\";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE_LITE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\fuc\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\third_party\libkirk;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
@@ -322,12 +322,12 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <SupportJustMyCode></SupportJustMyCode>
       <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
       <UseFullPaths>false</UseFullPaths>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;MHFU_DEFAULT_RELAY="lunarpride.net:27313";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;MHFU_DEFAULT_RELAY="lunarpride.net:27313";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE_LITE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
     </ClCompile>
     <ResourceCompile>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;MHFU_DEFAULT_RELAY=\"lunarpride.net:27313\";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;MHFU_DEFAULT_RELAY=\"lunarpride.net:27313\";MHFU_RCHEEVOS=1;MHFU_GAMEPAD=1;MHFU_FFMPEG=1;PSPRECOMP_TRACE_LITE;_CRT_SECURE_NO_WARNINGS;PSPRECOMP_REAL_THREADS=1;RC_CLIENT_SUPPORTS_HASH;RC_DISABLE_LUA;BASISD_SUPPORT_KTX2=1;BASISD_SUPPORT_KTX2_ZSTD=1;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>E:\Project\MHFU-Android\work\fuc\gen;E:\Project\MHFU-Android\host;E:\Project\MHFU-Android\build-all\_deps\stb-src;E:\Project\MHFU-Android\deps\ffmpeg\include;E:\Project\MHFU-Android\psprecomp\include;E:\Project\MHFU-Android\third_party\libkirk;E:\Project\MHFU-Android\build-all\_deps\rcheevos-src\include;E:\Project\MHFU-Android\build-all\_deps\sdl3-build\include-revision;E:\Project\MHFU-Android\build-all\_deps\sdl3-src\include;E:\Project\MHFU-Android\build-all\_deps\basisu-src\transcoder;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
@@ -529,6 +529,12 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <ClCompile Include="E:\Project\MHFU-Android\host\chnnlsv.c">
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <ClCompile Include="E:\Project\MHFU-Android\host\perfhint.c">
       <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
       <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ProgramDatabase</DebugInformationFormat>
       <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">ProgramDatabase</DebugInformationFormat>

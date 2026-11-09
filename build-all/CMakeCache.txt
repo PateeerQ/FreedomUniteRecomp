@@ -384,6 +384,12 @@ MHFU_LAUNCHER:BOOL=ON
 //recompiled overlays
 MHFU_OVL_DIR:PATH=E:/Project/MHFU-Android/work/gen_ovl
 
+//Profile-guided optimisation (clang): OFF, GEN or USE
+MHFU_PGO:STRING=OFF
+
+//MHFU_PGO=USE's merged profile
+MHFU_PGO_PROFILE:FILEPATH=E:/Project/MHFU-Android/work/pgo/mhfu.profdata
+
 //RetroAchievements in game (rcheevos)
 MHFU_RCHEEVOS:BOOL=ON
 
@@ -396,8 +402,8 @@ MHFU_SDL_WINDOW:BOOL=OFF
 //Texture packs (PPSSPP's textures.ini, PNG and KTX2)
 MHFU_TEXPACK:BOOL=ON
 
-//Record every recompiled function entry
-MHFU_TRACE:BOOL=ON
+//Recompiled-code tracing: FULL, LITE or OFF
+MHFU_TRACE:STRING=LITE
 
 //A host for every region set up in work/ (mhfu_host_<region>)
 MHFU_UNIVERSAL:BOOL=ON
@@ -1209,6 +1215,10 @@ LIBC_ISINF_HANDLES_FLOAT:INTERNAL=1
 LIBC_ISNAN_HANDLES_FLOAT:INTERNAL=1
 //Have symbol __GLIBC__
 LIBC_IS_GLIBC:INTERNAL=
+//STRINGS property for variable: MHFU_PGO
+MHFU_PGO-STRINGS:INTERNAL=OFF;GEN;USE
+//STRINGS property for variable: MHFU_TRACE
+MHFU_TRACE-STRINGS:INTERNAL=FULL;LITE;OFF
 NLOHMANN_JSON_CONFIG_INSTALL_DIR:INTERNAL=share/cmake/nlohmann_json
 //ADVANCED property for variable: PKG_CONFIG_ARGN
 PKG_CONFIG_ARGN-ADVANCED:INTERNAL=1
