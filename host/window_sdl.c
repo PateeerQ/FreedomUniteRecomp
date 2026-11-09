@@ -275,7 +275,7 @@ static void text_centered(canvas *c, float cx, float cy, int px, uint32_t col, c
  * controls on, off or automatic -- off while a controller is connected. */
 
 enum { T_NONE, T_STICK, T_DPAD, T_CROSS, T_CIRCLE, T_SQUARE, T_TRIANGLE, T_L, T_R, T_SELECT, T_START, T_MENU, T_EDGE, T_RSTICK, T_SWIPE,
-       T_SKILL0, T_SKILL1, T_SKILL2, T_ATTACK, T_ROLL, T_ITEM, T_RUN };
+       T_SKILL0, T_SKILL1, T_SKILL2, T_ATTACK, T_ROLL, T_ITEM, T_RUN, T_YES, T_NO, T_ACT };
 enum { VPAD_AUTO, VPAD_ON, VPAD_OFF };
 enum { G_STICK, G_DPAD, G_FACE, G_L, G_R, G_SELECT, G_START, G_MENU, G_RSTICK, G_SKILL, G_ATTACK, G_ROLL, G_ITEM, G_RUN, G_COUNT };
 static const char *const k_group_name[G_COUNT] = { "stick", "dpad", "face", "l", "r", "select", "start", "menu", "rstick", "skill",
@@ -293,6 +293,11 @@ static int     g_vpad_mode = VPAD_AUTO;
 static int     g_vpad_alpha = 100;                    /* percent */
 static int     g_skills_on = 1;                        /* the weapon buttons */
 static int     g_style = STYLE_MOBILE;                  /* the button style */
+/* The stick and the d-pad as one round control (the default): the stick in the
+ * middle, the d-pad a ring of four arcs around it (8 ways; a finger slides
+ * round it). 0: the two apart, as before. */
+static int     g_pad_combined = 1;
+#define PAD_INNER 0.62f                                  /* the stick's part of the radius */
 static float   g_attack_kx, g_attack_ky;                /* the attack pad's knob, -1..1 */
 static int     g_attack_held;
 static int     g_menu_open;
@@ -361,6 +366,7 @@ static void settings_load(void) {
         if (sscanf(line, "button_opacity=%d", &v) == 1 && v >= 10 && v <= 100) g_vpad_alpha = v;
         if (sscanf(line, "weapon_buttons=%d", &v) == 1) g_skills_on = v != 0;
         if (sscanf(line, "button_style=%d", &v) == 1 && v >= 0) g_style = v ? STYLE_MOBILE : STYLE_PSP;   /* 2: the old Auto */
+        if (sscanf(line, "pad_combined=%d", &v) == 1) g_pad_combined = v != 0;
         if (sscanf(line, "resolution=%d", &v) == 1 && v >= 1 && v <= 4) g_res_setting = v;
         if (sscanf(line, "fps60=%d", &v) == 1) g_fps60 = v != 0;
         if (sscanf(line, "widescreen=%d", &v) == 1) g_wide = v != 0;
@@ -397,6 +403,7 @@ static void settings_save(void) {
     fprintf(f, "fps60=%d\nwidescreen=%d\nweapon_buttons=%d\nbutton_style=%d\ntexpack=%d\n", g_fps60, g_wide,
             g_skills_on, g_style, g_texpack);
     if (g_texstyle[0]) fprintf(f, "texpack_style=%s\n", g_texstyle);
+    fprintf(f, "pad_combined=%d\n", g_pad_combined);
     for (int i = 0; i < mhfu_mod_count(); i++) fprintf(f, "mod_%s=%d\n", mhfu_mod_id(i), mhfu_mod_on(i));
     for (int g = 0; g < G_COUNT; g++)
         if (g_place[g].set)
@@ -428,7 +435,7 @@ static layout layout_for(float w, float h) {
 }
 
 /* Each group's sizes, from the screen's height and its factor. */
-static float stick_r(const layout *L) { return 0.15f * L->h * L->k[G_STICK]; }
+static float stick_r(const layout *L) { return (g_pad_combined ? 0.21f : 0.15f) * L->h * L->k[G_STICK]; }
 static float rstick_r(const layout *L) { return 0.13f * L->h * L->k[G_RSTICK]; }
 static float dpad_r(const layout *L)  { return 0.15f * L->h * L->k[G_DPAD]; }
 static float face_o(const layout *L)  { return 0.12f * L->h * L->k[G_FACE]; }
@@ -451,6 +458,7 @@ static int hunt_ctx(void) {
 static int mobile_now(void) { return g_style == STYLE_MOBILE && (g_edit || hunt_ctx() == CTX_DRAWN); }
 static int group_shown(int g) {
     if (g == G_RSTICK) return 0;                       /* the camera is a swipe now */
+    if (g == G_DPAD && g_pad_combined) return 0;       /* it is the stick's ring */
     const int m = mobile_now();
     if (g == G_FACE || g == G_DPAD) return !m;
     if (!m) return g != G_ATTACK && g != G_ROLL && g != G_ITEM && g != G_RUN;
@@ -575,6 +583,13 @@ static int hit(const layout *L, float x, float y) {
         skill_pos(L, i, ns, &sx, &sy);
         if (dist(x, y, sx, sy) < skill_r(L) * 1.2f) return T_SKILL0 + i;
     }
+    if (g_pad_combined) {
+        /* one round control: the middle is the stick, the ring the d-pad */
+        const float d = dist(x, y, L->x[G_STICK], L->y[G_STICK]), r = stick_r(L);
+        if (d < r * PAD_INNER) return T_STICK;
+        if (d < r * 1.25f) return T_DPAD;
+        return T_NONE;
+    }
     if (!m && dist(x, y, L->x[G_DPAD], L->y[G_DPAD]) < dpad_r(L) * 1.25f) return T_DPAD;
     if (dist(x, y, L->x[G_STICK], L->y[G_STICK]) < stick_r(L) * 1.6f) return T_STICK;
     return T_NONE;
@@ -640,7 +655,7 @@ static void touch_update(float w, float h) {
         const finger *f = &g_fingers[i];
         if (!f->elem) continue;
         if (f->elem == T_STICK) {
-            const float r = stick_r(&L);
+            const float r = stick_r(&L) * (g_pad_combined ? PAD_INNER * 0.85f : 1.0f);
             float dx = (f->x - L.x[G_STICK]) / r, dy = (f->y - L.y[G_STICK]) / r;
             const float m = sqrtf(dx * dx + dy * dy);
             if (m > 1) { dx /= m; dy /= m; }
@@ -671,8 +686,9 @@ static void touch_update(float w, float h) {
             g_swipe_x = f->x;
             g_swipe_y = f->y;
         } else if (f->elem == T_DPAD) {
-            const float dx = f->x - L.x[G_DPAD], dy = f->y - L.y[G_DPAD];
-            if (sqrtf(dx * dx + dy * dy) > dpad_r(&L) * 0.2f) {
+            const int gd = g_pad_combined ? G_STICK : G_DPAD;
+            const float dx = f->x - L.x[gd], dy = f->y - L.y[gd];
+            if (sqrtf(dx * dx + dy * dy) > (g_pad_combined ? stick_r(&L) * 0.3f : dpad_r(&L) * 0.2f)) {
                 const float a = atan2f(dy, dx) * 180 / 3.14159265f;     /* 0 = right, 90 = down */
                 if (a > -67.5f && a < 67.5f) b |= PSP_CTRL_RIGHT;
                 if (a > 22.5f && a < 157.5f) b |= PSP_CTRL_DOWN;
@@ -1012,12 +1028,42 @@ static void draw_vpad(canvas *c, float s) {
     }
     /* the stick */
     const float sr = stick_r(&L);
-    disc(c, S(L.x[G_STICK]), S(L.y[G_STICK]), S(sr), fillc);
-    ring(c, S(L.x[G_STICK]), S(L.y[G_STICK]), S(sr), t, line);
-    float kx = L.x[G_STICK], ky = L.y[G_STICK];
-    if (g_touch_ax >= 0) { kx += (g_touch_ax - 128) / 127.0f * sr; ky += (g_touch_ay - 128) / 127.0f * sr; }
-    disc(c, S(kx), S(ky), S(sr * 0.45f), g_touch_ax >= 0 ? on : va(236, 194, 104, 90));
-    ring(c, S(kx), S(ky), S(sr * 0.45f), t, line);
+    const float scx = L.x[G_STICK], scy = L.y[G_STICK];
+    if (g_pad_combined) {
+        /* the d-pad ring: four arcs (up, right, down, left), each lit while its
+         * direction is held, a chevron on each, then the stick's well inside */
+        const float mid = sr * (1.0f + PAD_INNER) / 2, band = sr * (1.0f - PAD_INNER) * 0.86f;
+        disc(c, S(scx), S(scy), S(sr), fillc);
+        const struct { float deg; uint32_t bit; float dx, dy; } arcs[4] = {
+            { -90, PSP_CTRL_UP, 0, -1 }, { 0, PSP_CTRL_RIGHT, 1, 0 }, { 90, PSP_CTRL_DOWN, 0, 1 }, { 180, PSP_CTRL_LEFT, -1, 0 } };
+        for (int i = 0; i < 4; i++) {
+            const int lit = (g_touch_buttons & arcs[i].bit) != 0;
+            const uint32_t col = lit ? on : va(236, 194, 104, 40);
+            for (float a = arcs[i].deg - 38; a < arcs[i].deg + 38; a += 4) {
+                const float r0 = a * 3.14159265f / 180, r1 = (a + 4) * 3.14159265f / 180;
+                segment(c, S(scx + cosf(r0) * mid), S(scy + sinf(r0) * mid), S(scx + cosf(r1) * mid), S(scy + sinf(r1) * mid),
+                        S(band), col);
+            }
+            chevron(c, S(scx + arcs[i].dx * mid), S(scy + arcs[i].dy * mid), arcs[i].dx, arcs[i].dy, S(band * 0.30f), t,
+                    lit ? va(40, 30, 20, 230) : white);
+        }
+        ring(c, S(scx), S(scy), S(sr), t, line);
+        disc(c, S(scx), S(scy), S(sr * PAD_INNER), va(12, 9, 6, 120));
+        ring(c, S(scx), S(scy), S(sr * PAD_INNER), t * 0.8f, line);
+        const float travel = sr * PAD_INNER * 0.55f, knob = sr * PAD_INNER * 0.48f;
+        float kx = scx, ky = scy;
+        if (g_touch_ax >= 0) { kx += (g_touch_ax - 128) / 127.0f * travel; ky += (g_touch_ay - 128) / 127.0f * travel; }
+        disc(c, S(kx), S(ky), S(knob), g_touch_ax >= 0 ? on : va(236, 194, 104, 90));
+        disc(c, S(kx), S(ky - knob * 0.12f), S(knob * 0.72f), va(255, 245, 225, 22));
+        ring(c, S(kx), S(ky), S(knob), t, line);
+    } else {
+        disc(c, S(scx), S(scy), S(sr), fillc);
+        ring(c, S(scx), S(scy), S(sr), t, line);
+        float kx = scx, ky = scy;
+        if (g_touch_ax >= 0) { kx += (g_touch_ax - 128) / 127.0f * sr; ky += (g_touch_ay - 128) / 127.0f * sr; }
+        disc(c, S(kx), S(ky), S(sr * 0.45f), g_touch_ax >= 0 ? on : va(236, 194, 104, 90));
+        ring(c, S(kx), S(ky), S(sr * 0.45f), t, line);
+    }
     /* the camera swipe, while a finger does it */
     if (g_touch_rheld) {
         const float rr = L.h * 0.06f;
@@ -1228,7 +1274,7 @@ static void draw_editor(canvas *c, float s) {
  * Android dialogs (MhfuActivity, over JNI): they need text fields. */
 
 enum { R_HEAD, R_ITEM };
-enum { M_RESUME, M_NET, M_ACH, M_VPAD, M_STYLE, M_EDIT, M_OPACITY, M_SKILLS, M_FPS, M_RES, M_SMOOTH, M_WIDE, M_CHEATS, M_TEXPACK, M_TEXSTYLE, M_TEXINSTALL, M_MOD0, M_MOD1, M_MOD2, M_SAVES, M_FILES, M_CRASH, M_UPDATE, M_ABOUT, M_EXIT };
+enum { M_RESUME, M_NET, M_ACH, M_VPAD, M_STYLE, M_PAD, M_EDIT, M_OPACITY, M_SKILLS, M_FPS, M_RES, M_SMOOTH, M_WIDE, M_CHEATS, M_TEXPACK, M_TEXSTYLE, M_TEXINSTALL, M_MOD0, M_MOD1, M_MOD2, M_SAVES, M_FILES, M_CRASH, M_UPDATE, M_ABOUT, M_EXIT };
 typedef struct { int kind, id; const char *text; } menu_row;
 static const menu_row k_menu[] = {
     { R_HEAD, -1, "GAME" },     { R_ITEM, M_RESUME, "Back to game" },
@@ -1236,6 +1282,7 @@ static const menu_row k_menu[] = {
     { R_HEAD, -1, "ONLINE" },   { R_ITEM, M_NET, "Multiplayer" }, { R_ITEM, M_ACH, "RetroAchievements" },
 #endif
     { R_HEAD, -1, "CONTROLS" }, { R_ITEM, M_VPAD, "Virtual gamepad" }, { R_ITEM, M_STYLE, "Button style" },
+    { R_ITEM, M_PAD, "Stick and d-pad" },
     { R_ITEM, M_EDIT, "Edit button layout" },
     { R_ITEM, M_OPACITY, "Button opacity" }, { R_ITEM, M_SKILLS, "Weapon buttons" },
     { R_HEAD, -1, "DISPLAY" },  { R_ITEM, M_RES, "Resolution" }, { R_ITEM, M_SMOOTH, "60 FPS (beta)" },
@@ -1311,6 +1358,7 @@ static const char *menu_value(int id) {
     case M_FPS: return g_show_fps ? "On" : "Off";
     case M_SKILLS: return g_skills_on ? "On" : "Off";
     case M_STYLE: return g_style == STYLE_MOBILE ? "Mobile" : "Legacy PSP";
+    case M_PAD: return g_pad_combined ? "Combined" : "Separate";
     case M_SMOOTH: return !MHFU_HAS_FPS60 ? "Not in this build" : !g_fps60 ? "Off" : mhfu_fps_target() >= 60 ? "On" : "On (room at 30)";
     case M_WIDE: return mhfu_mod_widescreen() ? "On" : "Off";
 #if MHFU_TEXPACK
@@ -1448,6 +1496,7 @@ static void menu_tap(float px, float py, float w, float h) {
             case M_RESUME: menu_set(0); break;
             case M_VPAD: g_vpad_mode = (g_vpad_mode + 1) % 3; settings_save(); break;
             case M_STYLE: g_style = !g_style; touch_release_all(); settings_save(); break;
+            case M_PAD: g_pad_combined = !g_pad_combined; touch_release_all(); settings_save(); break;
             case M_SKILLS: g_skills_on = !g_skills_on; touch_release_all(); settings_save(); break;
             case M_FPS: g_show_fps = !g_show_fps; g_show_fps_init = g_show_fps; settings_save(); break;
             case M_SMOOTH: g_fps60 = !g_fps60; mhfu_fps_set_preferred(g_fps60 ? 60 : 30); settings_save(); break;
