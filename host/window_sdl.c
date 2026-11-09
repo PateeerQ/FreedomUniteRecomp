@@ -468,6 +468,8 @@ static int hunt_ctx(void) {
  *   Yes, No and Square (a quest's details), always the same three (separate
  *   Next and detail buttons came and went, Muhammad) */
 enum { UI_PLAY, UI_MENU, UI_TALK, UI_OBJ, UI_WINDOW };
+#define WINDOW_ENTER_MS 120
+#define WINDOW_KEEP_MS 1500
 /* The object in reach: its kind (region.h) and a door's destination. */
 enum { OBJ_DOOR = 1, OBJ_GATE = 2, OBJ_TRAINING = 3, OBJ_BOX = 7, OBJ_CHAIR = 8, OBJ_BOARD = 9 };
 static int obj_now(int *kind, int *dest) {
@@ -485,14 +487,22 @@ static int ui_ctx(void) {
     if (psp_read8(MHFU_ADDR_MENU_OPEN)) return UI_MENU;
     /* a window is open: the hunter is held (that bit also drops while running)
      * and a question, a message or a menu (prompt id 3 and up) is up */
-    static int in_window;                               /* kept while the hunter stays held: the
-                                                         * message flag blinks between a dialog's lines */
+    /* The window flags must hold WINDOW_ENTER_MS to count (one blinks for a
+     * moment while running, when the hold bit is clear too: Yes/No showed up
+     * mid-run, phone log 2026-11-09); once in, a gap up to WINDOW_KEEP_MS
+     * (between a dialog's lines) keeps the buttons. */
+    static int in_window;
+    static uint64_t flags_since, flags_last;
+    const uint64_t now = SDL_GetTicks();
     const int held = lobby && !(psp_read8(MHFU_ADDR_HUNTER_FREE) & 0x04);
-    if (held && (in_window || psp_read8(MHFU_ADDR_YESNO) || psp_read8(MHFU_ADDR_MESSAGE) ||
-                 psp_read8(MHFU_ADDR_UI_PROMPT) >= 3)) {
-        in_window = 1;
-        return UI_WINDOW;
-    }
+    const int flags = held && (psp_read8(MHFU_ADDR_YESNO) || psp_read8(MHFU_ADDR_MESSAGE) ||
+                               psp_read8(MHFU_ADDR_UI_PROMPT) >= 3);
+    if (flags) {
+        if (!flags_since) flags_since = now;
+        flags_last = now;
+        if (now - flags_since >= WINDOW_ENTER_MS) in_window = 1;
+    } else flags_since = 0;
+    if (in_window && held && now - flags_last < WINDOW_KEEP_MS) return UI_WINDOW;
     in_window = 0;
     if (psp_read32(MHFU_ADDR_TALK_TARGET)) return UI_TALK;
     int kind, dest;
