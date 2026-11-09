@@ -514,6 +514,8 @@ static void hle_CtlDelHandler(void) {
     psp_ret(0);
 }
 
+int mhfu_adhoc_in_group(void) { return g_state == ST_CONNECTED; }
+
 static void connect_group(const char group[MHN_GROUP_LEN]) {
     memcpy(g_group, group, MHN_GROUP_LEN);
     if (online()) mhn_ctl_connect(g_group);
