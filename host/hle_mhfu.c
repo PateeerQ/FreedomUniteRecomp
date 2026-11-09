@@ -438,6 +438,8 @@ int mhfu_overlays_missing(void) { return g_ovl_missing; }
  * hash differs: EU C5DF3522). */
 static char g_ovl_name[OVL_SLOTS][33];
 int mhfu_in_quest(void) { return g_ovl_hash[1] && !strncmp(g_ovl_name[1], "game_task", 9); }
+/* In the village or a hall (lobby_task.ovl in slot 1): not the title's menus. */
+int mhfu_in_lobby(void) { return g_ovl_hash[1] && !strncmp(g_ovl_name[1], "lobby_task", 10); }
 
 static uint32_t fnv1a(const uint8_t *p, size_t n) {
     uint32_t h = 2166136261u;
