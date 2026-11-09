@@ -76,7 +76,9 @@ param(
     [ValidateSet("EU", "US", "JP", "FUC")] [string]$Region = "EU",
     # -Universal: the game from build-all (scripts\build-universal.ps1),
     # mhfu_host_<region>.exe, instead of the region's own build folder.
-    [switch]$Universal
+    [switch]$Universal,
+    # -Exe path\mhfu_host.exe: that build instead (e.g. build-perf, to compare builds).
+    [string]$Exe
 )
 
 $ErrorActionPreference = 'Stop'
@@ -87,6 +89,7 @@ $buildDir = if ($sub) { "build-$sub" } else { "build" }
 $gameId = @{ EU = "ULES01213"; US = "ULUS10391"; JP = "ULJM05500"; FUC = "ULJM05500" }[$Region]
 
 $exe = @(
+    $(if ($Exe) { (Resolve-Path $Exe).Path }),
     $(if ($Universal) { "$repo\build-all\$Config\mhfu_host_$($Region.ToLower()).exe" }),
     "$repo\$buildDir\$Config\mhfu_host.exe",
     "$repo\$buildDir\mhfu_host.exe"
