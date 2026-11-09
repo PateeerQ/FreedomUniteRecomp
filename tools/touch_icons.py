@@ -28,6 +28,14 @@ ICONS = [
     ('CHARGE', 'lorc/hammer-drop'),
     ('RUN', 'lorc/run'),
     ('TALK', 'delapouite/chat-bubble'),
+    ('CHEST', 'delapouite/chest'),
+    ('DOOR', 'delapouite/exit-door'),
+    ('CHAIR', 'delapouite/wooden-chair'),
+    ('BOARD', 'lorc/scroll-unfurled'),
+    ('QUEST', 'lorc/crossed-swords'),
+    ('TRAIN', 'lorc/target-dummy'),
+    ('DETAIL', 'lorc/magnifying-glass'),
+    ('NEXT', 'delapouite/next-button'),
 ]
 URL = 'https://raw.githubusercontent.com/game-icons/icons/master/%s.svg'
 
