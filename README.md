@@ -14,6 +14,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%20x64-0078d6" alt="Windows x64">
   <img src="https://img.shields.io/badge/platform-Android%208%2B%20(arm64)-3ddc84" alt="Android 8+ arm64">
   <a href="https://github.com/sp00nznet/psprecomp"><img src="https://img.shields.io/badge/built%20with-psprecomp-555" alt="Built with psprecomp"></a>
+  <a href="https://discord.gg/gCqSPkfUhj"><img src="https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
 <p align="center">
@@ -22,7 +23,8 @@
   <a href="#multiplayer">Multiplayer</a> ·
   <a href="#building-from-source">Building</a> ·
   <a href="#credits">Credits</a> ·
-  <a href="#license">License</a>
+  <a href="#license">License</a> ·
+  <a href="https://discord.gg/gCqSPkfUhj">Discord</a>
 </p>
 
 ---
@@ -32,6 +34,8 @@ program for **Windows** and **Android**: no emulator runs the game. It adds what
 anyone can join with a code, 60 FPS, widescreen, controllers, rearrangeable touch buttons and RetroAchievements.
 
 **Maintained by [PateeerQ](https://github.com/PateeerQ).**
+
+Questions, bug reports, finding other hunters: join the **[Discord server](https://discord.gg/gCqSPkfUhj)**.
 
 > [!IMPORTANT]
 > Not affiliated with, endorsed by or sponsored by Capcom or Sony. You need your own copy of the game.
