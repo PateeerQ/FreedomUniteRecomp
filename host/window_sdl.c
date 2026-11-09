@@ -24,6 +24,7 @@
 #include "gamepad.h"
 #include "hle_mhfu.h"
 #include "adhoc.h"
+#include "chat.h"
 #include "input.h"
 #include "keys.h"
 #include "lobby.h"
@@ -278,11 +279,14 @@ static void text_centered(canvas *c, float cx, float cy, int px, uint32_t col, c
  * controls on, off or automatic -- off while a controller is connected. */
 
 enum { T_NONE, T_STICK, T_DPAD, T_CROSS, T_CIRCLE, T_SQUARE, T_TRIANGLE, T_L, T_R, T_SELECT, T_START, T_MENU, T_EDGE, T_RSTICK, T_SWIPE,
-       T_SKILL0, T_SKILL1, T_SKILL2, T_ATTACK, T_ROLL, T_ITEM, T_RUN, T_YES, T_NO, T_ACT, T_ACT2, T_DETAIL };
+       T_SKILL0, T_SKILL1, T_SKILL2, T_ATTACK, T_ROLL, T_ITEM, T_RUN, T_YES, T_NO, T_ACT, T_ACT2, T_DETAIL, T_LLEFT, T_LRIGHT, T_CHAT,
+       T_DRAW, T_USE, T_KICK, T_BAG, T_PICK, T_QSTART, T_WX0, T_WX1, T_WX2, T_WX3, T_WX4, T_WX5 };
 enum { VPAD_AUTO, VPAD_ON, VPAD_OFF };
-enum { G_STICK, G_DPAD, G_FACE, G_L, G_R, G_SELECT, G_START, G_MENU, G_RSTICK, G_SKILL, G_ATTACK, G_ROLL, G_ITEM, G_RUN, G_COUNT };
+enum { G_STICK, G_DPAD, G_FACE, G_L, G_R, G_SELECT, G_START, G_MENU, G_RSTICK, G_SKILL, G_ATTACK, G_ROLL, G_ITEM, G_RUN,
+       G_DRAW, G_USE, G_KICK, G_BAG, G_YESNO, G_EXTRAS, G_ACT, G_PICK, G_COUNT };
 static const char *const k_group_name[G_COUNT] = { "stick", "dpad", "face", "l", "r", "select", "start", "menu", "rstick", "skill",
-                                                   "attack", "roll", "item", "run" };
+                                                   "attack", "roll", "item", "run",
+                                                   "draw", "use", "kick", "bag", "yesno", "extras", "act", "pick" };
 /* The button styles, chosen in the drawer: the PSP's face buttons and d-pad
  * everywhere, or the mobile one: in a quest with the weapon out, the attack
  * pad, Dodge (Cross), Sheathe (Square) and the weapon buttons (R is on the pad
@@ -424,16 +428,42 @@ static layout layout_for(float w, float h) {
     const float def[G_COUNT][2] = {
         { 0.24f * h, h - 0.26f * h }, { 0.24f * h, 0.40f * h }, { w - 0.25f * h, 0.50f * h },
         { 0.20f * h, 0.09f * h }, { w - 0.20f * h, 0.09f * h },
-        { w / 2 - 0.13f * h, h - 0.0725f * h }, { w / 2 + 0.13f * h, h - 0.0725f * h }, { w / 2, 0.08f * h },
+        { w / 2 - 0.13f * h, h - 0.0725f * h }, { w / 2 + 0.13f * h, h - 0.0725f * h },
+        { 0.08f * h, 0.20f * h },                      /* the menu button: top left, under the L pill (Start, chat right of it) */
         { w - 0.58f * h, h - 0.20f * h }, { w - 0.56f * h, 0.50f * h },
         { w - 0.26f * h, 0.60f * h }, { w - 0.13f * h, 0.88f * h }, { w - 0.44f * h, 0.88f * h },
         { w - 0.16f * h, 0.76f * h },
+        { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },        /* draw, use, kick, bag: from the face buttons, below */
+        { 0, 0 }, { 0, 0 }, { 0, 0 },                  /* yes/no, the menus' row, the action button: likewise */
+        { 0, 0 },                                      /* pick up: the face buttons' middle */
     };
     for (int g = 0; g < G_COUNT; g++) {
         L.x[g] = g_place[g].set ? g_place[g].cx * w : def[g][0];
         L.y[g] = g_place[g].set ? g_place[g].cy * h : def[g][1];
         L.k[g] = g_place[g].set ? g_place[g].k : 1.0f;
     }
+    /* The hunting buttons (Mobile, weapon sheathed) take the face buttons'
+     * place: draw (Triangle) above, use (Square) left, kick (Select) right,
+     * the bag (L) below. */
+    const float fo = 0.12f * h * L.k[G_FACE];
+    const float off[4][2] = { { 0, -1.1f }, { -1.2f, 0 }, { 1.2f, 0 }, { 0, 1.1f } };
+    for (int i = 0; i < 4; i++) {
+        const int g = G_DRAW + i;
+        if (g_place[g].set) continue;
+        L.x[g] = L.x[G_FACE] + off[i][0] * fo;
+        L.y[g] = L.y[G_FACE] + off[i][1] * fo;
+    }
+    /* Yes and No on the face buttons' place, the menus' own row above them,
+     * the action button (Talk, an object) above and left, clear of the
+     * hunting buttons. */
+    const float roff[3][2] = { { 0, 0 }, { 0, -2.35f }, { -1.6f, -1.3f } };
+    for (int i = 0; i < 3; i++) {
+        const int g = G_YESNO + i;
+        if (g_place[g].set) continue;
+        L.x[g] = L.x[G_FACE] + roff[i][0] * fo;
+        L.y[g] = L.y[G_FACE] + roff[i][1] * fo;
+    }
+    if (!g_place[G_PICK].set) { L.x[G_PICK] = L.x[G_FACE]; L.y[G_PICK] = L.y[G_FACE]; }   /* amid draw/use/kick/bag */
     return L;
 }
 
@@ -471,17 +501,27 @@ static int hunt_ctx(void) {
  *   Next and detail buttons came and went, Muhammad) */
 enum { UI_PLAY, UI_MENU, UI_TALK, UI_OBJ, UI_WINDOW };
 #define WINDOW_ENTER_MS 120
-#define WINDOW_KEEP_MS 1500
+#define WINDOW_KEEP_MS (MHFU_ADDR_LOBBY_WINDOW ? 250 : 1500)   /* JP/FUC's flag is exact */
 /* The object in reach: its kind (region.h) and a door's destination. */
-enum { OBJ_DOOR = 1, OBJ_GATE = 2, OBJ_TRAINING = 3, OBJ_BOX = 7, OBJ_CHAIR = 8, OBJ_BOARD = 9 };
+enum { OBJ_DOOR = 1, OBJ_GATE = 2, OBJ_TRAINING = 3, OBJ_BOX = 7, OBJ_CHAIR = 8, OBJ_BOARD = 9,
+       OBJ_SUPPLY = 24, OBJ_BED = 30, OBJ_DELIVERY = 33,
+       OBJ_SAVE_BED = 5 };                      /* the house's bed: save the game (Square) */   /* the last three: a quest's base camp (FUC dumps 19:17, 19:47) */
+/* In a quest: only the Supply Box and the Delivery Box, opened with Circle and
+ * only with the weapon sheathed. The lobby's prompt byte stays 0 there, but the
+ * pointer goes back to 0 when the hunter walks off (11 dumps). */
+static int quest_obj(int kind) { return kind == OBJ_SUPPLY || kind == OBJ_DELIVERY || kind == OBJ_BED; }
 static int obj_now(int *kind, int *dest) {
-    if (!psp_read8(MHFU_ADDR_OBJ_PROMPT)) return 0;         /* no prompt shown: the pointer may be stale */
+    const int quest = mhfu_in_quest();
+    if (!quest && !psp_read8(MHFU_ADDR_OBJ_PROMPT)) return 0;   /* no prompt shown: the pointer may be stale */
+    if (quest && hunt_ctx() != CTX_SHEATHED) return 0;
     const uint32_t p = psp_read32(MHFU_ADDR_OBJ_TARGET);
     if (p < 0x08800000u || p > 0x0A000000u - 0x18u) return 0;
     *kind = psp_read8(p + 2) | psp_read8(p + 3) << 8;
     *dest = psp_read8(p + 0x16) | psp_read8(p + 0x17) << 8;
-    return 1;
+    return !quest || quest_obj(*kind);
 }
+/* The button an object takes: Circle for the quest's boxes, else Square. */
+static uint32_t obj_bit(int kind) { return quest_obj(kind) ? PSP_CTRL_CIRCLE : PSP_CTRL_SQUARE; }
 static int ui_ctx(void) {
     if (g_style != STYLE_MOBILE || g_edit) return UI_PLAY;
     const int lobby = mhfu_in_lobby(), quest = mhfu_in_quest();
@@ -496,19 +536,54 @@ static int ui_ctx(void) {
     static int in_window;
     static uint64_t flags_since, flags_last;
     const uint64_t now = SDL_GetTicks();
-    const int held = lobby && !(psp_read8(MHFU_ADDR_HUNTER_FREE) & 0x04);
-    const int flags = held && (psp_read8(MHFU_ADDR_YESNO) || psp_read8(MHFU_ADDR_MESSAGE) ||
-                               psp_read8(MHFU_ADDR_UI_PROMPT) >= 3);
+    const unsigned hold = psp_read8(MHFU_ADDR_HUNTER_FREE);
+    const int held = (lobby || quest) && !(hold & 0x04);
+    /* In a quest a window or a screen (the Supply Box, Abandon Quest, "Quest
+     * Retired", the save question) drops 0x20 as well as 0x04 (0xA4 -> 0x82 /
+     * 0x80; FUC dumps 20:05, 20:58), but so do attacks, dodges and area changes
+     * (Yes/No showed up there): the two window bytes must agree too. */
+    int quest_held = 0;
+    if (quest && !(hold & 0x24)) {
+        const unsigned wa = psp_read8(MHFU_ADDR_QUEST_WIN_A), wb = psp_read8(MHFU_ADDR_QUEST_WIN_B);
+        quest_held = (wa == 2 && wb == 5) || (wa == 10 && wb == 10);
+    }
+    /* The end-of-quest reward screen (Take Reward, Send to Item Box, End) keeps
+     * the hunter "free" and those bytes 0, but sets the prompt byte (4; 0 in
+     * every quest dump without a window): FUC dumps 22:47. 1 and 2 are an
+     * object's prompt (2 seen standing still in a quest): windows are 3 up. */
+    if (quest && psp_read8(MHFU_ADDR_UI_PROMPT) >= 3) quest_held = 1;
+    if (quest && psp_read8(MHFU_ADDR_QUEST_PHASE) == 2) quest_held = 1;   /* the screens after a quest */
+    /* The house's bed (save, "Exit Game?") leaves the lobby's window flag at 0:
+     * the hunter's scripted-act byte tells it, with the hold bit down. */
+    /* Only at that bed (object kind 5) with its prompt gone: the byte is 1 in
+     * other acts too (walking through a door, standing at the bed), and Yes/No
+     * blinked there (phone log 22:20). */
+    int lobby_act = 0;
+    if (lobby && held && psp_read8(MHFU_ADDR_HUNTER_ACT) == 1 && !psp_read8(MHFU_ADDR_OBJ_PROMPT)) {
+        const uint32_t op = psp_read32(MHFU_ADDR_OBJ_TARGET);
+        lobby_act = op >= 0x08800000u && op <= 0x0A000000u - 0x18u &&
+                    (psp_read8(op + 2) | psp_read8(op + 3) << 8) == OBJ_SAVE_BED;
+    }
+    const int flags = lobby_act ||
+                      (MHFU_ADDR_LOBBY_WINDOW && lobby
+                           ? psp_read8(MHFU_ADDR_LOBBY_WINDOW) != 0                /* set from the first word */
+                           : quest ? quest_held
+                                   : held && (psp_read8(MHFU_ADDR_YESNO) || psp_read8(MHFU_ADDR_MESSAGE) ||
+                                              psp_read8(MHFU_ADDR_UI_PROMPT) >= 3));
     if (flags) {
         if (!flags_since) flags_since = now;
         flags_last = now;
         if (now - flags_since >= WINDOW_ENTER_MS) in_window = 1;
     } else flags_since = 0;
-    if (in_window && held && now - flags_last < WINDOW_KEEP_MS) return UI_WINDOW;
+    if (in_window && (quest ? quest_held : held || (MHFU_ADDR_LOBBY_WINDOW && lobby)) && now - flags_last < WINDOW_KEEP_MS)
+        return UI_WINDOW;
     in_window = 0;
-    if (psp_read32(MHFU_ADDR_TALK_TARGET)) return UI_TALK;
+    /* Not in a quest: the pointer was set near a carcass in one set of dumps
+     * (19:28) and stayed 0 at one in another (19:47); carving and gathering
+     * have no flag found yet. */
+    if (!quest && psp_read32(MHFU_ADDR_TALK_TARGET)) return UI_TALK;
     int kind, dest;
-    if (lobby && obj_now(&kind, &dest)) return UI_OBJ;
+    if (obj_now(&kind, &dest)) return UI_OBJ;
     return UI_PLAY;
 }
 /* Portable 2nd G and FUComplete (its English translation) keep the Japanese
@@ -536,8 +611,11 @@ static int ui_ctx_settled(void) {
         pending = -1;
         /* Which flags chose it, to find a wrong one from a phone's log. */
         static const char *const name[] = { "play", "menu", "talk", "object", "window" };
-        printf("touch ui: %s (free %02X yesno %u message %u prompt %u menu %u talk %08X obj %08X objprompt %u)\n",
-               settled >= 0 && settled < 5 ? name[settled] : "?", psp_read8(MHFU_ADDR_HUNTER_FREE),
+        printf("touch ui: %s (qwin %u/%u win %u free %02X yesno %u message %u prompt %u menu %u talk %08X obj %08X objprompt %u)\n",
+               settled >= 0 && settled < 5 ? name[settled] : "?", psp_read8(MHFU_ADDR_QUEST_WIN_A),
+               psp_read8(MHFU_ADDR_QUEST_WIN_B),
+               MHFU_ADDR_LOBBY_WINDOW && mhfu_in_lobby() ? psp_read8(MHFU_ADDR_LOBBY_WINDOW) : 0u,
+               psp_read8(MHFU_ADDR_HUNTER_FREE),
                psp_read8(MHFU_ADDR_YESNO), psp_read8(MHFU_ADDR_MESSAGE), psp_read8(MHFU_ADDR_UI_PROMPT),
                psp_read8(MHFU_ADDR_MENU_OPEN), psp_read32(MHFU_ADDR_TALK_TARGET), psp_read32(MHFU_ADDR_OBJ_TARGET),
                psp_read8(MHFU_ADDR_OBJ_PROMPT));
@@ -550,8 +628,11 @@ static int ui_ctx_settled(void) {
 /* A door's second choice (0 none): the Gathering Hall's entrance also takes
  * Cross, its way out Triangle (FUComplete dumps). */
 static uint32_t obj_extra(int kind, int dest) {
-    if (kind == OBJ_DOOR && dest == 4) return PSP_CTRL_CROSS;
-    if (kind == OBJ_DOOR && dest == 5) return PSP_CTRL_TRIANGLE;
+    /* The prompt byte is 2 at an object with two choices (FUC dumps): the
+     * Gathering Hall's entrance (destination 4) takes Cross, the other doors
+     * Triangle. */
+    if (kind != OBJ_DOOR) return 0;
+    if (psp_read8(MHFU_ADDR_UI_PROMPT) == 2 || dest == 5) return dest == 4 ? PSP_CTRL_CROSS : PSP_CTRL_TRIANGLE;
     return 0;
 }
 /* In the village or the Gathering Hall, outside a quest (Mobile style): no face
@@ -562,15 +643,56 @@ static int lobby_now(void) { return g_style == STYLE_MOBILE && !g_edit && mhfu_i
 
 /* The mobile buttons are on; the editor shows all of them, to place. */
 static int mobile_now(void) { return g_style == STYLE_MOBILE && (g_edit || hunt_ctx() == CTX_DRAWN); }
+static int g_l_held;                                   /* the bag (L toggle), below */
+/* The layout editor's pages (Mobile style): each shows only the buttons that
+ * are on screen together, so nothing is edited under something else. The
+ * order: what a hunter needs first. Legacy PSP has the one page of PSP
+ * buttons. */
+enum { EP_SHEATHED, EP_COMBAT, EP_LOBBY, EP_YESNO, EP_MENUROW, EP_COUNT };
+static const char *const k_edit_page[EP_COUNT] = {
+    "Hunting: weapon sheathed", "Hunting: weapon out (combat)", "Village and Gathering Hall",
+    "Yes / No (dialogs and menus)", "Menu buttons (sort, pages, zoom)" };
+static int g_edit_page, g_edit_list;                   /* the page; its list is open */
+static int edit_page_has(int g) {
+    if (g == G_MENU) return 1;
+    if (g_style != STYLE_MOBILE)
+        return g == G_STICK || g == G_DPAD || g == G_FACE || g == G_L || g == G_R || g == G_SELECT || g == G_START ||
+               g == G_SKILL;
+    switch (g_edit_page) {
+    case EP_SHEATHED: return g == G_STICK || g == G_DRAW || g == G_USE || g == G_KICK || g == G_BAG || g == G_PICK ||
+                             g == G_ROLL;
+    case EP_COMBAT: return g == G_STICK || g == G_ATTACK || g == G_ROLL || g == G_ITEM || g == G_SKILL;
+    case EP_LOBBY: return g == G_STICK || g == G_ACT || g == G_L;
+    case EP_YESNO: return g == G_STICK || g == G_YESNO;
+    case EP_MENUROW: return g == G_YESNO || g == G_EXTRAS;
+    }
+    return 0;
+}
 static int group_shown(int g) {
     if (g == G_RSTICK) return 0;                       /* the camera is a swipe now */
     if (g == G_DPAD && pad_combined()) return 0;       /* it is the stick's ring */
-    if ((g_uictx == UI_MENU || g_uictx == UI_WINDOW) && (g == G_FACE || g == G_L || g == G_R || g == G_SKILL || g == G_ATTACK || g == G_ROLL ||
-                               g == G_ITEM)) return 0;   /* Yes and No instead */
+    const int hunt_new = g == G_DRAW || g == G_USE || g == G_KICK || g == G_BAG || g == G_PICK;
+    const int ctx_group = g == G_YESNO || g == G_EXTRAS || g == G_ACT;
+    if (ctx_group && !g_edit) return 0;               /* placed in the editor; drawn by the context */
+    if (hunt_new && g_style != STYLE_MOBILE) return 0;   /* the Mobile style's own */
+    if (g_edit) return edit_page_has(g) && g != G_RUN;
+    if ((g_uictx == UI_MENU || g_uictx == UI_WINDOW) &&
+        (g == G_FACE || g == G_L || g == G_R || g == G_SKILL || g == G_ATTACK || g == G_ROLL || g == G_ITEM || hunt_new))
+        return 0;                                      /* Yes and No instead */
     if (lobby_now()) {
-        if (g == G_FACE || g == G_R) return 0;
+        if (g == G_FACE || g == G_R || g == G_SELECT || g == G_START || hunt_new) return 0;   /* Select: nothing there; Start: by the menu */
         if (g == G_L) return g_uictx == UI_PLAY && mhfu_adhoc_in_group();
     }
+    if (g_style == STYLE_MOBILE && mhfu_in_quest()) {
+        /* Hunting: no L, R, Select or face buttons; Start sits by the menu
+         * button. Sheathed: draw, use, kick, the bag and Cross (crouch, or a
+         * dodge while running); drawn: the attack pad and its buttons. */
+        if (g == G_L || g == G_R || g == G_SELECT || g == G_START || g == G_FACE) return 0;
+        const int sheathed = hunt_ctx() == CTX_SHEATHED;
+        /* the bag open: only it and its sides (Square, Circle) */
+        if (hunt_new) return sheathed && (g == G_BAG || !g_l_held);
+        if (g == G_ROLL && sheathed) return !g_l_held;
+    } else if (hunt_new) return 0;
     const int m = mobile_now();
     if (g == G_FACE || g == G_DPAD) return !m;
     if (!m) return g != G_ATTACK && g != G_ROLL && g != G_ITEM && g != G_RUN;
@@ -591,7 +713,7 @@ static uint32_t attack_bits(float dx, float dy) {
 /* The pictures on the buttons (icon(), below the layout): no words on them. */
 enum { ICON_CROUCH, ICON_DODGE, ICON_RUN, ICON_SHEATHE, ICON_ITEM, ICON_SWORD, ICON_GUARD, ICON_AIM, ICON_TARGET,
        ICON_DEMON, ICON_SPIRIT, ICON_DANCE, ICON_FADE, ICON_CHARGE, ICON_TALK,
-       ICON_CHEST, ICON_DOOR, ICON_CHAIR, ICON_BOARD, ICON_QUEST, ICON_TRAIN };
+       ICON_CHEST, ICON_DOOR, ICON_CHAIR, ICON_BOARD, ICON_QUEST, ICON_TRAIN, ICON_DELIVERY, ICON_CARVE, ICON_SLEEP, ICON_BAG, ICON_KICK, ICON_CHAT, ICON_DRAW, ICON_USE, ICON_SORT, ICON_DELETE, ICON_ZOOM, ICON_NEEDS, ICON_SAVE, ICON_PICK };
 
 /* The weapon buttons: a column left of the face buttons whose buttons follow
  * the weapon the hunter carries, each holding a PSP combination (the game
@@ -643,6 +765,13 @@ static void pill_size(const layout *L, int g, float *hw, float *hh) {
 }
 
 /* A group's bounds, for the editor. */
+static void yes_pos(const layout *L, float *x, float *y);
+static void no_pos(const layout *L, float *x, float *y);
+static float big_r(const layout *L);
+static float yn_o(const layout *L);
+static float yn_r(const layout *L);
+static float wx_r(const layout *L);
+static float act_r(const layout *L);
 static void group_box(const layout *L, int g, float *x0, float *y0, float *x1, float *y1) {
     float rx, ry;
     switch (g) {
@@ -654,6 +783,17 @@ static void group_box(const layout *L, int g, float *x0, float *y0, float *x1, f
     case G_SKILL: rx = skill_r(L); ry = skill_r(L) * 3.4f; break;      /* room for all three */
     case G_ATTACK: rx = ry = attack_r(L); break;
     case G_ROLL: case G_ITEM: case G_RUN: rx = ry = small_r(L, g); break;
+    case G_DRAW: case G_USE: case G_KICK: case G_BAG: case G_PICK: rx = ry = 0.06f * L->h * L->k[g]; break;
+    case G_YESNO: {
+        float ax, ay, bx2, by2;
+        no_pos(L, &ax, &ay);
+        yes_pos(L, &bx2, &by2);
+        rx = fmaxf(L->x[g] - ax, bx2 - L->x[g]) + big_r(L);
+        ry = yn_o(L) * 1.15f + yn_r(L);
+        break;
+    }
+    case G_EXTRAS: rx = 0.12f * L->h * L->k[g] * 1.3f * 2 + wx_r(L); ry = wx_r(L); break;
+    case G_ACT: rx = act_r(L) * 3.4f; ry = act_r(L); break;
     default: pill_size(L, g, &rx, &ry); break;
     }
     *x0 = L->x[g] - rx; *y0 = L->y[g] - ry; *x1 = L->x[g] + rx; *y1 = L->y[g] + ry;
@@ -664,14 +804,15 @@ static float dist(float ax, float ay, float bx, float by) { return sqrtf((ax - b
 /* Yes and No sit where the face buttons are, No left of Yes; the action button (Talk, an object) a little
  * above the face buttons' middle in the lobby (where they are not), above and
  * left of them in a quest; a door's second choice left of it. */
-static float big_r(const layout *L) { return face_r(L) * 1.35f; }
-static void yes_pos(const layout *L, float *x, float *y) { *x = L->x[G_FACE] + face_o(L) * 0.75f; *y = L->y[G_FACE] + face_o(L) * 0.55f; }
-static void no_pos(const layout *L, float *x, float *y) { *x = L->x[G_FACE] - face_o(L) * 1.35f; *y = L->y[G_FACE] + face_o(L) * 0.55f; }
-static void act_pos(const layout *L, float *x, float *y) {
-    if (lobby_now()) { *x = L->x[G_FACE]; *y = L->y[G_FACE] - face_o(L) * 0.9f; return; }
-    *x = L->x[G_FACE] - face_o(L) * 2.6f; *y = L->y[G_FACE] - face_o(L) * 0.6f;
-}
-static void act2_pos(const layout *L, float *x, float *y) { act_pos(L, x, y); *x -= big_r(L) * 2.3f; }
+static float yn_o(const layout *L) { return 0.12f * L->h * L->k[G_YESNO]; }
+static float yn_r(const layout *L) { return 0.068f * L->h * L->k[G_YESNO]; }
+static float big_r(const layout *L) { return yn_r(L) * 1.35f; }
+static float act_r(const layout *L) { return 0.068f * L->h * L->k[G_ACT] * 1.35f; }
+static float wx_r(const layout *L) { return 0.068f * L->h * L->k[G_EXTRAS]; }
+static void yes_pos(const layout *L, float *x, float *y) { *x = L->x[G_YESNO] + yn_o(L) * 0.75f; *y = L->y[G_YESNO] + yn_o(L) * 0.55f; }
+static void no_pos(const layout *L, float *x, float *y) { *x = L->x[G_YESNO] - yn_o(L) * 1.35f; *y = L->y[G_YESNO] + yn_o(L) * 0.55f; }
+static void act_pos(const layout *L, float *x, float *y) { *x = L->x[G_ACT]; *y = L->y[G_ACT]; }
+static void act2_pos(const layout *L, float *x, float *y) { act_pos(L, x, y); *x -= act_r(L) * 2.3f; }
 /* The object's picture. */
 static int obj_icon(int kind) {
     switch (kind) {
@@ -680,32 +821,159 @@ static int obj_icon(int kind) {
     case OBJ_BOX: return ICON_CHEST;
     case OBJ_CHAIR: return ICON_CHAIR;
     case OBJ_BOARD: return ICON_BOARD;
-    default: return ICON_DOOR;
+    case OBJ_SUPPLY: return ICON_CHEST;
+    case OBJ_DELIVERY: return ICON_DELIVERY;
+    case OBJ_BED: return ICON_SLEEP;
+    case OBJ_SAVE_BED: return ICON_SAVE;
+    default: return -1;                                /* doors: the plain Square mark */
     }
 }
 static int asks_yes_no(void) { return g_uictx == UI_MENU || g_uictx == UI_WINDOW; }
 /* Square (a quest's details) above Yes and No, in the lobby's windows. */
-static void detail_pos(const layout *L, float *x, float *y) { *x = L->x[G_FACE] - face_o(L) * 0.30f; *y = L->y[G_FACE] - face_o(L) * 1.15f; }
+static void detail_pos(const layout *L, float *x, float *y) { *x = L->x[G_YESNO] - yn_o(L) * 0.30f; *y = L->y[G_YESNO] - yn_o(L) * 1.15f; }
+/* Not at a bookshelf (object kind 10): its question takes Yes and No only. */
+static int detail_shown(void) {
+    if (g_uictx != UI_WINDOW) return 0;
+    const uint32_t p = psp_read32(MHFU_ADDR_OBJ_TARGET);
+    if (p < 0x08800000u || p > 0x0A000000u - 0x18u) return 1;
+    const int kind = psp_read8(p + 2) | psp_read8(p + 3) << 8;
+    return kind != 10 && kind != OBJ_SAVE_BED && kind != OBJ_SUPPLY && kind != OBJ_DELIVERY;   /* bookshelf, bed, boxes: Yes and No */
+}
+
+/* Hunting (Mobile): the bag holds L as a toggle (the item bar), with Square
+ * (left) and Circle (right) beside it while held; draw, use and kick are
+ * Triangle, Square and Select; Start sits left of the menu button. */
+static int quest_buttons(void) { return g_style == STYLE_MOBILE && !g_edit && mhfu_in_quest(); }
+/* Start as a round button under the menu button: hunting, the village and the halls (Mobile). */
+static int start_by_menu(void) { return quest_buttons() || lobby_now(); }
+static float hunt_r(const layout *L, int g) { return 0.06f * L->h * L->k[g]; }
+static int g_l_held;
+static int l_toggles(void);
+static int l_side_shown(void) { return g_l_held && l_toggles() && group_shown(G_BAG); }
+static float l_side_r(const layout *L) { return face_r(L) * 0.85f; }
+static void l_side_pos(const layout *L, int right, float *x, float *y) {
+    *x = L->x[G_BAG] + (right ? 1.0f : -1.0f) * (hunt_r(L, G_BAG) + l_side_r(L) * 1.25f);
+    *y = L->y[G_BAG];
+}
+static void qstart_pos(const layout *L, float *x, float *y) { *x = L->x[G_MENU]; *y = L->y[G_MENU] + menu_r(L) * 2.6f; }
+
+/* The item box's sub-menus (JP/FUC, lobby_task's memory; FUC dumps 20:25):
+ * MHFU_ADDR_BOX_SUB is 1 in a sub-menu, 0 on the box's own menu, and
+ * MHFU_ADDR_BOX_KIND tells which: 0 put in (sort, quantity = Triangle), 1 take
+ * out / combine and the like (L, sort, R), 2 change equipment (page back =
+ * Triangle + L, page on = Triangle + R, sort), 4 the equipment sets (delete =
+ * Triangle). Info is the Square already there. (The prompt byte tried first
+ * follows the highlighted line's help text: the buttons blinked.) */
+enum { WX_SORT, WX_PAGE_PREV, WX_PAGE_NEXT, WX_LEFT, WX_RIGHT, WX_DELETE, WX_QTY, WX_ZOOM, WX_NEEDS };
+static int g_win_id;                                     /* 1 + the sub-menu's kind, 0 none */
+/* Which of the box's screens is up (FUC dumps 20:25, 21:04, 21:11): only at
+ * the item box (object kind 6 or 7; a bookshelf's Yes/No got the box's
+ * buttons), in a sub-menu (BOX_SUB), by the box menu's line (BOX_MAIN: 0 put
+ * in, 1 take out, 2 combine, 3 change equipment, 4 arrange, 5 sell) and, under
+ * change equipment, BOX_KIND (2 the equipment list, 4 editing a set; 1 its own
+ * four-line menu). Returns 1 put in, 2 take out / combine, 3 the equipment
+ * list, 4 editing a set, 0 nothing extra. */
+static int box_menu(void) {
+    if (MHFU_ADDR_CRAFT_SCREEN && mhfu_in_lobby()) {     /* the smithy: crafting 6, decorations 7 */
+        const int cs = psp_read8(MHFU_ADDR_CRAFT_SCREEN);
+        if (cs == 2) return 6;
+        if (cs == 5) return 7;
+    }
+    if (!MHFU_ADDR_BOX_SUB || !mhfu_in_lobby() || !psp_read8(MHFU_ADDR_BOX_SUB)) return 0;
+    const uint32_t p = psp_read32(MHFU_ADDR_OBJ_TARGET);
+    if (p < 0x08800000u || p > 0x0A000000u - 0x18u) return 0;
+    const int obj = psp_read8(p + 2) | psp_read8(p + 3) << 8;
+    if (obj != 6 && obj != OBJ_BOX) return 0;
+    const int kind = psp_read8(MHFU_ADDR_BOX_KIND), line = psp_read8(MHFU_ADDR_BOX_MAIN);
+    /* Change equipment, arrange and sell open a choice first (four lines, two
+     * lines) and their list under it: BOX_DEEP is 1 only once the list is up
+     * (the choice showed the list's buttons before). */
+    if (line >= 3 && !psp_read8(MHFU_ADDR_BOX_DEEP)) return 0;
+    switch (line) {
+    case 0: return 1;                                    /* put in */
+    case 1: case 2: case 4: case 5: return 2;            /* take out, combine, arrange, sell: lists */
+    case 3: return kind == 2 ? 3 : kind == 4 ? 4 : 0;    /* the equipment list, editing a set */
+    default: return 0;
+    }
+}
+static int win_extras(int out[6]) {
+    if (g_uictx != UI_WINDOW) return 0;
+    switch (g_win_id) {
+    case 1: out[0] = WX_SORT; out[1] = WX_QTY; return 2;
+    case 2: out[0] = WX_LEFT; out[1] = WX_SORT; out[2] = WX_RIGHT; return 3;
+    case 3: out[0] = WX_PAGE_PREV; out[1] = WX_LEFT; out[2] = WX_SORT; out[3] = WX_RIGHT; out[4] = WX_PAGE_NEXT; return 5;
+    case 4: out[0] = WX_DELETE; return 1;
+    case 6: out[0] = WX_ZOOM; out[1] = WX_NEEDS; return 2;          /* crafting: zoom (L), requirements (R) */
+    case 7: out[0] = WX_LEFT; out[1] = WX_RIGHT; return 2;          /* decorations: pages (L, R) */
+    default: return 0;
+    }
+}
+static uint32_t wx_bits(int k) {
+    switch (k) {
+    case WX_SORT: return PSP_CTRL_SELECT;
+    case WX_PAGE_PREV: return PSP_CTRL_TRIANGLE | PSP_CTRL_LTRIGGER;
+    case WX_PAGE_NEXT: return PSP_CTRL_TRIANGLE | PSP_CTRL_RTRIGGER;
+    case WX_LEFT: return PSP_CTRL_LTRIGGER;
+    case WX_RIGHT: return PSP_CTRL_RTRIGGER;
+    case WX_DELETE: return PSP_CTRL_TRIANGLE;
+    case WX_QTY: return PSP_CTRL_TRIANGLE;
+    case WX_ZOOM: return PSP_CTRL_LTRIGGER;
+    case WX_NEEDS: return PSP_CTRL_RTRIGGER;
+    }
+    return 0;
+}
+static void wx_pos(const layout *L, int i, int n, float *x, float *y) {
+    /* Centred on the face buttons, but a long row (the equipment list's five)
+     * ends at most 1.3 steps right of them: it grows to the left. */
+    const float step = 0.12f * L->h * L->k[G_EXTRAS] * 1.3f, half = (n - 1) / 2.0f * step;
+    *x = L->x[G_EXTRAS] + (i - (n - 1) / 2.0f) * step - (half > step ? half - step : 0.0f);
+    *y = L->y[G_EXTRAS];
+}
 
 /* The control under (x, y), in window pixels. Generous: a thumb is wide. */
 static int hit(const layout *L, float x, float y) {
     if (dist(x, y, L->x[G_MENU], L->y[G_MENU]) < menu_r(L) * 1.4f) return T_MENU;
+    if (mhfu_chat_available() && dist(x, y, L->x[G_MENU], L->y[G_MENU] + menu_r(L) * (start_by_menu() ? 5.2f : 2.6f)) < menu_r(L) * 1.3f)
+        return T_CHAT;
     float bx, by;
     if (asks_yes_no()) {
         yes_pos(L, &bx, &by);
         if (dist(x, y, bx, by) < big_r(L) * 1.25f) return T_YES;
         no_pos(L, &bx, &by);
         if (dist(x, y, bx, by) < big_r(L) * 1.25f) return T_NO;
-        if (g_uictx == UI_WINDOW) {
+        if (detail_shown()) {
             detail_pos(L, &bx, &by);
-            if (dist(x, y, bx, by) < face_r(L) * 1.4f) return T_DETAIL;
+            if (dist(x, y, bx, by) < yn_r(L) * 1.4f) return T_DETAIL;
         }
     } else if (g_uictx == UI_TALK || g_uictx == UI_OBJ) {
         act_pos(L, &bx, &by);
-        if (dist(x, y, bx, by) < big_r(L) * 1.2f) return T_ACT;
+        if (dist(x, y, bx, by) < act_r(L) * 1.2f) return T_ACT;
         if (g_uictx == UI_OBJ && obj_extra(g_obj_kind, g_obj_dest)) {
             act2_pos(L, &bx, &by);
-            if (dist(x, y, bx, by) < big_r(L) * 1.2f) return T_ACT2;
+            if (dist(x, y, bx, by) < act_r(L) * 1.2f) return T_ACT2;
+        }
+    }
+    if (l_side_shown()) {
+        l_side_pos(L, 0, &bx, &by);
+        if (dist(x, y, bx, by) < l_side_r(L) * 1.3f) return T_LLEFT;
+        l_side_pos(L, 1, &bx, &by);
+        if (dist(x, y, bx, by) < l_side_r(L) * 1.3f) return T_LRIGHT;
+    }
+    if (start_by_menu()) {
+        qstart_pos(L, &bx, &by);
+        if (dist(x, y, bx, by) < menu_r(L) * 1.3f) return T_QSTART;
+    }
+    if (quest_buttons()) {
+        static const int hg[5] = { G_DRAW, G_USE, G_KICK, G_BAG, G_PICK }, he[5] = { T_DRAW, T_USE, T_KICK, T_BAG, T_PICK };
+        for (int i = 0; i < 5; i++)
+            if (group_shown(hg[i]) && dist(x, y, L->x[hg[i]], L->y[hg[i]]) < hunt_r(L, hg[i]) * 1.3f) return he[i];
+    }
+    {
+        int wx[6];
+        const int nw = win_extras(wx);
+        for (int i = 0; i < nw; i++) {
+            wx_pos(L, i, nw, &bx, &by);
+            if (dist(x, y, bx, by) < wx_r(L) * 1.25f) return T_WX0 + i;
         }
     }
     static const int pills[4] = { G_L, G_R, G_SELECT, G_START }, pill_elem[4] = { T_L, T_R, T_SELECT, T_START };
@@ -721,6 +989,8 @@ static int hit(const layout *L, float x, float y) {
         if (dist(x, y, L->x[G_ITEM], L->y[G_ITEM]) < small_r(L, G_ITEM) * 1.3f) return T_ITEM;
         if (group_shown(G_RUN) && dist(x, y, L->x[G_RUN], L->y[G_RUN]) < small_r(L, G_RUN) * 1.3f) return T_RUN;
         if (dist(x, y, L->x[G_ATTACK], L->y[G_ATTACK]) < attack_r(L) * 1.15f) return T_ATTACK;
+    } else if (group_shown(G_ROLL) && dist(x, y, L->x[G_ROLL], L->y[G_ROLL]) < small_r(L, G_ROLL) * 1.3f) {
+        return T_ROLL;
     } else if (group_shown(G_RUN) && dist(x, y, L->x[G_RUN], L->y[G_RUN]) < small_r(L, G_RUN) * 1.3f) {
         return T_RUN;
     } else if (group_shown(G_FACE)) {
@@ -764,9 +1034,21 @@ static uint32_t elem_button(int e) {
     case T_RUN: return PSP_CTRL_RTRIGGER;
     case T_YES: return yes_bit();
     case T_NO: return no_bit();
-    case T_ACT: return g_uictx == UI_TALK ? PSP_CTRL_CIRCLE : g_uictx == UI_OBJ ? PSP_CTRL_SQUARE : 0;
+    case T_ACT: return g_uictx == UI_TALK ? PSP_CTRL_CIRCLE : g_uictx == UI_OBJ ? obj_bit(g_obj_kind) : 0;
     case T_ACT2: return g_uictx == UI_OBJ ? obj_extra(g_obj_kind, g_obj_dest) : 0;
-    case T_DETAIL: return g_uictx == UI_WINDOW ? PSP_CTRL_SQUARE : 0;
+    case T_DETAIL: return detail_shown() ? PSP_CTRL_SQUARE : 0;
+    case T_LLEFT: return l_side_shown() ? PSP_CTRL_SQUARE : 0;
+    case T_LRIGHT: return l_side_shown() ? PSP_CTRL_CIRCLE : 0;
+    case T_DRAW: return PSP_CTRL_TRIANGLE;
+    case T_USE: return PSP_CTRL_SQUARE;
+    case T_KICK: return PSP_CTRL_SELECT;
+    case T_PICK: return PSP_CTRL_CIRCLE;   /* gather, carve, pick up */
+    case T_QSTART: return PSP_CTRL_START;
+    case T_WX0: case T_WX1: case T_WX2: case T_WX3: case T_WX4: case T_WX5: {
+        int wx[6];
+        const int nw = win_extras(wx);
+        return e - T_WX0 < nw ? wx_bits(wx[e - T_WX0]) : 0;
+    }
     case T_SKILL0: case T_SKILL1: case T_SKILL2: {
         skill sk[SKILLS];
         return e - T_SKILL0 < skills_now(sk) ? sk[e - T_SKILL0].bits : 0;
@@ -811,7 +1093,21 @@ static int target_pending(void) {
 
 /* The PSP state of every finger, into what the game reads. */
 #define STICK_RUN 0.95f                        /* how far out the stick runs, of its radius */
+/* In a quest (Mobile) L is a toggle: a tap holds it (the item bar, L + Square
+ * to use, L + Circle / Square to pick), another lets go (Muhammad, 2026-11-09). */
+static int l_toggles(void) { return quest_buttons() && hunt_ctx() == CTX_SHEATHED; }
+/* Where the stick at its edge runs: the lobby, and a quest with the weapon
+ * sheathed (drawn, R is the weapon's own: guard, aim, ...). Mobile only. */
+static int stick_runs(void) {
+    if (g_style != STYLE_MOBILE || g_edit) return 0;
+    /* Not while a menu or a window is up: there R is the menu's own (the
+     * smithy's requirements, pages), and the stick only moves the cursor. */
+    if (g_uictx == UI_MENU || g_uictx == UI_WINDOW) return 0;
+    return lobby_now() || (mhfu_in_quest() && hunt_ctx() == CTX_SHEATHED);
+}
 static int g_stick_run;                        /* it does now: its outline glows */
+static uint64_t g_held_elems;                   /* the touch elements a finger is on (T_*) */
+static int elem_held(int e) { return e > 0 && e < 64 && (g_held_elems >> e & 1); }
 static void touch_update(float w, float h) {
     const layout L = layout_for(w, h);
     uint32_t b = 0;
@@ -829,7 +1125,7 @@ static void touch_update(float w, float h) {
             ay = (int)(128 + dy * 127);
             /* In the lobby the stick pushed to its edge runs (holds R): no
              * Run button there (Muhammad, 2026-11-09). */
-            if (m >= STICK_RUN && lobby_now()) { b |= PSP_CTRL_RTRIGGER; run = 1; }
+            if (m >= STICK_RUN && stick_runs()) { b |= PSP_CTRL_RTRIGGER; run = 1; }
         } else if (f->elem == T_ATTACK) {
             const float r = attack_r(&L);
             float dx = (f->x - L.x[G_ATTACK]) / r, dy = (f->y - L.y[G_ATTACK]) / r;
@@ -872,9 +1168,17 @@ static void touch_update(float w, float h) {
             if (f->elem >= T_SKILL0 && f->elem <= T_SKILL2) sd |= 1 << (f->elem - T_SKILL0);
         }
     }
+    if (!l_toggles()) g_l_held = 0;
+    if (g_l_held) b |= PSP_CTRL_LTRIGGER;
     if (g_target_tap_until && SDL_GetTicks() < g_target_tap_until) b |= PSP_CTRL_LTRIGGER | PSP_CTRL_DOWN;
     else g_target_tap_until = 0;
     g_touch_buttons = b;
+    {
+        uint64_t held = 0;
+        for (int i = 0; i < FINGERS; i++)
+            if (g_fingers[i].elem > 0 && g_fingers[i].elem < 64) held |= 1ull << g_fingers[i].elem;
+        g_held_elems = held;
+    }
     g_stick_run = run;
     g_skill_down = sd;
     g_attack_held = atk;
@@ -890,6 +1194,7 @@ static void touch_update(float w, float h) {
 static void touch_release_all(void) {
     memset(g_fingers, 0, sizeof g_fingers);
     g_touch_buttons = 0;
+    g_held_elems = 0;
     g_skill_down = 0;
     g_attack_held = 0;
     g_touch_ax = g_touch_ay = -1;
@@ -905,7 +1210,9 @@ static uint32_t va(int r, int g, int b, int a) { return rgba(r, g, b, a * g_vpad
 static void draw_pill(canvas *c, float s, const layout *L, int g, uint32_t bit, const char *label, uint32_t fillc, uint32_t on, uint32_t line, uint32_t white, float t) {
     float hw, hh;
     pill_size(L, g, &hw, &hh);
-    round_rect(c, (L->x[g] - hw) * s, (L->y[g] - hh) * s, 2 * hw * s, 2 * hh * s, hh * s, g_touch_buttons & bit ? on : fillc, t, line);
+    (void)bit;
+    const int pe = g == G_L ? T_L : g == G_R ? T_R : g == G_SELECT ? T_SELECT : T_START;
+    round_rect(c, (L->x[g] - hw) * s, (L->y[g] - hh) * s, 2 * hw * s, 2 * hh * s, hh * s, elem_held(pe) ? on : fillc, t, line);
     text_centered(c, L->x[g] * s, L->y[g] * s, (int)(hh * (g == G_L || g == G_R ? 1.0f : 0.95f) * s), white, label);
 }
 
@@ -996,7 +1303,10 @@ static const unsigned char k_icon_rgb[][3] = {
     [ICON_DEMON] = { 255, 105, 75 }, [ICON_SPIRIT] = { 130, 210, 255 }, [ICON_DANCE] = { 255, 150, 115 },
     [ICON_FADE] = { 195, 175, 255 }, [ICON_CHARGE] = { 255, 180, 85 }, [ICON_TALK] = { 250, 245, 235 },
     [ICON_CHEST] = { 240, 200, 120 }, [ICON_DOOR] = { 235, 225, 205 }, [ICON_CHAIR] = { 225, 190, 150 },
-    [ICON_BOARD] = { 240, 228, 200 }, [ICON_QUEST] = { 255, 205, 110 }, [ICON_TRAIN] = { 225, 190, 150 },
+    [ICON_BOARD] = { 240, 228, 200 }, [ICON_QUEST] = { 255, 205, 110 }, [ICON_TRAIN] = { 225, 190, 150 }, [ICON_DELIVERY] = { 240, 200, 120 }, [ICON_CARVE] = { 235, 225, 205 }, [ICON_SLEEP] = { 190, 200, 255 }, [ICON_BAG] = { 240, 200, 120 }, [ICON_KICK] = { 235, 225, 205 },
+    [ICON_CHAT] = { 250, 245, 235 }, [ICON_DRAW] = { 250, 245, 235 }, [ICON_USE] = { 150, 235, 170 },
+    [ICON_SORT] = { 235, 225, 205 }, [ICON_DELETE] = { 255, 150, 130 }, [ICON_ZOOM] = { 235, 225, 205 },
+    [ICON_NEEDS] = { 240, 228, 200 }, [ICON_SAVE] = { 150, 205, 255 }, [ICON_PICK] = { 150, 235, 170 },
 };
 static uint32_t icon_col(int which, int a) { return va(k_icon_rgb[which][0], k_icon_rgb[which][1], k_icon_rgb[which][2], a); }
 
@@ -1184,16 +1494,31 @@ static void draw_vpad(canvas *c, float s) {
 #define S(v) ((v) * s)
     /* L, R, Select, Start */
     if (group_shown(G_L)) draw_pill(c, s, &L, G_L, PSP_CTRL_LTRIGGER, "L", fillc, on, line, white, t);
+    if (group_shown(G_SELECT)) draw_pill(c, s, &L, G_SELECT, PSP_CTRL_SELECT, "SELECT", fillc, on, line, white, t);
     if (group_shown(G_R)) draw_pill(c, s, &L, G_R, PSP_CTRL_RTRIGGER, "R", fillc, on, line, white, t);
-    draw_pill(c, s, &L, G_SELECT, PSP_CTRL_SELECT, "SELECT", fillc, on, line, white, t);
-    draw_pill(c, s, &L, G_START, PSP_CTRL_START, "START", fillc, on, line, white, t);
+    if (group_shown(G_START)) draw_pill(c, s, &L, G_START, PSP_CTRL_START, "START", fillc, on, line, white, t);
+    {
+        /* hunting, sheathed: draw (Triangle), use (Square), kick (Select), the bag (L, lit while held) */
+        const struct { int g; uint32_t bit; int pic; } hb[5] = {
+            { G_DRAW, PSP_CTRL_TRIANGLE, ICON_DRAW }, { G_USE, PSP_CTRL_SQUARE, ICON_USE },
+            { G_KICK, PSP_CTRL_SELECT, ICON_KICK }, { G_BAG, PSP_CTRL_LTRIGGER, ICON_BAG },
+            { G_PICK, PSP_CTRL_CIRCLE, ICON_PICK } };
+        for (int i = 0; i < 5; i++) {
+            if (!group_shown(hb[i].g)) continue;
+            const float rr = hunt_r(&L, hb[i].g), cx = L.x[hb[i].g], cy = L.y[hb[i].g];
+            static const int he[5] = { T_DRAW, T_USE, T_KICK, T_BAG, T_PICK };
+            const int lit = hb[i].g == G_BAG ? g_l_held : elem_held(he[i]);
+            round_button(c, S(cx), S(cy), S(rr), lit, hb[i].pic, t, line, fillc);
+            icon(c, S(cx), S(cy), S(rr * 0.58f), hb[i].pic, t * 1.2f, icon_col(hb[i].pic, 235));
+        }
+    }
     /* the d-pad: four arms */
     const float dr = dpad_r(&L), a = dr * 0.30f, len = dr * 0.80f;
     const struct { float ox, oy; uint32_t bit; } arms[4] = {
         { 0, -1, PSP_CTRL_UP }, { 0, 1, PSP_CTRL_DOWN }, { -1, 0, PSP_CTRL_LEFT }, { 1, 0, PSP_CTRL_RIGHT } };
     for (int i = 0; i < 4 && group_shown(G_DPAD); i++) {
         const float cx = L.x[G_DPAD] + arms[i].ox * len, cy = L.y[G_DPAD] + arms[i].oy * len;
-        round_rect(c, S(cx - a), S(cy - a), S(2 * a), S(2 * a), S(a * 0.3f), g_touch_buttons & arms[i].bit ? on : fillc, t, line);
+        round_rect(c, S(cx - a), S(cy - a), S(2 * a), S(2 * a), S(a * 0.3f), elem_held(T_DPAD) && (g_touch_buttons & arms[i].bit) ? on : fillc, t, line);
         const float tx = arms[i].ox, ty = arms[i].oy, px = -ty, py = tx;
         segment(c, S(cx + tx * a * 0.4f), S(cy + ty * a * 0.4f), S(cx - tx * a * 0.2f + px * a * 0.4f), S(cy - ty * a * 0.2f + py * a * 0.4f), t, white);
         segment(c, S(cx + tx * a * 0.4f), S(cy + ty * a * 0.4f), S(cx - tx * a * 0.2f - px * a * 0.4f), S(cy - ty * a * 0.2f - py * a * 0.4f), t, white);
@@ -1210,7 +1535,7 @@ static void draw_vpad(canvas *c, float s) {
         const struct { float deg; uint32_t bit; float dx, dy; } arcs[4] = {
             { -90, PSP_CTRL_UP, 0, -1 }, { 0, PSP_CTRL_RIGHT, 1, 0 }, { 90, PSP_CTRL_DOWN, 0, 1 }, { 180, PSP_CTRL_LEFT, -1, 0 } };
         for (int i = 0; i < 4; i++) {
-            const int lit = (g_touch_buttons & arcs[i].bit) != 0;
+            const int lit = elem_held(T_DPAD) && (g_touch_buttons & arcs[i].bit) != 0;
             if (lit)                                    /* the part held: filled in, the rest plain */
                 for (float a = arcs[i].deg - 45; a < arcs[i].deg + 45; a += 4) {
                     const float r0 = a * 3.14159265f / 180, r1 = (a + 4) * 3.14159265f / 180;
@@ -1219,7 +1544,7 @@ static void draw_vpad(canvas *c, float s) {
                 }
         }
         for (int i = 0; i < 4; i++) {
-            const int lit = (g_touch_buttons & arcs[i].bit) != 0;
+            const int lit = elem_held(T_DPAD) && (g_touch_buttons & arcs[i].bit) != 0;
             const float d = (45.0f + 90.0f * i) * 3.14159265f / 180;      /* the line between two parts */
             segment(c, S(scx + cosf(d) * sr * PAD_INNER), S(scy + sinf(d) * sr * PAD_INNER), S(scx + cosf(d) * sr),
                     S(scy + sinf(d) * sr), t * 0.8f, line);
@@ -1262,19 +1587,34 @@ static void draw_vpad(canvas *c, float s) {
     const float fo = face_o(&L), r = face_r(&L), k = r * 0.42f;
     for (int i = 0; i < 4 && group_shown(G_FACE); i++) {
         const float cx = L.x[G_FACE] + face[i].ox * fo, cy = L.y[G_FACE] + face[i].oy * fo;
-        const int pressed = (g_touch_buttons & face[i].bit) != 0;
+        static const int fe[4] = { T_CROSS, T_CIRCLE, T_SQUARE, T_TRIANGLE };
+        const int pressed = elem_held(fe[i]);
         disc(c, S(cx), S(cy), S(r), pressed ? on : fillc);
         ring(c, S(cx), S(cy), S(r), t, line);
         face_shape(c, S(cx), S(cy), S(k), face[i].shape, t * 1.4f, face[i].tint);
+    }
+    /* L held (item bar): Square (left) and Circle (right) beside it */
+    if (l_side_shown()) {
+        const float lr = l_side_r(&L);
+        for (int k = 0; k < 2; k++) {
+            float lx, ly;
+            l_side_pos(&L, k, &lx, &ly);
+            const int f = k ? 1 : 2;                    /* face[]: 1 Circle, 2 Square */
+            disc(c, S(lx), S(ly), S(lr), elem_held(k ? T_LRIGHT : T_LLEFT) ? on : fillc);
+            ring(c, S(lx), S(ly), S(lr), t, line);
+            face_shape(c, S(lx), S(ly), S(lr * 0.36f), face[f].shape, t * 1.3f, face[f].tint);
+            chevron(c, S(lx + (k ? 1.0f : -1.0f) * lr * 1.45f), S(ly), k ? 1.0f : -1.0f, 0, S(lr * 0.28f), t * 1.2f, white);
+        }
     }
     /* Yes and No (menus, questions, the title screens), Next, or the action
      * button (Talk near an NPC, Square at an object) */
     float bx, by;
     const float br = big_r(&L);
     const uint32_t dark = va(20, 15, 10, 120), green = va(150, 210, 90, 230);
-    if (asks_yes_no()) {
+    const int edit_yn = g_edit && edit_page_has(G_YESNO), edit_act = g_edit && edit_page_has(G_ACT);
+    if (asks_yes_no() || edit_yn) {
         yes_pos(&L, &bx, &by);
-        const int yon = (g_touch_buttons & yes_bit()) != 0, non = (g_touch_buttons & no_bit()) != 0;
+        const int yon = elem_held(T_YES), non = elem_held(T_NO);
         disc(c, S(bx), S(by), S(br), yon ? va(90, 190, 90, 170) : va(20, 15, 10, 110));
         ring(c, S(bx), S(by), S(br), t * 1.6f, va(120, 220, 110, 230));
         ring(c, S(bx), S(by), S(br * 0.82f), t * 0.8f, va(236, 194, 104, 120));
@@ -1286,36 +1626,75 @@ static void draw_vpad(canvas *c, float s) {
         ring(c, S(bx), S(by), S(br * 0.82f), t * 0.8f, va(236, 194, 104, 120));
         segment(c, S(bx - br * 0.32f), S(by - br * 0.32f), S(bx + br * 0.32f), S(by + br * 0.32f), t * 2.4f, white);
         segment(c, S(bx - br * 0.32f), S(by + br * 0.32f), S(bx + br * 0.32f), S(by - br * 0.32f), t * 2.4f, white);
-        if (g_uictx == UI_WINDOW) {
+        int wx[6];
+        int nw = win_extras(wx);
+        if (g_edit && edit_page_has(G_EXTRAS)) {       /* the editor: the longest row, to place */
+            static const int sample[5] = { WX_PAGE_PREV, WX_LEFT, WX_SORT, WX_RIGHT, WX_PAGE_NEXT };
+            nw = 5;
+            for (int i = 0; i < 5; i++) wx[i] = sample[i];
+        }
+        for (int i = 0; i < nw; i++) {
+            /* the menu's own: sort, pages, L/R, delete */
+            float ex, ey;
+            const float er = wx_r(&L);
+            wx_pos(&L, i, nw, &ex, &ey);
+            disc(c, S(ex), S(ey), S(er), elem_held(T_WX0 + i) ? on : dark);
+            ring(c, S(ex), S(ey), S(er), t * 1.3f, line);
+            switch (wx[i]) {
+            case WX_SORT: icon(c, S(ex), S(ey), S(er * 0.55f), ICON_SORT, t, icon_col(ICON_SORT, 235)); break;
+            case WX_DELETE: icon(c, S(ex), S(ey), S(er * 0.55f), ICON_DELETE, t, icon_col(ICON_DELETE, 235)); break;
+            case WX_QTY: face_shape(c, S(ex), S(ey), S(er * 0.40f), face[3].shape, t * 1.4f, face[3].tint); break;
+            case WX_ZOOM: icon(c, S(ex), S(ey), S(er * 0.55f), ICON_ZOOM, t, icon_col(ICON_ZOOM, 235)); break;
+            case WX_NEEDS: icon(c, S(ex), S(ey), S(er * 0.55f), ICON_NEEDS, t, icon_col(ICON_NEEDS, 235)); break;
+            case WX_LEFT: case WX_RIGHT: {
+                const float d = wx[i] == WX_RIGHT ? 1.0f : -1.0f;
+                chevron(c, S(ex), S(ey), d, 0, S(er * 0.32f), t * 1.6f, white);
+                break;
+            }
+            default: {                                  /* pages: two chevrons */
+                const float d = wx[i] == WX_PAGE_NEXT ? 1.0f : -1.0f;
+                chevron(c, S(ex - d * er * 0.2f), S(ey), d, 0, S(er * 0.28f), t * 1.5f, white);
+                chevron(c, S(ex + d * er * 0.2f), S(ey), d, 0, S(er * 0.28f), t * 1.5f, white);
+            }
+            }
+        }
+        if (detail_shown() || edit_yn) {
             /* Square: a quest's details */
-            const float dr = face_r(&L);
+            const float dr = yn_r(&L);
             detail_pos(&L, &bx, &by);
-            disc(c, S(bx), S(by), S(dr), (g_touch_buttons & PSP_CTRL_SQUARE) ? on : dark);
+            disc(c, S(bx), S(by), S(dr), elem_held(T_DETAIL) ? on : dark);
             ring(c, S(bx), S(by), S(dr), t * 1.3f, line);
             face_shape(c, S(bx), S(by), S(dr * 0.42f), face[2].shape, t * 1.6f, face[2].tint);
         }
-    } else if (g_uictx == UI_TALK) {
-        /* Talk: game-icons.net's chat bubble */
+    } else if (g_uictx == UI_TALK || edit_act) {
+        /* Talk: the thought bubble (in the editor too, to place) */
+        const float ar = act_r(&L);
         act_pos(&L, &bx, &by);
-        disc(c, S(bx), S(by), S(br), (g_touch_buttons & PSP_CTRL_CIRCLE) ? on : dark);
-        ring(c, S(bx), S(by), S(br), t * 1.6f, green);
-        icon(c, S(bx), S(by), S(br * 0.55f), ICON_TALK, t * 1.3f, icon_col(ICON_TALK, 240));
+        disc(c, S(bx), S(by), S(ar), elem_held(T_ACT) ? on : dark);
+        ring(c, S(bx), S(by), S(ar), t * 1.6f, green);
+        icon(c, S(bx), S(by), S(ar * 0.55f), ICON_TALK, t * 1.3f, icon_col(ICON_TALK, 240));
+        if (edit_act) {                                /* and where a door's second choice goes */
+            act2_pos(&L, &bx, &by);
+            disc(c, S(bx), S(by), S(ar * 0.8f), dark);
+            ring(c, S(bx), S(by), S(ar * 0.8f), t * 1.4f, face[0].tint);
+            face_shape(c, S(bx), S(by), S(ar * 0.34f), face[0].shape, t * 2.0f, face[0].tint);
+        }
     } else if (g_uictx == UI_OBJ) {
+        const float br = act_r(&L);
         /* Square, with the object's picture; a door's second choice beside it,
          * with its PSP mark */
         act_pos(&L, &bx, &by);
-        disc(c, S(bx), S(by), S(br), (g_touch_buttons & PSP_CTRL_SQUARE) ? on : dark);
+        disc(c, S(bx), S(by), S(br), elem_held(T_ACT) ? on : dark);
         ring(c, S(bx), S(by), S(br), t * 1.6f, green);
         const uint32_t extra = obj_extra(g_obj_kind, g_obj_dest);
-        if (extra) face_shape(c, S(bx), S(by), S(br * 0.40f), face[2].shape, t * 2.0f, face[2].tint);   /* two choices: plain marks */
-        else {
-            const int pic = obj_icon(g_obj_kind);
-            icon(c, S(bx), S(by), S(br * 0.55f), pic, t * 1.3f, icon_col(pic, 240));
-        }
+        const int pic = obj_icon(g_obj_kind);
+        if (extra || pic < 0 || quest_obj(g_obj_kind) == 0 && g_obj_kind == OBJ_DOOR)   /* doors: the plain mark */
+            face_shape(c, S(bx), S(by), S(br * 0.40f), face[2].shape, t * 2.0f, face[2].tint);
+        else icon(c, S(bx), S(by), S(br * 0.55f), pic, t * 1.3f, icon_col(pic, 240));
         if (extra) {
             const int f = extra == PSP_CTRL_CROSS ? 0 : 3;
             act2_pos(&L, &bx, &by);
-            disc(c, S(bx), S(by), S(br * 0.8f), (g_touch_buttons & extra) ? on : dark);
+            disc(c, S(bx), S(by), S(br * 0.8f), elem_held(T_ACT2) ? on : dark);
             ring(c, S(bx), S(by), S(br * 0.8f), t * 1.4f, face[f].tint);
             face_shape(c, S(bx), S(by), S(br * 0.34f), face[f].shape, t * 2.0f, face[f].tint);
         }
@@ -1342,7 +1721,7 @@ static void draw_vpad(canvas *c, float s) {
     {
         /* Cross (Dodge with the weapon out), Square (Sheathe), and Run (R; in
          * the lobby, in place of the R pill) */
-        const int out = 1;
+        const int out = mobile_now() || g_stick_run;      /* drawn or running: dodge; standing: crouch */
         const struct { int g; uint32_t bit; int pic; } sm[3] = {
             { G_ROLL, PSP_CTRL_CROSS, out ? ICON_DODGE : ICON_CROUCH },
             { G_ITEM, PSP_CTRL_SQUARE, out ? ICON_SHEATHE : ICON_ITEM },
@@ -1350,7 +1729,8 @@ static void draw_vpad(canvas *c, float s) {
         for (int i = 0; i < 3; i++) {
             if (!group_shown(sm[i].g)) continue;
             const float rr = small_r(&L, sm[i].g), cx = L.x[sm[i].g], cy = L.y[sm[i].g];
-            round_button(c, S(cx), S(cy), S(rr), (g_touch_buttons & sm[i].bit) != 0, sm[i].pic, t, line, fillc);
+            static const int se[3] = { T_ROLL, T_ITEM, T_RUN };
+            round_button(c, S(cx), S(cy), S(rr), elem_held(se[i]), sm[i].pic, t, line, fillc);
             icon(c, S(cx), S(cy), S(rr * 0.56f), sm[i].pic, t * 1.3f, icon_col(sm[i].pic, 235));
         }
     }
@@ -1376,6 +1756,20 @@ static void draw_menu_button(canvas *c, float s) {
     disc(c, x, y, r, rgba(20, 15, 10, 120));
     ring(c, x, y, r, 2.2f * s, rgba(236, 194, 104, 170));
     for (int i = -1; i <= 1; i++) segment(c, x - r * 0.45f, y + i * r * 0.32f, x + r * 0.45f, y + i * r * 0.32f, 2.4f * s, rgba(250, 245, 235, 210));
+    if (start_by_menu()) {                             /* hunting and the lobby: Start under it (the chat further down) */
+        const float sy = y + r * 2.6f;
+        disc(c, x, sy, r, rgba(20, 15, 10, 120));
+        ring(c, x, sy, r, 2.2f * s, rgba(236, 194, 104, 170));
+        segment(c, x - r * 0.25f, sy - r * 0.38f, x - r * 0.25f, sy + r * 0.38f, 2.6f * s, rgba(250, 245, 235, 220));
+        segment(c, x - r * 0.25f, sy - r * 0.38f, x + r * 0.42f, sy, 2.6f * s, rgba(250, 245, 235, 220));
+        segment(c, x - r * 0.25f, sy + r * 0.38f, x + r * 0.42f, sy, 2.6f * s, rgba(250, 245, 235, 220));
+    }
+    if (mhfu_chat_available()) {                       /* in a room: the chat bubble under them */
+        const float cy = y + r * (start_by_menu() ? 5.2f : 2.6f);
+        disc(c, x, cy, r, rgba(20, 15, 10, 120));
+        ring(c, x, cy, r, 2.2f * s, rgba(236, 194, 104, 170));
+        icon(c, x, cy, r * 0.6f, ICON_CHAT, 2.2f * s, icon_col(ICON_CHAT, 230));
+    }
 }
 
 /* ---- the layout editor ------------------------------------------------------------------
@@ -1398,9 +1792,20 @@ static void edit_toolbar(float w, float h, float *x, float *y, float *bw, float 
     *y = h * 0.035f;
 }
 
+/* The page button under the toolbar, and its list (Mobile style only). */
+static void edit_page_rect(float w, float h, float *x, float *y, float *pw, float *ph) {
+    float tx, ty, bw, bh, gap;
+    edit_toolbar(w, h, &tx, &ty, &bw, &bh, &gap);
+    *pw = h * 1.05f;
+    *ph = bh;
+    *x = (w - *pw) / 2;
+    *y = ty + bh + gap;
+}
+
 static void edit_open(void) {
     g_edit = 1;
     g_edit_sel = -1;
+    g_edit_list = 0;
     g_dragging = 0;
     touch_release_all();
 }
@@ -1433,6 +1838,19 @@ static void edit_touch(const SDL_Event *e, float w, float h) {
     if (e->type == SDL_EVENT_FINGER_DOWN) {
         float tx, ty, bw, bh, gap;
         edit_toolbar(w, h, &tx, &ty, &bw, &bh, &gap);
+        if (g_style == STYLE_MOBILE) {
+            float qx, qy, pw, ph;
+            edit_page_rect(w, h, &qx, &qy, &pw, &ph);
+            if (g_edit_list) {                         /* the open list: pick a page, or close it */
+                for (int i = 0; i < EP_COUNT; i++) {
+                    const float iy = qy + (i + 1) * ph * 1.05f;
+                    if (px >= qx && px < qx + pw && py >= iy && py < iy + ph) { g_edit_page = i; g_edit_sel = -1; }
+                }
+                g_edit_list = 0;
+                return;
+            }
+            if (px >= qx && px < qx + pw && py >= qy && py < qy + ph) { g_edit_list = 1; return; }
+        }
         if (py >= ty && py < ty + bh)
             for (int i = 0; i < E_COUNT; i++) {
                 const float bx = tx + i * (bw + gap);
@@ -1500,8 +1918,28 @@ static void draw_editor(canvas *c, float s) {
         text_centered(c, (bx + bw / 2) * s, (ty + bh / 2) * s, (int)(bh * 0.40f * s),
                       dim ? rgba(150, 140, 120, 255) : rgba(252, 247, 237, 255), k_edit_label[i]);
     }
-    text_centered(c, w / 2 * s, (ty + bh + h * 0.05f) * s, (int)(h * 0.030f * s), rgba(252, 247, 237, 230),
-                  g_edit_sel >= 0 ? "Drag to move it; Smaller and Bigger resize it" : "Touch a control to move or resize it");
+    float hint_y = ty + bh + h * 0.05f;
+    if (g_style == STYLE_MOBILE) {
+        /* the page: a drop-down of the button sets */
+        float qx, qy, pw, ph;
+        edit_page_rect(w, h, &qx, &qy, &pw, &ph);
+        char label[96];
+        snprintf(label, sizeof label, "%s   %s", k_edit_page[g_edit_page], g_edit_list ? "^" : "v");
+        round_rect(c, qx * s, qy * s, pw * s, ph * s, ph / 2 * s, rgba(60, 40, 22, 240), 2 * s, gold);
+        text_centered(c, (qx + pw / 2) * s, (qy + ph / 2) * s, (int)(ph * 0.38f * s), rgba(252, 247, 237, 255), label);
+        hint_y = qy + ph + h * 0.04f;
+        if (g_edit_list)
+            for (int i = 0; i < EP_COUNT; i++) {
+                const float iy = qy + (i + 1) * ph * 1.05f;
+                round_rect(c, qx * s, iy * s, pw * s, ph * s, ph / 2 * s,
+                           i == g_edit_page ? rgba(126, 90, 40, 245) : rgba(30, 23, 17, 245), 2 * s, rgba(126, 98, 54, 255));
+                text_centered(c, (qx + pw / 2) * s, (iy + ph / 2) * s, (int)(ph * 0.38f * s), rgba(252, 247, 237, 255),
+                              k_edit_page[i]);
+            }
+    }
+    if (!g_edit_list)
+        text_centered(c, w / 2 * s, hint_y * s, (int)(h * 0.030f * s), rgba(252, 247, 237, 230),
+                      g_edit_sel >= 0 ? "Drag to move it; Smaller and Bigger resize it" : "Touch a control to move or resize it");
 }
 
 /* ---- the in-game menu: the hunter's settings board -----------------------------------------
@@ -2398,8 +2836,15 @@ static void draw_toast(canvas *c, int x, int y, int w, int h, const toast *t) {
 static char          g_tb_prompt[128], g_tb_text[TEXT_MAX * 4 + 1];
 static int           g_tb_limit;
 static SDL_AtomicInt g_tb_state;                  /* 0 none, 1 open, 2 done, 3 cancelled */
+static float g_tb_draw_k = 1.0f;                  /* the overlay canvas's scale back to window pixels */
+static int   g_tb_started;                         /* the keyboard was asked for this box */
 
 static int utf8_len(const char *s) { int n = 0; while (*s) { utf8_next(&s); n++; } return n; }
+/* Where the box's field and its Send / Close buttons were drawn, in window
+ * pixels (the overlay may be drawn at half size): a phone has no Enter or
+ * Escape, so they are touched; touching the field brings the keyboard back. */
+static float g_tb_hit[3][4];                       /* field, send, close: x, y, w, h */
+static int   g_tb_hit_ok;
 
 static void draw_textbox(canvas *c) {
     const float u = g_ui;
@@ -2416,6 +2861,34 @@ static void draw_textbox(canvas *c) {
     text(c, x + (int)(32 * u), y + (int)(82 * u), (int)(20 * u), rgba(252, 247, 237, 255), shown, w - (int)(64 * u));
     text(c, x + (int)(22 * u), y + (int)(128 * u), (int)(14 * u), rgba(205, 192, 168, 255),
          "Enter: OK    Escape: cancel", w - (int)(44 * u));
+    /* Send and Close, right of the hint */
+    const int bw = (int)(96 * u), bh = (int)(30 * u), by = y + h - bh - (int)(10 * u);
+    const int sx = x + w - (int)(20 * u) - bw, cx = sx - (int)(10 * u) - bw;
+    fill(c, cx, by, bw, bh, rgba(60, 40, 30, 255));
+    frame_rect(c, cx, by, bw, bh, 1, rgba(126, 98, 54, 255));
+    text(c, cx + (int)(22 * u), by + (int)(21 * u), (int)(15 * u), rgba(252, 247, 237, 255), "Close", bw);
+    fill(c, sx, by, bw, bh, rgba(126, 90, 40, 255));
+    frame_rect(c, sx, by, bw, bh, 1, gold);
+    text(c, sx + (int)(26 * u), by + (int)(21 * u), (int)(15 * u), rgba(252, 247, 237, 255), "Send", bw);
+    const float k = g_tb_draw_k;                   /* canvas -> window pixels */
+    const float r[3][4] = { { (float)(x + 20 * u), (float)(y + 52 * u), (float)(w - 40 * u), (float)(44 * u) },
+                            { (float)sx, (float)by, (float)bw, (float)bh }, { (float)cx, (float)by, (float)bw, (float)bh } };
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 4; j++) g_tb_hit[i][j] = r[i][j] * k;
+    g_tb_hit_ok = 1;
+}
+/* A touch on the open box: 1 if it took it. */
+static int textbox_touch(float px, float py) {
+    if (!g_tb_hit_ok) return 0;
+    int which = -1;
+    for (int i = 0; i < 3; i++)
+        if (px >= g_tb_hit[i][0] && px < g_tb_hit[i][0] + g_tb_hit[i][2] && py >= g_tb_hit[i][1] &&
+            py < g_tb_hit[i][1] + g_tb_hit[i][3]) which = i;
+    if (which < 0) return 0;
+    if (which == 0) { SDL_StopTextInput(g_window); SDL_StartTextInput(g_window); return 1; }
+    SDL_SetAtomicInt(&g_tb_state, which == 1 ? 2 : 3);
+    SDL_StopTextInput(g_window);
+    return 1;
 }
 
 /* ---- the room's chat (chat.c) ----------------------------------------------------------
@@ -2526,8 +2999,9 @@ static int overlay_sig_now(overlay_sig *g) {
     g->group = mhfu_adhoc_in_group();
     g->vis = vpad_visible();
     SDL_GetWindowSizeInPixels(g_window, &g->w, &g->h);
-    g->buttons = g_touch_buttons;
+    g->buttons = g_touch_buttons ^ (uint32_t)g_held_elems ^ (uint32_t)(g_held_elems >> 32);
     g->rheld |= g_stick_run << 1;
+    g->okind |= (g_uictx == UI_WINDOW ? box_menu() : 0) << 16;
     return 1;
 }
 
@@ -2535,7 +3009,15 @@ static int compose(void) {
     if (!g_gl) return 0;
     SDL_LockMutex(g_lock);
     g_uictx = ui_ctx_settled();                          /* menu, talk, objects: which buttons show */
-    if (g_uictx == UI_OBJ && !obj_now(&g_obj_kind, &g_obj_dest)) g_obj_kind = g_obj_dest = 0;
+    {
+        const int id = g_uictx == UI_WINDOW ? box_menu() : 0;
+        if (id != g_win_id && id) printf("touch ui: item box screen %d\n", id);
+        g_win_id = id;
+    }
+    if (g_uictx == UI_OBJ) {                             /* the last object in reach: walking off, its */
+        int k, d;                                        /* picture stays until the button goes */
+        if (obj_now(&k, &d)) { g_obj_kind = k; g_obj_dest = d; }
+    }
     float in = 0;
     int showing = toast_phase(SDL_GetTicks(), &in);
     while (showing < 0) {
@@ -2586,12 +3068,22 @@ static int compose(void) {
             fill(&c, 0, 0, fw, fh, rgba(0, 0, 0, 192));
             text(&c, (int)(5 * g_ui), fpx + (int)(2 * g_ui), fpx, rgba(80, 255, 80, 255), line, 0);
         }
-        if (nchat) draw_chat(&c, (int)(6 * g_ui), (int)((fps ? 30 : 8) * g_ui), chat, nchat);
+        if (nchat) {
+            /* under the menu button's row when the touch controls are up */
+            int cx = (int)(6 * g_ui);
+            if (vpad_visible() && !g_menu_open) {     /* right of the menu button's column */
+                const layout ML = layout_for((float)ww, (float)wh);
+                const int right = (int)((ML.x[G_MENU] + menu_r(&ML) * 1.5f) * s);
+                if (right > cx) cx = right;
+            }
+            draw_chat(&c, cx, (int)((fps ? 30 : 8) * g_ui), chat, nchat);
+        }
         if (showing) {
             const int tw = (int)(440 * g_ui), th = (int)(116 * g_ui);
             draw_toast(&c, c.w - tw - (int)(20 * g_ui) + (int)((1 - in) * (tw + 30 * g_ui)), (int)(20 * g_ui), tw, th, &g_toasts[0]);
         }
         if (prog > 0) draw_menu(&c, s, prog);
+        g_tb_draw_k = 1.0f / s;
         if (box) draw_textbox(&c);
         g_ui = ui;
         SDL_UnlockMutex(g_lock);
@@ -2615,6 +3107,7 @@ static int compose(void) {
     }
     if (showing) draw_toast(&c, c.w - tw - (int)(20 * g_ui) + (int)((1 - in) * (tw + 30 * g_ui)), (int)(20 * g_ui), tw, th, &g_toasts[0]);
     if (nchat) draw_chat(&c, (int)(6 * g_ui), chy, chat, nchat);
+    g_tb_draw_k = 1.0f;
     if (box) draw_textbox(&c);
     SDL_UnlockMutex(g_lock);
     psp_render_gl_overlay(c.px, c.w, c.h);
@@ -2989,14 +3482,19 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
     uint64_t last_compose = 0;
     while (!quit) {
         SDL_Event e;
+        if (SDL_GetAtomicInt(&g_tb_state) != 1) g_tb_started = 0;
         if (wait_event(&e, moving ? 16 : g_ui_pending ? 30 : 100)) {
             do {
                 if (e.type == g_ev_window) { make_window(); continue; }
                 if (e.type == g_ev_wake) {
-                    if (SDL_GetAtomicInt(&g_tb_state) == 1 && g_window && !SDL_TextInputActive(g_window)) {
+                    const int tb = SDL_GetAtomicInt(&g_tb_state) == 1;
+                    if (tb && !g_tb_started && g_window) {   /* just opened: the keyboard, even if one was "active" */
                         memset(g_held, 0, sizeof g_held);
                         keys_changed();
+                        g_tb_hit_ok = 0;
+                        if (SDL_TextInputActive(g_window)) SDL_StopTextInput(g_window);
                         SDL_StartTextInput(g_window);
+                        g_tb_started = 1;
                     }
                     moving = 1;
                     continue;
@@ -3031,6 +3529,10 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
                     int ww = 0, wh = 0;
                     SDL_GetWindowSizeInPixels(g_window, &ww, &wh);
                     const float px = e.tfinger.x * ww, py = e.tfinger.y * wh;
+                    if (e.type == SDL_EVENT_FINGER_DOWN && SDL_GetAtomicInt(&g_tb_state) == 1 && textbox_touch(px, py)) {
+                        moving = 1;                     /* Send, Close, or the field (the keyboard again) */
+                        break;
+                    }
                     if (g_edit) {
                         edit_touch(&e, (float)ww, (float)wh);
                         moving = 1;
@@ -3050,11 +3552,18 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
                     if (e.type == SDL_EVENT_FINGER_DOWN && slot < 0 && free_slot >= 0) {
                         const int el = hit(&L, px, py);
                         if (el == T_MENU) { menu_set(1); moving = 1; break; }
+                        if (el == T_CHAT) { mhfu_chat_request(); moving = 1; break; }   /* the room chat */
                         if (px < ww * 0.025f) {          /* the left edge: a swipe opens the drawer */
                             g_fingers[free_slot].id = e.tfinger.fingerID;
                             g_fingers[free_slot].elem = T_EDGE;
                             g_fingers[free_slot].x = px;
                             g_fingers[free_slot].y = py;
+                            break;
+                        }
+                        if (el == T_BAG && l_toggles() && vpad_visible()) {   /* the bag: a toggle, no finger kept */
+                            g_l_held = !g_l_held;
+                            touch_update((float)ww, (float)wh);
+                            moving = 1;
                             break;
                         }
                         if (el && vpad_visible()) {
@@ -3106,6 +3615,10 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
                         break;
                     }
                     if (down && !e.key.repeat && e.key.scancode == SDL_SCANCODE_F3) { g_show_fps = !g_show_fps; moving = 1; break; }
+                    if (down && !e.key.repeat && e.key.scancode == SDL_SCANCODE_F1 && mhfu_chat_available()) {
+                        mhfu_chat_request();                     /* in a room F1 is the chat's */
+                        break;
+                    }
                     if (down && !e.key.repeat && (e.key.scancode == SDL_SCANCODE_AC_BACK || e.key.scancode == SDL_SCANCODE_F1)) {
                         if (g_edit) edit_close();
                         else menu_set(!g_menu_open);
@@ -3143,6 +3656,12 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
         if (now >= next_stats) {
             mhfu_stats_tick(now, g_fps_text, sizeof g_fps_text);
             next_stats = now + 500;
+            moving = 1;
+        }
+        if (g_l_held && !l_toggles() && g_window) {   /* out of the quest: let L go */
+            int ww = 0, wh = 0;
+            SDL_GetWindowSizeInPixels(g_window, &ww, &wh);
+            touch_update((float)ww, (float)wh);
             moving = 1;
         }
         if (ui_ctx_settled() != g_uictx) moving = 1;   /* a menu opened, an NPC came near: other buttons
