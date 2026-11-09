@@ -27,6 +27,7 @@ ICONS = [
     ('FADE', 'lorc/back-forth'),
     ('CHARGE', 'lorc/hammer-drop'),
     ('RUN', 'lorc/run'),
+    ('TALK', 'delapouite/chat-bubble'),
 ]
 URL = 'https://raw.githubusercontent.com/game-icons/icons/master/%s.svg'
 
