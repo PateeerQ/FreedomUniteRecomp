@@ -130,6 +130,16 @@
  * dumps). Not at the heap's usual distance: EU 0x09993C75 (two gate dumps
  * against seven others), JP/FUC 0x0998F9DC (8 object dumps against idle and
  * NPC ones); US by the heap rule, unverified. */
+/* u8 in lobby_task's memory: 1 from the moment a dialog, a question or a menu
+ * opens (the NPC's first words already) until it closes; 0 when free, also
+ * while running. FUC dumps: 19 of 2026-11-09 13:53-14:07 and 4 of 19:14 (idle,
+ * near an NPC, the first words, all words). Not found for EU/US yet (0: the
+ * hold bit and the question/message flags are used there). */
+#if MHFU_REGION_JP || MHFU_REGION_FUC
+#define MHFU_ADDR_LOBBY_WINDOW  0x09B0AC40u
+#else
+#define MHFU_ADDR_LOBBY_WINDOW  0u
+#endif
 #if MHFU_REGION_JP || MHFU_REGION_FUC
 #define MHFU_ADDR_OBJ_PROMPT    0x0998F9DCu
 #elif MHFU_IS_US
