@@ -34,8 +34,6 @@ ICONS = [
     ('BOARD', 'lorc/scroll-unfurled'),
     ('QUEST', 'lorc/crossed-swords'),
     ('TRAIN', 'lorc/target-dummy'),
-    ('DETAIL', 'lorc/magnifying-glass'),
-    ('NEXT', 'delapouite/next-button'),
 ]
 URL = 'https://raw.githubusercontent.com/game-icons/icons/master/%s.svg'
 
