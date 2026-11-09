@@ -2,9 +2,11 @@
 #include "chat.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "input.h"
+#include "keys.h"
 #include "lobby.h"
 #include "window.h"
 #include "net/client.h"
@@ -15,6 +17,25 @@ static int  g_open;             /* the chat box is up */
 static int  g_was_online;
 static char g_code[8];
 static int  g_roll_call;        /* frames until "In the room: ..." (the hub names them first) */
+static volatile int g_request;  /* the chat key or bubble was pressed */
+
+void mhfu_chat_request(void) { g_request = 1; }
+int mhfu_chat_available(void) { return mhn_client_online(); }
+
+/* MHFU_CHAT_KEY names the key as input.ini does (default f1). */
+static const char *chat_key_name(void) {
+    const char *k = getenv("MHFU_CHAT_KEY");
+    return k && k[0] && mhfu_keys_vk(k) >= 0 ? k : "f1";
+}
+int mhfu_chat_key_vk(void) { return mhfu_keys_vk(chat_key_name()); }
+const char *mhfu_chat_key_label(void) {
+    static char label[24];
+    const char *k = chat_key_name();
+    size_t i = 0;
+    for (; k[i] && i + 1 < sizeof label; i++) label[i] = (char)(k[i] >= 'a' && k[i] <= 'z' ? k[i] - 32 : k[i]);
+    label[i] = 0;
+    return label;
+}
 
 /* UTF-16 (the text box's) into UTF-8. */
 static void to_utf8(const uint16_t *in, char *out, size_t cap) {
@@ -101,7 +122,11 @@ uint32_t mhfu_chat_buttons(uint32_t buttons, uint8_t *ax, uint8_t *ay) {
         if (online) {
             memcpy(g_code, code, sizeof g_code);
             char hint[96];
-            snprintf(hint, sizeof hint, "Room %s: press SELECT to chat", g_code);
+#ifdef __ANDROID__
+            snprintf(hint, sizeof hint, "Room %s: tap the chat bubble (top) to chat", g_code);
+#else
+            snprintf(hint, sizeof hint, "Room %s: press %s to chat", g_code, mhfu_chat_key_label());
+#endif
             mhfu_window_chat("", hint, 2);
             g_roll_call = 60;                           /* 2 s of game frames */
         } else {
@@ -137,15 +162,14 @@ uint32_t mhfu_chat_buttons(uint32_t buttons, uint8_t *ax, uint8_t *ay) {
         return 0;                                       /* this frame too: Enter may still be down */
     }
 
+    const int pressed = g_request;
+    g_request = 0;
     if (!online) return buttons;
-    static uint32_t held;
-    const int pressed = (buttons & PSP_CTRL_SELECT) && !(held & PSP_CTRL_SELECT);
-    held = buttons;
     if (pressed) {
         char prompt[64];
         snprintf(prompt, sizeof prompt, "Chat: room %s (Enter sends, Esc cancels)", g_code);
         static const uint16_t empty[1] = { 0 };
         if (mhfu_window_ask_text(prompt, empty, CHAT_CHARS) == 0) g_open = 1;
     }
-    return buttons & ~PSP_CTRL_SELECT;                  /* in a room, Select is the chat's */
+    return buttons;                                     /* Select stays the game's: it kicks */
 }
