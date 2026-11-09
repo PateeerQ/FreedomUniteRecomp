@@ -1,7 +1,7 @@
 """Builds host/touch_icons.h: the touch buttons' pictures as 64x64 alpha masks.
 
 The pictures are from game-icons.net (https://game-icons.net), CC BY 3.0, by
-Lorc (https://lorcblog.blogspot.com) and Delapouite (https://delapouite.com);
+Lorc (https://lorcblog.blogspot.com), Delapouite (https://delapouite.com) and SeregaCthtuf;
 host/about.h credits them. Each is its SVG's white path, rasterised here
 (4x supersampled, even-odd fill).
 
@@ -16,7 +16,7 @@ SIZE = 64
 # ICON_* name in host/window_sdl.c -> author/name in github.com/game-icons/icons
 ICONS = [
     ('SWORD', 'lorc/broadsword'),
-    ('DODGE', 'lorc/dodging'),
+    ('DODGE', 'lorc/sprint'),
     ('SHEATHE', 'delapouite/scabbard'),
     ('GUARD', 'lorc/bordered-shield'),
     ('AIM', 'delapouite/crosshair'),
@@ -27,13 +27,28 @@ ICONS = [
     ('FADE', 'lorc/back-forth'),
     ('CHARGE', 'lorc/hammer-drop'),
     ('RUN', 'lorc/run'),
-    ('TALK', 'delapouite/chat-bubble'),
+    ('TALK', 'seregacthtuf/thought-bubble'),
     ('CHEST', 'delapouite/chest'),
     ('DOOR', 'delapouite/exit-door'),
     ('CHAIR', 'delapouite/wooden-chair'),
     ('BOARD', 'lorc/scroll-unfurled'),
     ('QUEST', 'lorc/crossed-swords'),
     ('TRAIN', 'lorc/target-dummy'),
+    ('DELIVERY', 'delapouite/hand-truck'),
+    ('CARVE', 'lorc/meat-cleaver'),
+    ('CROUCH', 'delapouite/rubber-boot'),
+    ('SLEEP', 'delapouite/sleeping-bag'),
+    ('BAG', 'delapouite/backpack'),
+    ('KICK', 'lorc/boot-kick'),
+    ('CHAT', 'lorc/conversation'),
+    ('DRAW', 'delapouite/sword-brandish'),
+    ('USE', 'delapouite/drinking'),
+    ('SORT', 'lorc/cycle'),
+    ('DELETE', 'delapouite/trash-can'),
+    ('ZOOM', 'lorc/magnifying-glass'),
+    ('NEEDS', 'lorc/papers'),
+    ('SAVE', 'delapouite/save'),
+    ('PICK', 'quoting/card-pickup'),
 ]
 URL = 'https://raw.githubusercontent.com/game-icons/icons/master/%s.svg'
 
