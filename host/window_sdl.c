@@ -519,7 +519,19 @@ static int ui_ctx_settled(void) {
     if (now_ctx == settled) { pending = -1; return settled; }
     if (g_edit || g_style != STYLE_MOBILE) { pending = -1; return settled = now_ctx; }
     if (now_ctx != pending) { pending = now_ctx; since = now; }
-    else if (now - since >= UI_SETTLE_MS) { settled = now_ctx; pending = -1; return settled; }
+    else if (now - since >= UI_SETTLE_MS) {
+        settled = now_ctx;
+        pending = -1;
+        /* Which flags chose it, to find a wrong one from a phone's log. */
+        static const char *const name[] = { "play", "menu", "talk", "object", "window" };
+        printf("touch ui: %s (free %02X yesno %u message %u prompt %u menu %u talk %08X obj %08X objprompt %u)\n",
+               settled >= 0 && settled < 5 ? name[settled] : "?", psp_read8(MHFU_ADDR_HUNTER_FREE),
+               psp_read8(MHFU_ADDR_YESNO), psp_read8(MHFU_ADDR_MESSAGE), psp_read8(MHFU_ADDR_UI_PROMPT),
+               psp_read8(MHFU_ADDR_MENU_OPEN), psp_read32(MHFU_ADDR_TALK_TARGET), psp_read32(MHFU_ADDR_OBJ_TARGET),
+               psp_read8(MHFU_ADDR_OBJ_PROMPT));
+        fflush(stdout);
+        return settled;
+    }
     g_ui_pending = 1;
     return settled;
 }
@@ -1705,13 +1717,14 @@ static void menu_steps(const menu_geom *g, float y, float *mx, float *px, float 
     *bs = g->row * 0.66f;
     *by = y + (g->row - *bs) / 2;
     *px = g->lx + g->lw - g->pad * 0.5f - *bs;
-    *mx = *px - g->row * 1.7f - *bs;
+    *mx = *px - g->row * 2.6f - *bs;
 }
 
 /* In window pixels, onto the half-size canvas. */
 #define MS(v) ((int)((v) * s))
 static void wfill(canvas *c, float s, float x, float y, float w, float h, uint32_t col) {
-    fill(c, MS(x), MS(y), MS(x + w) - MS(x), MS(y + h) - MS(y), col);
+    const int iw = MS(x + w) - MS(x), ih = MS(y + h) - MS(y);
+    fill(c, MS(x), MS(y), iw < 1 && w > 0 ? 1 : iw, ih < 1 && h > 0 ? 1 : ih, col);
 }
 static void wframe(canvas *c, float s, float x, float y, float w, float h, uint32_t col, int studs) {
     const int t = s >= 1 ? 2 : 1;
