@@ -12,4 +12,7 @@ void mhfu_adhoc_register(void);
  * whatever happened since (connected, scan done, ...). */
 void mhfu_adhoc_tick(void);
 
+/* 1 while the game is in an ad hoc group (the Online Gathering Hall). */
+int mhfu_adhoc_in_group(void);
+
 #endif
