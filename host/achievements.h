@@ -25,4 +25,20 @@ void mhfu_ach_logout(void);
 /* Who is signed in (the display name), or "". */
 const char *mhfu_ach_user(void);
 
+/* The set, for the in-game menu's Achievements page. */
+typedef struct {
+    int state;                         /* 0 signed out, 1 loading, 2 loaded */
+    char title[128];
+    unsigned unlocked, total, points, points_total;
+} mhfu_ach_game;
+typedef struct {
+    unsigned id, points;
+    int unlocked;
+    char title[128], desc[256], progress[24];
+    char badge[640];                   /* the badge's PNG in the cache; it may not be there yet */
+} mhfu_ach_item;
+/* Fills *game and up to `cap` achievements (unlocked first); returns how many.
+ * The first call after the set loads fetches the badges in the background. */
+int mhfu_ach_items(mhfu_ach_game *game, mhfu_ach_item *out, int cap);
+
 #endif
