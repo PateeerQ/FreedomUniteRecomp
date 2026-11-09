@@ -464,13 +464,14 @@ static int hunt_ctx(void) {
  * - UI_TALK: an NPC in reach: a Talk button
  * - UI_OBJ: an object in reach: Square with the object's picture, and a
  *   second choice at some doors
- * - in the lobby while a window is open: UI_YESNO (Yes, No, and Square for a
- *   quest's details), UI_NEXT (one button: Next or Close), UI_LIST (a menu
- *   or list: Yes, No, Square) */
-enum { UI_PLAY, UI_MENU, UI_TALK, UI_OBJ, UI_NEXT, UI_YESNO, UI_LIST };
+ * - UI_WINDOW: in the lobby while a window, a question or a message is open:
+ *   Yes, No and Square (a quest's details), always the same three (separate
+ *   Next and detail buttons came and went, Muhammad) */
+enum { UI_PLAY, UI_MENU, UI_TALK, UI_OBJ, UI_WINDOW };
 /* The object in reach: its kind (region.h) and a door's destination. */
 enum { OBJ_DOOR = 1, OBJ_GATE = 2, OBJ_TRAINING = 3, OBJ_BOX = 7, OBJ_CHAIR = 8, OBJ_BOARD = 9 };
 static int obj_now(int *kind, int *dest) {
+    if (!psp_read8(MHFU_ADDR_OBJ_PROMPT)) return 0;         /* no prompt shown: the pointer may be stale */
     const uint32_t p = psp_read32(MHFU_ADDR_OBJ_TARGET);
     if (p < 0x08800000u || p > 0x0A000000u - 0x18u) return 0;
     *kind = psp_read8(p + 2) | psp_read8(p + 3) << 8;
@@ -482,11 +483,11 @@ static int ui_ctx(void) {
     const int lobby = mhfu_in_lobby(), quest = mhfu_in_quest();
     if (!lobby && !quest) return UI_MENU;                   /* title, character select, options */
     if (psp_read8(MHFU_ADDR_MENU_OPEN)) return UI_MENU;
-    if (lobby && !(psp_read8(MHFU_ADDR_HUNTER_FREE) & 0x04)) {
-        if (psp_read8(MHFU_ADDR_YESNO)) return UI_YESNO;
-        if (psp_read8(MHFU_ADDR_MESSAGE)) return UI_NEXT;
-        return UI_LIST;
-    }
+    /* a window is open: the hunter is held (that bit also drops while running)
+     * and a question, a message or a menu (prompt id 3 and up) is up */
+    if (lobby && !(psp_read8(MHFU_ADDR_HUNTER_FREE) & 0x04) &&
+        (psp_read8(MHFU_ADDR_YESNO) || psp_read8(MHFU_ADDR_MESSAGE) || psp_read8(MHFU_ADDR_UI_PROMPT) >= 3))
+        return UI_WINDOW;
     if (psp_read32(MHFU_ADDR_TALK_TARGET)) return UI_TALK;
     int kind, dest;
     if (lobby && obj_now(&kind, &dest)) return UI_OBJ;
@@ -531,12 +532,12 @@ static int mobile_now(void) { return g_style == STYLE_MOBILE && (g_edit || hunt_
 static int group_shown(int g) {
     if (g == G_RSTICK) return 0;                       /* the camera is a swipe now */
     if (g == G_DPAD && pad_combined()) return 0;       /* it is the stick's ring */
-    if (g_uictx == UI_MENU && (g == G_FACE || g == G_L || g == G_R || g == G_SKILL || g == G_ATTACK || g == G_ROLL ||
+    if ((g_uictx == UI_MENU || g_uictx == UI_WINDOW) && (g == G_FACE || g == G_L || g == G_R || g == G_SKILL || g == G_ATTACK || g == G_ROLL ||
                                g == G_ITEM)) return 0;   /* Yes and No instead */
     if (lobby_now()) {
         if (g == G_FACE || g == G_R) return 0;
         if (g == G_L) return g_uictx == UI_PLAY && mhfu_adhoc_in_group();
-        if (g == G_RUN) return g_uictx == UI_PLAY;
+        if (g == G_RUN) return g_uictx != UI_MENU && g_uictx != UI_WINDOW;   /* hidden only while Yes and No show */
     }
     const int m = mobile_now();
     if (g == G_FACE || g == G_DPAD) return !m;
@@ -558,7 +559,7 @@ static uint32_t attack_bits(float dx, float dy) {
 /* The pictures on the buttons (icon(), below the layout): no words on them. */
 enum { ICON_CROUCH, ICON_DODGE, ICON_RUN, ICON_SHEATHE, ICON_ITEM, ICON_SWORD, ICON_GUARD, ICON_AIM, ICON_TARGET,
        ICON_DEMON, ICON_SPIRIT, ICON_DANCE, ICON_FADE, ICON_CHARGE, ICON_TALK,
-       ICON_CHEST, ICON_DOOR, ICON_CHAIR, ICON_BOARD, ICON_QUEST, ICON_TRAIN, ICON_DETAIL, ICON_NEXT };
+       ICON_CHEST, ICON_DOOR, ICON_CHAIR, ICON_BOARD, ICON_QUEST, ICON_TRAIN };
 
 /* The weapon buttons: a column left of the face buttons whose buttons follow
  * the weapon the hunter carries, each holding a PSP combination (the game
@@ -628,14 +629,12 @@ static void group_box(const layout *L, int g, float *x0, float *y0, float *x1, f
 
 static float dist(float ax, float ay, float bx, float by) { return sqrtf((ax - bx) * (ax - bx) + (ay - by) * (ay - by)); }
 
-/* Yes and No sit where the face buttons are, No left of Yes, Square (a
- * quest's details) above them; the action button (Talk, an object) a little
+/* Yes and No sit where the face buttons are, No left of Yes; the action button (Talk, an object) a little
  * above the face buttons' middle in the lobby (where they are not), above and
  * left of them in a quest; a door's second choice left of it. */
 static float big_r(const layout *L) { return face_r(L) * 1.35f; }
 static void yes_pos(const layout *L, float *x, float *y) { *x = L->x[G_FACE] + face_o(L) * 0.75f; *y = L->y[G_FACE] + face_o(L) * 0.55f; }
 static void no_pos(const layout *L, float *x, float *y) { *x = L->x[G_FACE] - face_o(L) * 1.35f; *y = L->y[G_FACE] + face_o(L) * 0.55f; }
-static void detail_pos(const layout *L, float *x, float *y) { *x = L->x[G_FACE] - face_o(L) * 0.30f; *y = L->y[G_FACE] - face_o(L) * 1.15f; }
 static void act_pos(const layout *L, float *x, float *y) {
     if (lobby_now()) { *x = L->x[G_FACE]; *y = L->y[G_FACE] - face_o(L) * 0.9f; return; }
     *x = L->x[G_FACE] - face_o(L) * 2.6f; *y = L->y[G_FACE] - face_o(L) * 0.6f;
@@ -652,7 +651,9 @@ static int obj_icon(int kind) {
     default: return ICON_DOOR;
     }
 }
-static int asks_yes_no(void) { return g_uictx == UI_MENU || g_uictx == UI_YESNO || g_uictx == UI_LIST; }
+static int asks_yes_no(void) { return g_uictx == UI_MENU || g_uictx == UI_WINDOW; }
+/* Square (a quest's details) above Yes and No, in the lobby's windows. */
+static void detail_pos(const layout *L, float *x, float *y) { *x = L->x[G_FACE] - face_o(L) * 0.30f; *y = L->y[G_FACE] - face_o(L) * 1.15f; }
 
 /* The control under (x, y), in window pixels. Generous: a thumb is wide. */
 static int hit(const layout *L, float x, float y) {
@@ -663,13 +664,10 @@ static int hit(const layout *L, float x, float y) {
         if (dist(x, y, bx, by) < big_r(L) * 1.25f) return T_YES;
         no_pos(L, &bx, &by);
         if (dist(x, y, bx, by) < big_r(L) * 1.25f) return T_NO;
-        if (g_uictx != UI_MENU) {
+        if (g_uictx == UI_WINDOW) {
             detail_pos(L, &bx, &by);
-            if (dist(x, y, bx, by) < face_r(L) * 1.3f) return T_DETAIL;
+            if (dist(x, y, bx, by) < face_r(L) * 1.4f) return T_DETAIL;
         }
-    } else if (g_uictx == UI_NEXT) {
-        yes_pos(L, &bx, &by);
-        if (dist(x, y, bx, by) < big_r(L) * 1.3f) return T_ACT;
     } else if (g_uictx == UI_TALK || g_uictx == UI_OBJ) {
         act_pos(L, &bx, &by);
         if (dist(x, y, bx, by) < big_r(L) * 1.2f) return T_ACT;
@@ -685,7 +683,7 @@ static int hit(const layout *L, float x, float y) {
         pill_size(L, pills[i], &hw, &hh);
         if (fabsf(x - L->x[pills[i]]) < hw * 1.1f && fabsf(y - L->y[pills[i]]) < hh * 1.6f) return pill_elem[i];
     }
-    const int m = mobile_now() && g_uictx != UI_MENU;
+    const int m = mobile_now() && !asks_yes_no();
     if (m) {
         if (dist(x, y, L->x[G_ROLL], L->y[G_ROLL]) < small_r(L, G_ROLL) * 1.3f) return T_ROLL;
         if (dist(x, y, L->x[G_ITEM], L->y[G_ITEM]) < small_r(L, G_ITEM) * 1.3f) return T_ITEM;
@@ -734,9 +732,9 @@ static uint32_t elem_button(int e) {
     case T_RUN: return PSP_CTRL_RTRIGGER;
     case T_YES: return yes_bit();
     case T_NO: return no_bit();
-    case T_ACT: return g_uictx == UI_TALK ? PSP_CTRL_CIRCLE : g_uictx == UI_OBJ ? PSP_CTRL_SQUARE : g_uictx == UI_NEXT ? yes_bit() : 0;
+    case T_ACT: return g_uictx == UI_TALK ? PSP_CTRL_CIRCLE : g_uictx == UI_OBJ ? PSP_CTRL_SQUARE : 0;
     case T_ACT2: return g_uictx == UI_OBJ ? obj_extra(g_obj_kind, g_obj_dest) : 0;
-    case T_DETAIL: return g_uictx == UI_YESNO || g_uictx == UI_LIST ? PSP_CTRL_SQUARE : 0;
+    case T_DETAIL: return g_uictx == UI_WINDOW ? PSP_CTRL_SQUARE : 0;
     case T_SKILL0: case T_SKILL1: case T_SKILL2: {
         skill sk[SKILLS];
         return e - T_SKILL0 < skills_now(sk) ? sk[e - T_SKILL0].bits : 0;
@@ -961,7 +959,6 @@ static const unsigned char k_icon_rgb[][3] = {
     [ICON_FADE] = { 195, 175, 255 }, [ICON_CHARGE] = { 255, 180, 85 }, [ICON_TALK] = { 250, 245, 235 },
     [ICON_CHEST] = { 240, 200, 120 }, [ICON_DOOR] = { 235, 225, 205 }, [ICON_CHAIR] = { 225, 190, 150 },
     [ICON_BOARD] = { 240, 228, 200 }, [ICON_QUEST] = { 255, 205, 110 }, [ICON_TRAIN] = { 225, 190, 150 },
-    [ICON_DETAIL] = { 245, 155, 215 }, [ICON_NEXT] = { 250, 245, 235 },
 };
 static uint32_t icon_col(int which, int a) { return va(k_icon_rgb[which][0], k_icon_rgb[which][1], k_icon_rgb[which][2], a); }
 
@@ -1167,22 +1164,20 @@ static void draw_vpad(canvas *c, float s) {
     const float sr = stick_r(&L);
     const float scx = L.x[G_STICK], scy = L.y[G_STICK];
     if (pad_combined()) {
-        /* the d-pad ring: four arcs (up, right, down, left), each lit while its
-         * direction is held, a chevron on each, then the stick's well inside */
+        /* the d-pad ring: plain, four parts (up, right, down, left) parted by
+         * thin lines on the diagonals, a chevron on each (filled in while its
+         * direction is held), then the stick's well inside */
         const float mid = sr * (1.0f + PAD_INNER) / 2, band = sr * (1.0f - PAD_INNER) * 0.86f;
         disc(c, S(scx), S(scy), S(sr), fillc);
         const struct { float deg; uint32_t bit; float dx, dy; } arcs[4] = {
             { -90, PSP_CTRL_UP, 0, -1 }, { 0, PSP_CTRL_RIGHT, 1, 0 }, { 90, PSP_CTRL_DOWN, 0, 1 }, { 180, PSP_CTRL_LEFT, -1, 0 } };
         for (int i = 0; i < 4; i++) {
             const int lit = (g_touch_buttons & arcs[i].bit) != 0;
-            const uint32_t col = lit ? on : va(236, 194, 104, 40);
-            for (float a = arcs[i].deg - 38; a < arcs[i].deg + 38; a += 4) {
-                const float r0 = a * 3.14159265f / 180, r1 = (a + 4) * 3.14159265f / 180;
-                segment(c, S(scx + cosf(r0) * mid), S(scy + sinf(r0) * mid), S(scx + cosf(r1) * mid), S(scy + sinf(r1) * mid),
-                        S(band), col);
-            }
-            chevron(c, S(scx + arcs[i].dx * mid), S(scy + arcs[i].dy * mid), arcs[i].dx, arcs[i].dy, S(band * 0.30f), t,
-                    lit ? va(40, 30, 20, 230) : white);
+            const float d = (45.0f + 90.0f * i) * 3.14159265f / 180;      /* the line between two parts */
+            segment(c, S(scx + cosf(d) * sr * PAD_INNER), S(scy + sinf(d) * sr * PAD_INNER), S(scx + cosf(d) * sr),
+                    S(scy + sinf(d) * sr), t * 0.8f, line);
+            chevron(c, S(scx + arcs[i].dx * mid), S(scy + arcs[i].dy * mid), arcs[i].dx, arcs[i].dy, S(band * 0.30f),
+                    lit ? t * 2.0f : t, white);
         }
         ring(c, S(scx), S(scy), S(sr), t, line);
         disc(c, S(scx), S(scy), S(sr * PAD_INNER), va(12, 9, 6, 120));
@@ -1238,19 +1233,14 @@ static void draw_vpad(canvas *c, float s) {
         ring(c, S(bx), S(by), S(br * 0.82f), t * 0.8f, va(236, 194, 104, 120));
         segment(c, S(bx - br * 0.32f), S(by - br * 0.32f), S(bx + br * 0.32f), S(by + br * 0.32f), t * 2.4f, white);
         segment(c, S(bx - br * 0.32f), S(by + br * 0.32f), S(bx + br * 0.32f), S(by - br * 0.32f), t * 2.4f, white);
-        if (g_uictx != UI_MENU) {
-            /* Square: the quest's details */
+        if (g_uictx == UI_WINDOW) {
+            /* Square: a quest's details */
             const float dr = face_r(&L);
             detail_pos(&L, &bx, &by);
             disc(c, S(bx), S(by), S(dr), (g_touch_buttons & PSP_CTRL_SQUARE) ? on : dark);
-            ring(c, S(bx), S(by), S(dr), t * 1.3f, face[2].tint);
-            icon(c, S(bx), S(by), S(dr * 0.55f), ICON_DETAIL, t, icon_col(ICON_DETAIL, 235));
+            ring(c, S(bx), S(by), S(dr), t * 1.3f, line);
+            face_shape(c, S(bx), S(by), S(dr * 0.42f), face[2].shape, t * 1.6f, face[2].tint);
         }
-    } else if (g_uictx == UI_NEXT) {
-        yes_pos(&L, &bx, &by);
-        disc(c, S(bx), S(by), S(br), (g_touch_buttons & yes_bit()) ? on : dark);
-        ring(c, S(bx), S(by), S(br), t * 1.6f, green);
-        icon(c, S(bx), S(by), S(br * 0.5f), ICON_NEXT, t * 1.3f, icon_col(ICON_NEXT, 240));
     } else if (g_uictx == UI_TALK) {
         /* Talk: game-icons.net's chat bubble */
         act_pos(&L, &bx, &by);
@@ -1263,9 +1253,12 @@ static void draw_vpad(canvas *c, float s) {
         act_pos(&L, &bx, &by);
         disc(c, S(bx), S(by), S(br), (g_touch_buttons & PSP_CTRL_SQUARE) ? on : dark);
         ring(c, S(bx), S(by), S(br), t * 1.6f, green);
-        const int pic = obj_icon(g_obj_kind);
-        icon(c, S(bx), S(by), S(br * 0.55f), pic, t * 1.3f, icon_col(pic, 240));
         const uint32_t extra = obj_extra(g_obj_kind, g_obj_dest);
+        if (extra) face_shape(c, S(bx), S(by), S(br * 0.40f), face[2].shape, t * 2.0f, face[2].tint);   /* two choices: plain marks */
+        else {
+            const int pic = obj_icon(g_obj_kind);
+            icon(c, S(bx), S(by), S(br * 0.55f), pic, t * 1.3f, icon_col(pic, 240));
+        }
         if (extra) {
             const int f = extra == PSP_CTRL_CROSS ? 0 : 3;
             act2_pos(&L, &bx, &by);
@@ -2513,7 +2506,8 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
             next_stats = now + 500;
             moving = 1;
         }
-        if (ui_ctx() != g_uictx) moving = 1;    /* a menu opened, an NPC came near: other buttons */
+        if (ui_ctx_settled() != g_uictx) moving = 1;   /* a menu opened, an NPC came near: other buttons
+                                                   * (settled: a flag that flickers must not redraw every frame) */
         if (moving && g_window) moving = compose();
         if (g_window && now >= next_title) {
             char status[128], title[200];
