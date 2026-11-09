@@ -23,7 +23,7 @@
     "A native port of Monster Hunter Freedom Unite (PSP, ULES01213), statically recompiled.\n\n"          \
     "Maintained by " MHFU_MAINTAINER ".\n" MHFU_REPO_URL "\n\n"                                           \
     "Built on psprecomp (sp00nznet), SDL3, FFmpeg (LGPL), rcheevos, Dear ImGui and stb.\n"                 \
-    "Touch button icons by Lorc and Delapouite, game-icons.net (CC BY 3.0).\n\n"                         \
+    "Touch button icons by Lorc, Delapouite and SeregaCthtuf, game-icons.net (CC BY 3.0).\n\n"                         \
     "Not affiliated with or endorsed by Capcom. Monster Hunter is a trademark of Capcom. "                \
     "Play with your own copy of the game: no game files come with this program."
 
