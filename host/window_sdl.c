@@ -1902,7 +1902,56 @@ void mhfu_window_chat(const char *nick, const char *text, int self) {
 /* ---- composing the overlay (on the loop's thread) --------------------------------------- */
 
 static char g_fps_text[96] = "FPS --";
+/* SDL_WaitEventTimeout, but sleeping between looks. On Android SDL's own wait
+ * kept the loop's thread at a whole core (2026-11-09, Poco X7 Pro: 97% while
+ * the loop itself spent 99% of its time "waiting", and the game lagged):
+ * something wakes it at once, again and again. Looking every 4 ms costs
+ * nothing next to that. */
+static int wait_event(SDL_Event *e, int ms) {
+#ifdef __ANDROID__
+    const uint64_t until = SDL_GetTicks() + (uint64_t)ms;
+    for (;;) {
+        if (SDL_PollEvent(e)) return 1;
+        const uint64_t now = SDL_GetTicks();
+        if (now >= until) return 0;
+        SDL_Delay(until - now < 4 ? (uint32_t)(until - now) : 4);
+    }
+#else
+    return SDL_WaitEventTimeout(e, ms);
+#endif
+}
 #define COMPOSE_MS 33                                   /* the overlay's quickest redraw */
+/* What the touch controls show, coarsely: the overlay is the whole screen
+ * drawn on the CPU (about 30 ms on the Poco X7 Pro), so it is drawn again only
+ * when this changes (the stick's knob by 8 steps of 256), or every half second
+ * for the rest (the FPS line, chat). Toasts, the text box, the drawer and the
+ * editor animate: always. */
+typedef struct {
+    int ctx, okind, odest, ax, ay, rheld, sx, sy, ah, akx, aky, skills, mobile, lobby, group, vis, w, h;
+    uint32_t buttons;
+} overlay_sig;
+static int overlay_sig_now(overlay_sig *g) {
+    memset(g, 0, sizeof *g);
+    if (g_edit || g_menu_open || g_ntoasts || SDL_GetAtomicInt(&g_tb_state) == 1 || menu_progress(NULL) > 0) return 0;
+    g->ctx = ui_ctx_settled();
+    g->okind = g_obj_kind; g->odest = g_obj_dest;
+    g->ax = g_touch_ax < 0 ? -1 : g_touch_ax / 8;
+    g->ay = g_touch_ay < 0 ? -1 : g_touch_ay / 8;
+    g->rheld = g_touch_rheld;
+    g->sx = g_touch_rheld ? (int)(g_swipe_x / 16) : 0;
+    g->sy = g_touch_rheld ? (int)(g_swipe_y / 16) : 0;
+    g->ah = g_attack_held;
+    g->akx = g_attack_held ? (int)(g_attack_kx * 16) : 0;
+    g->aky = g_attack_held ? (int)(g_attack_ky * 16) : 0;
+    g->skills = g_skill_down | psp_read8(MHFU_ADDR_WEAPON_CLASS) << 8;
+    g->mobile = mobile_now();
+    g->lobby = lobby_now();
+    g->group = mhfu_adhoc_in_group();
+    g->vis = vpad_visible();
+    SDL_GetWindowSizeInPixels(g_window, &g->w, &g->h);
+    g->buttons = g_touch_buttons;
+    return 1;
+}
 
 static int compose(void) {
     if (!g_gl) return 0;
@@ -2361,7 +2410,7 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
     uint64_t last_compose = 0;
     while (!quit) {
         SDL_Event e;
-        if (SDL_WaitEventTimeout(&e, moving ? 16 : g_ui_pending ? 30 : 100)) {
+        if (wait_event(&e, moving ? 16 : g_ui_pending ? 30 : 100)) {
             do {
                 if (e.type == g_ev_window) { make_window(); continue; }
                 if (e.type == g_ev_wake) {
@@ -2523,8 +2572,16 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
          * CPU, and a finger on the stick sends over a hundred motion events a
          * second, which kept this thread busier than the game's (lag, 2026-11-09). */
         if (moving && g_window && SDL_GetTicks() - last_compose >= COMPOSE_MS) {
-            moving = compose();
-            last_compose = SDL_GetTicks();
+            static overlay_sig drawn;
+            overlay_sig sig;
+            const int steady = overlay_sig_now(&sig);
+            if (steady && !memcmp(&sig, &drawn, sizeof sig) && SDL_GetTicks() - last_compose < 500) moving = 0;
+            else {
+                moving = compose();
+                last_compose = SDL_GetTicks();
+                if (steady) drawn = sig;
+                else memset(&drawn, 0xFF, sizeof drawn);
+            }
         }
         if (g_window && now >= next_title) {
             char status[128], title[200];
