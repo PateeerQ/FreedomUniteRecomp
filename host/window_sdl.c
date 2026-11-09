@@ -454,11 +454,34 @@ static int hunt_ctx(void) {
     if (!mhfu_in_quest() || !MHFU_WEAPON_OUT) return CTX_FREE;   /* 0: not known in this build */
     return psp_read8(MHFU_WEAPON_OUT) ? CTX_DRAWN : CTX_SHEATHED;
 }
+/* What the screen asks for (Mobile style), from the game's memory (region.h):
+ * a menu or the title screens want only Yes and No (and the pad); near an NPC
+ * a Talk button, at the quest gate a Depart button, beside the usual ones.
+ * Yes is Cross and No is Circle in the western releases, the other way round
+ * in the Japanese one. Talking is Circle (the action button) in every one. */
+enum { UI_PLAY, UI_MENU, UI_TALK, UI_GATE };
+static int ui_ctx(void) {
+    if (g_style != STYLE_MOBILE || g_edit) return UI_PLAY;
+    const int lobby = mhfu_in_lobby(), quest = mhfu_in_quest();
+    if (!lobby && !quest) return UI_MENU;                   /* title, character select, options */
+    const unsigned prompt = psp_read8(MHFU_ADDR_UI_PROMPT);
+    if (psp_read8(MHFU_ADDR_MENU_OPEN) || prompt >= 3) return UI_MENU;
+    if (lobby && (prompt == 1 || prompt == 2)) return UI_GATE;
+    if (psp_read32(MHFU_ADDR_TALK_TARGET)) return UI_TALK;
+    return UI_PLAY;
+}
+static int jp_buttons(void) { return !strcmp(MHFU_REGION_TAG, "JP"); }
+static uint32_t yes_bit(void) { return jp_buttons() ? PSP_CTRL_CIRCLE : PSP_CTRL_CROSS; }
+static uint32_t no_bit(void) { return jp_buttons() ? PSP_CTRL_CROSS : PSP_CTRL_CIRCLE; }
+static uint32_t act_bit(int ui) { return ui == UI_GATE ? yes_bit() : PSP_CTRL_CIRCLE; }
+static int g_uictx;                                     /* ui_ctx(), once a frame */
+
 /* The mobile buttons are on; the editor shows all of them, to place. */
 static int mobile_now(void) { return g_style == STYLE_MOBILE && (g_edit || hunt_ctx() == CTX_DRAWN); }
 static int group_shown(int g) {
     if (g == G_RSTICK) return 0;                       /* the camera is a swipe now */
     if (g == G_DPAD && g_pad_combined) return 0;       /* it is the stick's ring */
+    if (g_uictx == UI_MENU && (g == G_FACE || g == G_L || g == G_R || g == G_SKILL)) return 0;   /* Yes and No instead */
     const int m = mobile_now();
     if (g == G_FACE || g == G_DPAD) return !m;
     if (!m) return g != G_ATTACK && g != G_ROLL && g != G_ITEM && g != G_RUN;
@@ -548,9 +571,27 @@ static void group_box(const layout *L, int g, float *x0, float *y0, float *x1, f
 
 static float dist(float ax, float ay, float bx, float by) { return sqrtf((ax - bx) * (ax - bx) + (ay - by) * (ay - by)); }
 
+/* Yes and No sit where the face buttons are, No left of Yes; the action button
+ * (Talk, Depart) above and left of the face buttons, out of a thumb's way. */
+static float big_r(const layout *L) { return face_r(L) * 1.35f; }
+static void yes_pos(const layout *L, float *x, float *y) { *x = L->x[G_FACE] + face_o(L) * 0.75f; *y = L->y[G_FACE] + face_o(L) * 0.55f; }
+static void no_pos(const layout *L, float *x, float *y) { *x = L->x[G_FACE] - face_o(L) * 1.35f; *y = L->y[G_FACE] + face_o(L) * 0.55f; }
+static void act_pos(const layout *L, float *x, float *y) { *x = L->x[G_FACE] - face_o(L) * 2.6f; *y = L->y[G_FACE] - face_o(L) * 0.6f; }
+
 /* The control under (x, y), in window pixels. Generous: a thumb is wide. */
 static int hit(const layout *L, float x, float y) {
     if (dist(x, y, L->x[G_MENU], L->y[G_MENU]) < menu_r(L) * 1.4f) return T_MENU;
+    if (g_uictx == UI_MENU) {
+        float bx, by;
+        yes_pos(L, &bx, &by);
+        if (dist(x, y, bx, by) < big_r(L) * 1.25f) return T_YES;
+        no_pos(L, &bx, &by);
+        if (dist(x, y, bx, by) < big_r(L) * 1.25f) return T_NO;
+    } else if (g_uictx == UI_TALK || g_uictx == UI_GATE) {
+        float bx, by;
+        act_pos(L, &bx, &by);
+        if (dist(x, y, bx, by) < big_r(L) * 1.2f) return T_ACT;
+    }
     static const int pills[4] = { G_L, G_R, G_SELECT, G_START }, pill_elem[4] = { T_L, T_R, T_SELECT, T_START };
     for (int i = 0; i < 4; i++) {
         float hw, hh;
@@ -603,6 +644,9 @@ static uint32_t elem_button(int e) {
     case T_SELECT: return PSP_CTRL_SELECT;   case T_START: return PSP_CTRL_START;
     case T_ROLL: return PSP_CTRL_CROSS;      case T_ITEM: return PSP_CTRL_SQUARE;
     case T_RUN: return PSP_CTRL_RTRIGGER;
+    case T_YES: return yes_bit();
+    case T_NO: return no_bit();
+    case T_ACT: return g_uictx == UI_TALK || g_uictx == UI_GATE ? act_bit(g_uictx) : 0;
     case T_SKILL0: case T_SKILL1: case T_SKILL2: {
         skill sk[SKILLS];
         return e - T_SKILL0 < skills_now(sk) ? sk[e - T_SKILL0].bits : 0;
@@ -1081,6 +1125,45 @@ static void draw_vpad(canvas *c, float s) {
         disc(c, S(cx), S(cy), S(r), pressed ? on : fillc);
         ring(c, S(cx), S(cy), S(r), t, line);
         face_shape(c, S(cx), S(cy), S(k), face[i].shape, t * 1.4f, face[i].tint);
+    }
+    /* Yes and No (menus, the title screens), or the action button (Talk near an
+     * NPC, Depart at the quest gate) */
+    if (g_uictx == UI_MENU) {
+        float bx, by;
+        const float br = big_r(&L);
+        yes_pos(&L, &bx, &by);
+        const int yon = (g_touch_buttons & yes_bit()) != 0, non = (g_touch_buttons & no_bit()) != 0;
+        disc(c, S(bx), S(by), S(br), yon ? va(90, 190, 90, 170) : va(20, 15, 10, 110));
+        ring(c, S(bx), S(by), S(br), t * 1.6f, va(120, 220, 110, 230));
+        ring(c, S(bx), S(by), S(br * 0.82f), t * 0.8f, va(236, 194, 104, 120));
+        segment(c, S(bx - br * 0.36f), S(by + br * 0.02f), S(bx - br * 0.08f), S(by + br * 0.30f), t * 2.4f, white);
+        segment(c, S(bx - br * 0.08f), S(by + br * 0.30f), S(bx + br * 0.40f), S(by - br * 0.30f), t * 2.4f, white);
+        no_pos(&L, &bx, &by);
+        disc(c, S(bx), S(by), S(br), non ? va(200, 80, 70, 170) : va(20, 15, 10, 110));
+        ring(c, S(bx), S(by), S(br), t * 1.6f, va(225, 90, 80, 230));
+        ring(c, S(bx), S(by), S(br * 0.82f), t * 0.8f, va(236, 194, 104, 120));
+        segment(c, S(bx - br * 0.32f), S(by - br * 0.32f), S(bx + br * 0.32f), S(by + br * 0.32f), t * 2.4f, white);
+        segment(c, S(bx - br * 0.32f), S(by + br * 0.32f), S(bx + br * 0.32f), S(by - br * 0.32f), t * 2.4f, white);
+    } else if (g_uictx == UI_TALK || g_uictx == UI_GATE) {
+        float bx, by;
+        const float br = big_r(&L);
+        act_pos(&L, &bx, &by);
+        const int lit = (g_touch_buttons & act_bit(g_uictx)) != 0;
+        disc(c, S(bx), S(by), S(br), lit ? on : va(20, 15, 10, 120));
+        ring(c, S(bx), S(by), S(br), t * 1.6f, va(150, 210, 90, 230));
+        if (g_uictx == UI_TALK) {
+            /* a speech bubble with three dots */
+            round_rect(c, S(bx - br * 0.48f), S(by - br * 0.36f), S(br * 0.96f), S(br * 0.62f), S(br * 0.16f), white, t, white);
+            segment(c, S(bx - br * 0.18f), S(by + br * 0.24f), S(bx - br * 0.32f), S(by + br * 0.46f), t * 2.0f, white);
+            for (int i = -1; i <= 1; i++) disc(c, S(bx + i * br * 0.24f), S(by - br * 0.05f), S(br * 0.08f), va(30, 25, 20, 255));
+        } else {
+            /* the confirm button's mark: a cross (western) or a circle (Japanese) */
+            if (jp_buttons()) ring(c, S(bx), S(by), S(br * 0.42f), t * 2.2f, white);
+            else {
+                segment(c, S(bx - br * 0.34f), S(by - br * 0.34f), S(bx + br * 0.34f), S(by + br * 0.34f), t * 2.4f, white);
+                segment(c, S(bx - br * 0.34f), S(by + br * 0.34f), S(bx + br * 0.34f), S(by - br * 0.34f), t * 2.4f, white);
+            }
+        }
     }
     if (group_shown(G_ATTACK)) {
         /* the attack pad: Triangle in the middle, Triangle + Circle up,
@@ -1710,6 +1793,7 @@ static char g_fps_text[96] = "FPS --";
 static int compose(void) {
     if (!g_gl) return 0;
     SDL_LockMutex(g_lock);
+    g_uictx = ui_ctx();                                  /* menu, talk, gate: which buttons show */
     float in = 0;
     int showing = toast_phase(SDL_GetTicks(), &in);
     while (showing < 0) {
@@ -2317,6 +2401,7 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
             next_stats = now + 500;
             moving = 1;
         }
+        if (ui_ctx() != g_uictx) moving = 1;    /* a menu opened, an NPC came near: other buttons */
         if (moving && g_window) moving = compose();
         if (g_window && now >= next_title) {
             char status[128], title[200];
