@@ -462,6 +462,7 @@ static void no_throttling(void) {
  * and the log goes to run.log there. */
 #include <SDL3/SDL_system.h>
 #include <dirent.h>
+#include <sys/stat.h>
 #include <unistd.h>
 static void android_args(int *argc, char ***argv) {
     static char base[512], eboot[600], root[600], iso[800], log[600], extra[64][256];
@@ -469,6 +470,17 @@ static void android_args(int *argc, char ***argv) {
     const char *dir = SDL_GetAndroidExternalStoragePath();
     snprintf(base, sizeof base, "%s", dir ? dir : "/sdcard/Android/data/com.pateeerq.mhfu/files");
     snprintf(log, sizeof log, "%s/run.log", base);
+#ifdef MHFU_PGO_GEN
+    {   /* A PGO training build (MHFU_PGO=GEN): its counts go to files/pgo/, one file a
+         * run, written now and then by input.c (Android rarely lets a process exit). */
+        extern void __llvm_profile_set_filename(const char *);
+        static char pgo[600];
+        snprintf(pgo, sizeof pgo, "%s/pgo", base);
+        mkdir(pgo, 0777);
+        snprintf(pgo, sizeof pgo, "%s/pgo/mhfu-%%p.profraw", base);
+        __llvm_profile_set_filename(pgo);
+    }
+#endif
     {   /* the last run's log stays, as run-prev.log: what went wrong is in the run before */
         char prev[600];
         snprintf(prev, sizeof prev, "%s/run-prev.log", base);
