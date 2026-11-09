@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="MHFU_RecompTitle.png" width="128" alt=""><br>
+  <img src="MHFU_RecompTitle.png" width="512" alt=""><br>
   Monster Hunter: Freedom Unite Recomp
 </h1>
 
