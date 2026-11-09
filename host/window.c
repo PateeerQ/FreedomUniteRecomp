@@ -11,6 +11,7 @@
  *
  * The Multiplayer menu is "Create Server" / "Join Server" (lobby.h): the
  * room's code and player count show in the title bar. */
+#include "chat.h"
 #include "window.h"
 #include "about.h"
 
@@ -614,6 +615,10 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         return 0;
     }
     case WM_KEYDOWN: case WM_SYSKEYDOWN:
+        if ((int)wp == mhfu_chat_key_vk() && mhfu_chat_available()) {   /* the room's chat (F1 by default) */
+            if (!(lp & (1 << 30))) mhfu_chat_request();
+            return 0;
+        }
         if (wp == VK_F3 && !(lp & (1 << 30))) {
             g_show_fps = !g_show_fps;
             if (g_gl) gl_overlay_text(overlay_line());
