@@ -42,7 +42,10 @@ if (-not $NoBuild) {
     # Gradle's warnings go to stderr, which Windows PowerShell takes for an error
     # under ErrorActionPreference Stop: relaxed while it runs, the exit code decides.
     $ErrorActionPreference = "Continue"
-    & "$repo\android\gradlew.bat" -p "$repo\android" assembleRelease "-Pmhfu.region=$Region" --console=plain 2>&1 | ForEach-Object { "$_" }
+    # PGO: with a profile from scripts\pgo-android.ps1 -Merge, the app is built with it.
+    $pgoArg = "-Pmhfu.pgo=off"
+    if (Test-Path "$repo\work\pgo\mhfu.profdata") { Write-Host "Android: with the PGO profile work\pgo\mhfu.profdata"; $pgoArg = "-Pmhfu.pgo=use" }
+    & "$repo\android\gradlew.bat" -p "$repo\android" assembleRelease "-Pmhfu.region=$Region" $pgoArg --console=plain 2>&1 | ForEach-Object { "$_" }
     $ErrorActionPreference = "Stop"
     if ($LASTEXITCODE) { throw "the Android build failed" }
 }
