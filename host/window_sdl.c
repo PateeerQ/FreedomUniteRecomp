@@ -275,7 +275,7 @@ static void text_centered(canvas *c, float cx, float cy, int px, uint32_t col, c
  * controls on, off or automatic -- off while a controller is connected. */
 
 enum { T_NONE, T_STICK, T_DPAD, T_CROSS, T_CIRCLE, T_SQUARE, T_TRIANGLE, T_L, T_R, T_SELECT, T_START, T_MENU, T_EDGE, T_RSTICK, T_SWIPE,
-       T_SKILL0, T_SKILL1, T_SKILL2, T_ATTACK, T_ROLL, T_ITEM, T_RUN, T_YES, T_NO, T_ACT };
+       T_SKILL0, T_SKILL1, T_SKILL2, T_ATTACK, T_ROLL, T_ITEM, T_RUN, T_YES, T_NO, T_ACT, T_ACT2 };
 enum { VPAD_AUTO, VPAD_ON, VPAD_OFF };
 enum { G_STICK, G_DPAD, G_FACE, G_L, G_R, G_SELECT, G_START, G_MENU, G_RSTICK, G_SKILL, G_ATTACK, G_ROLL, G_ITEM, G_RUN, G_COUNT };
 static const char *const k_group_name[G_COUNT] = { "stick", "dpad", "face", "l", "r", "select", "start", "menu", "rstick", "skill",
@@ -458,7 +458,7 @@ static int hunt_ctx(void) {
  * a menu or the title screens want only Yes and No (and the pad); near an NPC
  * a Talk button, at the quest gate a Depart button, beside the usual ones.
  * Yes is Cross and No is Circle in the western releases, the other way round
- * in the Japanese one. Talking is Circle (the action button) in every one. */
+ * in the Japanese one and FUComplete. Talking is Circle in every one. */
 enum { UI_PLAY, UI_MENU, UI_TALK, UI_GATE };
 static int ui_ctx(void) {
     if (g_style != STYLE_MOBILE || g_edit) return UI_PLAY;
@@ -470,11 +470,31 @@ static int ui_ctx(void) {
     if (psp_read32(MHFU_ADDR_TALK_TARGET)) return UI_TALK;
     return UI_PLAY;
 }
-static int jp_buttons(void) { return !strcmp(MHFU_REGION_TAG, "JP"); }
+/* Portable 2nd G and FUComplete (its English translation) keep the Japanese
+ * confirm button: Circle is Yes, Cross is No. */
+static int jp_buttons(void) { return !strcmp(MHFU_REGION_TAG, "JP") || !strcmp(MHFU_REGION_TAG, "FUC"); }
 static uint32_t yes_bit(void) { return jp_buttons() ? PSP_CTRL_CIRCLE : PSP_CTRL_CROSS; }
 static uint32_t no_bit(void) { return jp_buttons() ? PSP_CTRL_CROSS : PSP_CTRL_CIRCLE; }
 static uint32_t act_bit(int ui) { return ui == UI_GATE ? yes_bit() : PSP_CTRL_CIRCLE; }
-static int g_uictx;                                     /* ui_ctx(), once a frame */
+static int g_uictx;                                     /* ui_ctx_settled(), once a frame */
+/* ui_ctx() once it has held for UI_SETTLE_MS: the flags flicker for a frame or
+ * two (walking past an NPC, a prompt redrawn), and the buttons blinked with them. */
+#define UI_SETTLE_MS 250
+static int ui_ctx_settled(void) {
+    static int settled = UI_PLAY, pending = -1;
+    static uint64_t since;
+    const int now_ctx = ui_ctx();
+    const uint64_t now = SDL_GetTicks();
+    if (now_ctx == settled) { pending = -1; return settled; }
+    if (g_edit || g_style != STYLE_MOBILE) { pending = -1; return settled = now_ctx; }
+    if (now_ctx != pending) { pending = now_ctx; since = now; }
+    else if (now - since >= UI_SETTLE_MS) { settled = now_ctx; pending = -1; }
+    return settled;
+}
+/* In the village or the Gathering Hall, outside a quest (Mobile style): no face
+ * buttons, no L, and Run (R) in place of the R pill; Talk and the door's choices
+ * come as buttons of their own. */
+static int lobby_now(void) { return g_style == STYLE_MOBILE && !g_edit && mhfu_in_lobby() && !mhfu_in_quest(); }
 
 /* The mobile buttons are on; the editor shows all of them, to place. */
 static int mobile_now(void) { return g_style == STYLE_MOBILE && (g_edit || hunt_ctx() == CTX_DRAWN); }
@@ -482,11 +502,13 @@ static int group_shown(int g) {
     if (g == G_RSTICK) return 0;                       /* the camera is a swipe now */
     if (g == G_DPAD && g_pad_combined) return 0;       /* it is the stick's ring */
     if (g_uictx == UI_MENU && (g == G_FACE || g == G_L || g == G_R || g == G_SKILL)) return 0;   /* Yes and No instead */
+    if (lobby_now() && (g == G_FACE || g == G_L || g == G_R)) return 0;
+    if (g == G_RUN && lobby_now()) return 1;
     const int m = mobile_now();
     if (g == G_FACE || g == G_DPAD) return !m;
     if (!m) return g != G_ATTACK && g != G_ROLL && g != G_ITEM && g != G_RUN;
     if (g == G_R) return 0;                            /* Run, the pad and the weapon buttons have it */
-    if (g == G_RUN) return 0;                          /* sheathed is the PSP's buttons now */
+    if (g == G_RUN) return g_edit;                     /* the lobby's Run; placed in the editor */
     return 1;
 }
 
@@ -501,7 +523,7 @@ static uint32_t attack_bits(float dx, float dy) {
 
 /* The pictures on the buttons (icon(), below the layout): no words on them. */
 enum { ICON_CROUCH, ICON_DODGE, ICON_RUN, ICON_SHEATHE, ICON_ITEM, ICON_SWORD, ICON_GUARD, ICON_AIM, ICON_TARGET,
-       ICON_DEMON, ICON_SPIRIT, ICON_DANCE, ICON_FADE, ICON_CHARGE };
+       ICON_DEMON, ICON_SPIRIT, ICON_DANCE, ICON_FADE, ICON_CHARGE, ICON_TALK };
 
 /* The weapon buttons: a column left of the face buttons whose buttons follow
  * the weapon the hunter carries, each holding a PSP combination (the game
@@ -576,7 +598,10 @@ static float dist(float ax, float ay, float bx, float by) { return sqrtf((ax - b
 static float big_r(const layout *L) { return face_r(L) * 1.35f; }
 static void yes_pos(const layout *L, float *x, float *y) { *x = L->x[G_FACE] + face_o(L) * 0.75f; *y = L->y[G_FACE] + face_o(L) * 0.55f; }
 static void no_pos(const layout *L, float *x, float *y) { *x = L->x[G_FACE] - face_o(L) * 1.35f; *y = L->y[G_FACE] + face_o(L) * 0.55f; }
-static void act_pos(const layout *L, float *x, float *y) { *x = L->x[G_FACE] - face_o(L) * 2.6f; *y = L->y[G_FACE] - face_o(L) * 0.6f; }
+static void act_pos(const layout *L, float *x, float *y) {
+    if (lobby_now()) { *x = L->x[G_FACE]; *y = L->y[G_FACE]; return; }   /* the face buttons' place is free */
+    *x = L->x[G_FACE] - face_o(L) * 2.6f; *y = L->y[G_FACE] - face_o(L) * 0.6f;
+}
 
 /* The control under (x, y), in window pixels. Generous: a thumb is wide. */
 static int hit(const layout *L, float x, float y) {
@@ -587,7 +612,15 @@ static int hit(const layout *L, float x, float y) {
         if (dist(x, y, bx, by) < big_r(L) * 1.25f) return T_YES;
         no_pos(L, &bx, &by);
         if (dist(x, y, bx, by) < big_r(L) * 1.25f) return T_NO;
-    } else if (g_uictx == UI_TALK || g_uictx == UI_GATE) {
+    } else if (g_uictx == UI_GATE) {
+        /* a door with two choices: the confirm button and Square (the
+         * Gathering Hall's entrance asks for one or the other) */
+        float bx, by;
+        yes_pos(L, &bx, &by);
+        if (dist(x, y, bx, by) < big_r(L) * 1.2f) return T_ACT;
+        no_pos(L, &bx, &by);
+        if (dist(x, y, bx, by) < big_r(L) * 1.2f) return T_ACT2;
+    } else if (g_uictx == UI_TALK) {
         float bx, by;
         act_pos(L, &bx, &by);
         if (dist(x, y, bx, by) < big_r(L) * 1.2f) return T_ACT;
@@ -605,7 +638,9 @@ static int hit(const layout *L, float x, float y) {
         if (dist(x, y, L->x[G_ITEM], L->y[G_ITEM]) < small_r(L, G_ITEM) * 1.3f) return T_ITEM;
         if (group_shown(G_RUN) && dist(x, y, L->x[G_RUN], L->y[G_RUN]) < small_r(L, G_RUN) * 1.3f) return T_RUN;
         if (dist(x, y, L->x[G_ATTACK], L->y[G_ATTACK]) < attack_r(L) * 1.15f) return T_ATTACK;
-    } else {
+    } else if (group_shown(G_RUN) && dist(x, y, L->x[G_RUN], L->y[G_RUN]) < small_r(L, G_RUN) * 1.3f) {
+        return T_RUN;
+    } else if (group_shown(G_FACE)) {
         const float fo = face_o(L);
         const struct { float ox, oy; int e; } face[4] = {
             { 0, fo, T_CROSS }, { fo, 0, T_CIRCLE }, { -fo, 0, T_SQUARE }, { 0, -fo, T_TRIANGLE } };
@@ -647,6 +682,7 @@ static uint32_t elem_button(int e) {
     case T_YES: return yes_bit();
     case T_NO: return no_bit();
     case T_ACT: return g_uictx == UI_TALK || g_uictx == UI_GATE ? act_bit(g_uictx) : 0;
+    case T_ACT2: return g_uictx == UI_GATE ? PSP_CTRL_SQUARE : 0;
     case T_SKILL0: case T_SKILL1: case T_SKILL2: {
         skill sk[SKILLS];
         return e - T_SKILL0 < skills_now(sk) ? sk[e - T_SKILL0].bits : 0;
@@ -868,7 +904,7 @@ static const unsigned char k_icon_rgb[][3] = {
     [ICON_SHEATHE] = { 240, 228, 200 }, [ICON_ITEM] = { 150, 235, 170 }, [ICON_SWORD] = { 250, 245, 235 },
     [ICON_GUARD] = { 175, 205, 240 }, [ICON_AIM] = { 140, 232, 160 }, [ICON_TARGET] = { 255, 205, 110 },
     [ICON_DEMON] = { 255, 105, 75 }, [ICON_SPIRIT] = { 130, 210, 255 }, [ICON_DANCE] = { 255, 150, 115 },
-    [ICON_FADE] = { 195, 175, 255 }, [ICON_CHARGE] = { 255, 180, 85 },
+    [ICON_FADE] = { 195, 175, 255 }, [ICON_CHARGE] = { 255, 180, 85 }, [ICON_TALK] = { 250, 245, 235 },
 };
 static uint32_t icon_col(int which, int a) { return va(k_icon_rgb[which][0], k_icon_rgb[which][1], k_icon_rgb[which][2], a); }
 
@@ -1055,7 +1091,7 @@ static void draw_vpad(canvas *c, float s) {
     const float t = 2.2f * s;
 #define S(v) ((v) * s)
     /* L, R, Select, Start */
-    draw_pill(c, s, &L, G_L, PSP_CTRL_LTRIGGER, "L", fillc, on, line, white, t);
+    if (group_shown(G_L)) draw_pill(c, s, &L, G_L, PSP_CTRL_LTRIGGER, "L", fillc, on, line, white, t);
     if (group_shown(G_R)) draw_pill(c, s, &L, G_R, PSP_CTRL_RTRIGGER, "R", fillc, on, line, white, t);
     draw_pill(c, s, &L, G_SELECT, PSP_CTRL_SELECT, "SELECT", fillc, on, line, white, t);
     draw_pill(c, s, &L, G_START, PSP_CTRL_START, "START", fillc, on, line, white, t);
@@ -1144,26 +1180,29 @@ static void draw_vpad(canvas *c, float s) {
         ring(c, S(bx), S(by), S(br * 0.82f), t * 0.8f, va(236, 194, 104, 120));
         segment(c, S(bx - br * 0.32f), S(by - br * 0.32f), S(bx + br * 0.32f), S(by + br * 0.32f), t * 2.4f, white);
         segment(c, S(bx - br * 0.32f), S(by + br * 0.32f), S(bx + br * 0.32f), S(by - br * 0.32f), t * 2.4f, white);
-    } else if (g_uictx == UI_TALK || g_uictx == UI_GATE) {
+    } else if (g_uictx == UI_TALK) {
+        /* Talk: game-icons.net's chat bubble */
         float bx, by;
         const float br = big_r(&L);
         act_pos(&L, &bx, &by);
         const int lit = (g_touch_buttons & act_bit(g_uictx)) != 0;
         disc(c, S(bx), S(by), S(br), lit ? on : va(20, 15, 10, 120));
         ring(c, S(bx), S(by), S(br), t * 1.6f, va(150, 210, 90, 230));
-        if (g_uictx == UI_TALK) {
-            /* a speech bubble with three dots */
-            round_rect(c, S(bx - br * 0.48f), S(by - br * 0.36f), S(br * 0.96f), S(br * 0.62f), S(br * 0.16f), white, t, white);
-            segment(c, S(bx - br * 0.18f), S(by + br * 0.24f), S(bx - br * 0.32f), S(by + br * 0.46f), t * 2.0f, white);
-            for (int i = -1; i <= 1; i++) disc(c, S(bx + i * br * 0.24f), S(by - br * 0.05f), S(br * 0.08f), va(30, 25, 20, 255));
-        } else {
-            /* the confirm button's mark: a cross (western) or a circle (Japanese) */
-            if (jp_buttons()) ring(c, S(bx), S(by), S(br * 0.42f), t * 2.2f, white);
-            else {
-                segment(c, S(bx - br * 0.34f), S(by - br * 0.34f), S(bx + br * 0.34f), S(by + br * 0.34f), t * 2.4f, white);
-                segment(c, S(bx - br * 0.34f), S(by + br * 0.34f), S(bx + br * 0.34f), S(by - br * 0.34f), t * 2.4f, white);
-            }
-        }
+        icon(c, S(bx), S(by), S(br * 0.55f), ICON_TALK, t * 1.3f, icon_col(ICON_TALK, 240));
+    } else if (g_uictx == UI_GATE) {
+        /* the door's two choices: the confirm button's mark (a cross, or a
+         * circle in the Japanese releases) and Square */
+        float bx, by;
+        const float br = big_r(&L);
+        const int yes = jp_buttons() ? 1 : 0;              /* face[]: 0 Cross, 1 Circle, 2 Square */
+        yes_pos(&L, &bx, &by);
+        disc(c, S(bx), S(by), S(br), (g_touch_buttons & yes_bit()) ? on : va(20, 15, 10, 120));
+        ring(c, S(bx), S(by), S(br), t * 1.6f, va(150, 210, 90, 230));
+        face_shape(c, S(bx), S(by), S(br * 0.42f), face[yes].shape, t * 2.0f, face[yes].tint);
+        no_pos(&L, &bx, &by);
+        disc(c, S(bx), S(by), S(br), (g_touch_buttons & PSP_CTRL_SQUARE) ? on : va(20, 15, 10, 120));
+        ring(c, S(bx), S(by), S(br), t * 1.6f, va(150, 210, 90, 230));
+        face_shape(c, S(bx), S(by), S(br * 0.42f), face[2].shape, t * 2.0f, face[2].tint);
     }
     if (group_shown(G_ATTACK)) {
         /* the attack pad: Triangle in the middle, Triangle + Circle up,
@@ -1183,9 +1222,11 @@ static void draw_vpad(canvas *c, float s) {
         disc(c, S(kx), S(ky), S(ar * 0.36f), g_attack_held ? on : va(30, 23, 17, 150));
         ring(c, S(kx), S(ky), S(ar * 0.36f), t * 1.3f, line);
         icon(c, S(kx), S(ky), S(ar * 0.24f), ICON_SWORD, t * 1.3f, held == PSP_CTRL_TRIANGLE ? lit : white);
-        /* Cross (Crouch, or Dodge with the weapon out), Square (Item, or
-         * Sheathe) and Run (R, sheathed) */
-        const int out = 1;                             /* the mobile buttons show only with the weapon out */
+    }
+    {
+        /* Cross (Dodge with the weapon out), Square (Sheathe), and Run (R; in
+         * the lobby, in place of the R pill) */
+        const int out = 1;
         const struct { int g; uint32_t bit; int pic; } sm[3] = {
             { G_ROLL, PSP_CTRL_CROSS, out ? ICON_DODGE : ICON_CROUCH },
             { G_ITEM, PSP_CTRL_SQUARE, out ? ICON_SHEATHE : ICON_ITEM },
@@ -1793,7 +1834,7 @@ static char g_fps_text[96] = "FPS --";
 static int compose(void) {
     if (!g_gl) return 0;
     SDL_LockMutex(g_lock);
-    g_uictx = ui_ctx();                                  /* menu, talk, gate: which buttons show */
+    g_uictx = ui_ctx_settled();                          /* menu, talk, gate: which buttons show */
     float in = 0;
     int showing = toast_phase(SDL_GetTicks(), &in);
     while (showing < 0) {
