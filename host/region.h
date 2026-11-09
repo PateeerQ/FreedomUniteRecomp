@@ -125,5 +125,17 @@
 #define MHFU_ADDR_HUNTER_FREE   (MHFU_ADDR_WEAPON_CLASS + 0x42Cu)
 #define MHFU_ADDR_YESNO         (MHFU_ADDR_WEAPON_CLASS - 0x2C8u)
 #define MHFU_ADDR_MESSAGE       (MHFU_ADDR_WEAPON_CLASS + 0x8E0695u)
+/* u8: not 0 while the game shows an object's prompt ("Enter", "Depart", ...);
+ * the object pointer above can stay set when the hunter has walked away (EU
+ * dumps). Not at the heap's usual distance: EU 0x09993C75 (two gate dumps
+ * against seven others), JP/FUC 0x0998F9DC (8 object dumps against idle and
+ * NPC ones); US by the heap rule, unverified. */
+#if MHFU_REGION_JP || MHFU_REGION_FUC
+#define MHFU_ADDR_OBJ_PROMPT    0x0998F9DCu
+#elif MHFU_IS_US
+#define MHFU_ADDR_OBJ_PROMPT    (0x09993C75u + 0x140u)
+#else
+#define MHFU_ADDR_OBJ_PROMPT    0x09993C75u
+#endif
 
 #endif
