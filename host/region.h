@@ -98,6 +98,18 @@
 #define MHFU_EBOOT_FILE "ULJM05500_FUC_EBOOT.BIN"   /* not the JP one's: both in one app's folder */
 #else
 #define MHFU_EBOOT_FILE MHFU_GAME_ID "_EBOOT.BIN"
+
+/* What the hunter can do now, for the touch buttons (window_sdl.c). Found in
+ * EU memory dumps (2026-11-09: far, near an NPC, near the quest gate, the Start
+ * menu open); heap addresses, so every release has them where its weapon class
+ * is moved to (US +0x140, JP/FUC -0x42C0):
+ * - u32 EU 0x090B3734 (hunter struct): the NPC the hunter can talk to, else 0
+ * - u8  EU 0x099713F5: the prompt or window on screen: 0 none, 1-2 a gate
+ *   ("Depart on a Quest"), 0x0B the Start menu
+ * - u8  EU 0x09999C70: 1 while the Start menu is open */
+#define MHFU_ADDR_TALK_TARGET   (MHFU_ADDR_WEAPON_CLASS + 0x10Cu)
+#define MHFU_ADDR_UI_PROMPT     (MHFU_ADDR_WEAPON_CLASS + (0x099713F5u - 0x090B3628u))
+#define MHFU_ADDR_MENU_OPEN     (MHFU_ADDR_WEAPON_CLASS + (0x09999C70u - 0x090B3628u))
 #endif
 
 #endif
