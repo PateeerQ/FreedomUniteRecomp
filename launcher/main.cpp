@@ -678,6 +678,20 @@ static void page_achievements(float w, float) {
     page_title("Achievements", "From RetroAchievements (game 3732): your account's progress, and unlocking while you "
                                "play once you sign in below.");
 
+    // RetroAchievements links only the Europe disc to game 3732, and the set
+    // reads the Europe release's memory: the other releases earn nothing.
+    if (strcmp(region().tag, "EU") != 0) {
+        begin_panel("unsupported", ImVec2(0, 96));
+        ImGui::TextColored(C_WARN, "The %s release (%s) is not supported by RetroAchievements", region().name,
+                           region().title);
+        ImGui::PushFont(g_small);
+        dim("Only Monster Hunter Freedom Unite (Europe) has an achievement set. Nothing unlocks while you play this "
+            "release; the record below is your Europe progress.");
+        ImGui::PopFont();
+        ImGui::EndChild();
+        ImGui::Spacing();
+    }
+
     if (g_cfg.ra_user.empty() || g_cfg.ra_key.empty()) {
         ingame_panel();
         begin_panel("connect", ImVec2(0, 230));
