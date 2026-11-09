@@ -59,7 +59,10 @@ android {
                 arguments '-DANDROID_STL=c++_static', '-DMHFU_LAUNCHER=OFF', '-DMHFU_SDL_WINDOW=ON',
                           '-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON',
                           "-DMHFU_GEN_DIR=${mhfuWork}/gen", "-DMHFU_OVL_DIR=${mhfuWork}/gen_ovl",
-                          "-DMHFU_UNIVERSAL=${mhfuAll ? 'ON' : 'OFF'}", "-DMHFU_WORK_ROOT=${mhfuWorkRoot}"
+                          "-DMHFU_UNIVERSAL=${mhfuAll ? 'ON' : 'OFF'}", "-DMHFU_WORK_ROOT=${mhfuWorkRoot}",
+                          '-DMHFU_TRACE=LITE',
+                          // -Pmhfu.pgo=gen|use: profile-guided optimisation (scripts/pgo-android.ps1)
+                          "-DMHFU_PGO=${(project.findProperty('mhfu.pgo') ?: 'OFF').toString().toUpperCase()}"
                 // Optimised even in debug builds: an unoptimised recompiled game is too slow to try.
                 cFlags '-O2'
                 if (mhfuAll) targets(*mhfuHosts) else targets 'mhfu_host'
