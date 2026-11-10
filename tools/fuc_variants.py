@@ -160,6 +160,26 @@ def returns(eboot_read):
     return out
 
 
+def hook_returns(eboot_read, site, target, back):
+    """The jumps back into slot 1 of the MODLOAD function a hook at `site` enters.
+    A hook's usual way back lands just past its site, but a function may also jump
+    far ahead (issue #11: the Hall drink's buff hook at 0x08A3632C jumps to
+    0x09AACD8C before its plain return to 0x09AA7354): walk the function from its
+    entry to that usual return and take every jump into slot 1 on the way."""
+    if not (MODLOAD <= target < MODLOAD_END):
+        return set()
+    out = set()
+    for pc in range(target, min(target + 0x800, MODLOAD_END), 4):
+        w = struct.unpack('<I', eboot_read(pc, 4))[0]
+        if w >> 26 == 2:
+            t = (pc & 0xF0000000) | (w & 0x03FFFFFF) << 2
+            if 0x09A00000 <= t < 0x09E00000:
+                out.add(t)
+                if site < t <= site + 0x100:
+                    return out
+    return {t for t in back if site < t <= site + 0x100}   # no end found: the old rule
+
+
 def main():
     if len(sys.argv) != 5:
         raise SystemExit(__doc__)
@@ -220,6 +240,8 @@ def main():
                 open(path, 'wb').write(m.ovl)
                 written += 1
             seeds = sorted({t for s, t in m.hooks for t in back if s < t <= s + 0x100 and m.in_ovl(t, 4)}
+                           | {r for s, t in m.hooks for r in hook_returns(eboot_read, s, t, back)
+                              if m.in_ovl(r, 4)}
                            | {t for t in inherited if m.in_ovl(t, 4)})
             for s, t in m.hooks:
                 if MODLOAD <= t < MODLOAD_END:
