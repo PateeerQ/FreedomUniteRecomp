@@ -49,6 +49,7 @@ ICONS = [
     ('NEEDS', 'lorc/papers'),
     ('SAVE', 'delapouite/save'),
     ('PICK', 'quoting/card-pickup'),
+    ('VIEW', 'lorc/eyeball'),
 ]
 URL = 'https://raw.githubusercontent.com/game-icons/icons/master/%s.svg'
 
