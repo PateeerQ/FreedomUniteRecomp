@@ -18,6 +18,11 @@ int mhfu_overlays_missing(void);
 int mhfu_in_quest(void);
 int mhfu_in_lobby(void);
 
+/* MHFU_TRACE_HUNTER=1: the hunter's facing and position around area changes
+ * (an area loaded; then once a game frame with the stick the game gets). */
+void mhfu_hunter_trace_area(void);
+void mhfu_hunter_trace_frame(unsigned ax, unsigned ay, uint32_t buttons);
+
 /* VTimer handler calls so far: MHFU's frame clock is one. */
 uint64_t mhfu_vtimer_fired(void);
 
