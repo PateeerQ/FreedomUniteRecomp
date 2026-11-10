@@ -161,12 +161,19 @@
  * u8 0 its menu, 2 crafting, 5 attaching decorations. */
 #define MHFU_ADDR_CRAFT_SCREEN  0x09B0ACC4u
 #else
-#define MHFU_ADDR_LOBBY_WINDOW  0u
-#define MHFU_ADDR_BOX_SUB       0u
-#define MHFU_ADDR_BOX_KIND      0u
-#define MHFU_ADDR_BOX_MAIN      0u
-#define MHFU_ADDR_BOX_DEEP      0u
-#define MHFU_ADDR_CRAFT_SCREEN  0u
+/* EU = JP + 0x5388 here: 2924 lobby_task references matched by code between
+ * the JP (7AA81434) and EU (208A07B1) overlays; every one from 0x09B0AC10 to
+ * 0x09B1BB00 moved +0x5388 (2026-11-10, Muhammad: the window, item box and
+ * smithy buttons never showed in EU). The box flags have no direct reference
+ * near them: the same shift is assumed. US: overlay addresses +0x100. All 0 in
+ * the nine EU village dumps without a window; not yet checked with one open. */
+#define MHFU_LOBBY_JP_TO_EU(a)  ((a) + 0x5388u + (MHFU_IS_US ? 0x100u : 0u))
+#define MHFU_ADDR_LOBBY_WINDOW  MHFU_LOBBY_JP_TO_EU(0x09B0AC40u)
+#define MHFU_ADDR_BOX_SUB       MHFU_LOBBY_JP_TO_EU(0x09B154F8u)
+#define MHFU_ADDR_BOX_KIND      MHFU_LOBBY_JP_TO_EU(0x09B154F0u)
+#define MHFU_ADDR_BOX_MAIN      MHFU_LOBBY_JP_TO_EU(0x09B154F6u)
+#define MHFU_ADDR_BOX_DEEP      MHFU_LOBBY_JP_TO_EU(0x09B154F9u)
+#define MHFU_ADDR_CRAFT_SCREEN  MHFU_LOBBY_JP_TO_EU(0x09B0ACC4u)
 #endif
 #if MHFU_REGION_JP || MHFU_REGION_FUC
 #define MHFU_ADDR_OBJ_PROMPT    0x0998F9DCu
