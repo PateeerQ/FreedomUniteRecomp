@@ -547,6 +547,13 @@ static uint32_t obj_bit(int kind) { return quest_obj(kind) ? PSP_CTRL_CIRCLE : P
 static int ui_ctx(void) {
     if (g_style != STYLE_MOBILE || g_edit) return UI_PLAY;
     const int lobby = mhfu_in_lobby(), quest = mhfu_in_quest();
+    /* Once the screens after a quest begin (rewards, send to box), Yes/No stay
+     * until game_task is gone: a reward movie or scene between them cleared the
+     * flags and brought the hunting buttons back (Muhammad, 2026-11-10). */
+    static int quest_done;
+    if (!quest) quest_done = 0;
+    else if (psp_read8(MHFU_ADDR_QUEST_PHASE) == 2) quest_done = 1;   /* not the prompt byte: a cancelled window would latch */
+    if (quest_done) return UI_WINDOW;
     if (!lobby && !quest) return UI_MENU;                   /* title, character select, options */
     if (psp_read8(MHFU_ADDR_MENU_OPEN)) return UI_MENU;
     /* a window is open: the hunter is held (that bit also drops while running)
