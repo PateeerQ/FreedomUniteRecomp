@@ -564,6 +564,16 @@ int main(int argc, char **argv) {
 #ifdef __ANDROID__
     if (argc < 3) android_args(&argc, &argv);
 #endif
+    /* The GE on a thread of its own (psprecomp's PSPRECOMP_GE_THREAD), on unless
+     * MHFU_GE_THREAD=0 or the phone's menu turned it off (window_sdl.c sets it). */
+    if (!getenv("PSPRECOMP_GE_THREAD")) {
+        const char *g = getenv("MHFU_GE_THREAD");
+#ifdef _WIN32
+        _putenv_s("PSPRECOMP_GE_THREAD", g && g[0] == '0' ? "0" : "1");
+#else
+        setenv("PSPRECOMP_GE_THREAD", g && g[0] == '0' ? "0" : "1", 1);
+#endif
+    }
     if (argc < 3) {
         fprintf(stderr, "usage: %s <decrypted EBOOT> <root dir> [--iso FILE] [--budget N] [--seconds N]"
                 " [--window [SCALE]] [--fullscreen] [--size WxH] [--keys INI] [--press SCRIPT] [--snap N] [--name NAME]\n"
