@@ -490,7 +490,8 @@ static int hunt_ctx(void) {
 }
 /* What the screen asks for (Mobile style), from the game's memory (region.h).
  * Yes is Cross and No is Circle in the western releases, the other way round
- * in the Japanese one and FUComplete. Talking is Circle in every one; using a
+ * in the Japanese one and FUComplete. Talking is Cross in the western ones and
+ * Circle in the Japanese one and FUComplete (act_bit); using a
  * door, the quest gate, the item box, a chair or the quest board is Square.
  * - UI_MENU: the title screens, the Start menu: Yes and No
  * - UI_TALK: an NPC in reach: a Talk button
@@ -520,6 +521,14 @@ static int obj_now(int *kind, int *dest) {
     *dest = psp_read8(p + 0x16) | psp_read8(p + 0x17) << 8;
     return !quest || quest_obj(*kind);
 }
+/* Portable 2nd G and FUComplete (its English translation) keep the Japanese
+ * confirm button: Circle is Yes, Cross is No. */
+static int jp_buttons(void) { return !strcmp(MHFU_REGION_TAG, "JP") || !strcmp(MHFU_REGION_TAG, "FUC"); }
+/* Talking to an NPC (village, Hall): Circle in JP/FUC, Cross in the western
+ * releases (Muhammad on the phone, EU, 2026-11-10: Circle did not talk). In a
+ * quest the action (Supply Box, carving, gathering) stays Circle everywhere:
+ * Cross there crouches/dodges (phone, EU, the same day). */
+static uint32_t act_bit(void) { return jp_buttons() ? PSP_CTRL_CIRCLE : PSP_CTRL_CROSS; }
 /* The button an object takes: Circle for the quest's boxes, else Square. */
 static uint32_t obj_bit(int kind) { return quest_obj(kind) ? PSP_CTRL_CIRCLE : PSP_CTRL_SQUARE; }
 static int ui_ctx(void) {
@@ -586,9 +595,6 @@ static int ui_ctx(void) {
     if (obj_now(&kind, &dest)) return UI_OBJ;
     return UI_PLAY;
 }
-/* Portable 2nd G and FUComplete (its English translation) keep the Japanese
- * confirm button: Circle is Yes, Cross is No. */
-static int jp_buttons(void) { return !strcmp(MHFU_REGION_TAG, "JP") || !strcmp(MHFU_REGION_TAG, "FUC"); }
 static uint32_t yes_bit(void) { return jp_buttons() ? PSP_CTRL_CIRCLE : PSP_CTRL_CROSS; }
 static uint32_t no_bit(void) { return jp_buttons() ? PSP_CTRL_CROSS : PSP_CTRL_CIRCLE; }
 static int g_uictx;                                     /* ui_ctx_settled(), once a frame */
@@ -626,13 +632,16 @@ static int ui_ctx_settled(void) {
     return settled;
 }
 /* A door's second choice (0 none): the Gathering Hall's entrance also takes
- * Cross, its way out Triangle (FUComplete dumps). */
+ * Cross (Circle in the western releases), its way out Triangle (FUComplete dumps). */
 static uint32_t obj_extra(int kind, int dest) {
     /* The prompt byte is 2 at an object with two choices (FUC dumps): the
-     * Gathering Hall's entrance (destination 4) takes Cross, the other doors
-     * Triangle. */
+     * Gathering Hall's entrance (destination 4) takes Cross in JP/FUC, the
+     * other doors Triangle. The western releases swap Cross and Circle there as
+     * they do for Yes/No: the Online Gathering Hall is Circle in the USA game
+     * (Muhammad on the phone, 2026-11-10; EU assumed the same). */
     if (kind != OBJ_DOOR) return 0;
-    if (psp_read8(MHFU_ADDR_UI_PROMPT) == 2 || dest == 5) return dest == 4 ? PSP_CTRL_CROSS : PSP_CTRL_TRIANGLE;
+    if (psp_read8(MHFU_ADDR_UI_PROMPT) == 2 || dest == 5)
+        return dest == 4 ? (jp_buttons() ? PSP_CTRL_CROSS : PSP_CTRL_CIRCLE) : PSP_CTRL_TRIANGLE;
     return 0;
 }
 /* In the village or the Gathering Hall, outside a quest (Mobile style): no face
@@ -1034,7 +1043,7 @@ static uint32_t elem_button(int e) {
     case T_RUN: return PSP_CTRL_RTRIGGER;
     case T_YES: return yes_bit();
     case T_NO: return no_bit();
-    case T_ACT: return g_uictx == UI_TALK ? PSP_CTRL_CIRCLE : g_uictx == UI_OBJ ? obj_bit(g_obj_kind) : 0;
+    case T_ACT: return g_uictx == UI_TALK ? act_bit() : g_uictx == UI_OBJ ? obj_bit(g_obj_kind) : 0;
     case T_ACT2: return g_uictx == UI_OBJ ? obj_extra(g_obj_kind, g_obj_dest) : 0;
     case T_DETAIL: return detail_shown() ? PSP_CTRL_SQUARE : 0;
     case T_LLEFT: return l_side_shown() ? PSP_CTRL_SQUARE : 0;
@@ -1042,7 +1051,7 @@ static uint32_t elem_button(int e) {
     case T_DRAW: return PSP_CTRL_TRIANGLE;
     case T_USE: return PSP_CTRL_SQUARE;
     case T_KICK: return PSP_CTRL_SELECT;
-    case T_PICK: return PSP_CTRL_CIRCLE;   /* gather, carve, pick up */
+    case T_PICK: return PSP_CTRL_CIRCLE;   /* gather, carve, pick up (Circle in every release) */
     case T_QSTART: return PSP_CTRL_START;
     case T_WX0: case T_WX1: case T_WX2: case T_WX3: case T_WX4: case T_WX5: {
         int wx[6];
@@ -1676,8 +1685,9 @@ static void draw_vpad(canvas *c, float s) {
         if (edit_act) {                                /* and where a door's second choice goes */
             act2_pos(&L, &bx, &by);
             disc(c, S(bx), S(by), S(ar * 0.8f), dark);
-            ring(c, S(bx), S(by), S(ar * 0.8f), t * 1.4f, face[0].tint);
-            face_shape(c, S(bx), S(by), S(ar * 0.34f), face[0].shape, t * 2.0f, face[0].tint);
+            const int f2 = jp_buttons() ? 0 : 1;       /* the Hall's entrance: Cross in JP/FUC, Circle else */
+            ring(c, S(bx), S(by), S(ar * 0.8f), t * 1.4f, face[f2].tint);
+            face_shape(c, S(bx), S(by), S(ar * 0.34f), face[f2].shape, t * 2.0f, face[f2].tint);
         }
     } else if (g_uictx == UI_OBJ) {
         const float br = act_r(&L);
@@ -1692,7 +1702,7 @@ static void draw_vpad(canvas *c, float s) {
             face_shape(c, S(bx), S(by), S(br * 0.40f), face[2].shape, t * 2.0f, face[2].tint);
         else icon(c, S(bx), S(by), S(br * 0.55f), pic, t * 1.3f, icon_col(pic, 240));
         if (extra) {
-            const int f = extra == PSP_CTRL_CROSS ? 0 : 3;
+            const int f = extra == PSP_CTRL_CROSS ? 0 : extra == PSP_CTRL_CIRCLE ? 1 : 3;
             act2_pos(&L, &bx, &by);
             disc(c, S(bx), S(by), S(br * 0.8f), elem_held(T_ACT2) ? on : dark);
             ring(c, S(bx), S(by), S(br * 0.8f), t * 1.4f, face[f].tint);
