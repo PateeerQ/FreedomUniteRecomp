@@ -774,6 +774,40 @@ int main(int argc, char **argv) {
         _Exit(0);
     }
 
+    if (getenv("MHFU_TEST_CAPSULE")) {   /* TEMP: game_sub's capsule test with the area-2 numbers */
+        extern void ovCF9AF581_func_09C36758(void);
+        const uint32_t buf = psp_sysmem_alloc(0x1000, 0);
+        memset(psp_mem_ptr(buf, 0x1000), 0, 0x1000);
+        const float P[4] = { 2580, 14.9f, 5175, 0 }, A[4] = { 20000, -500, -9500, 0 }, B[4] = { 0, -500, -9500, 0 };
+        for (int k = 0; k < 4; k++) {
+            psp_write_f32(buf + k * 4, P[k]); psp_write_f32(buf + 16 + k * 4, A[k]); psp_write_f32(buf + 32 + k * 4, B[k]);
+        }
+        psp_cpu.r[PSP_REG_A0] = buf; psp_cpu.r[5] = buf + 16; psp_cpu.r[6] = buf + 32;
+        psp_cpu.f[12] = 2500; psp_cpu.f[13] = 10000;
+        psp_cpu.r[29] = buf + 0x800; psp_cpu.r[PSP_REG_RA] = 0;
+        {
+            psp_write_f32(buf + 0x100, -0.0f); psp_write_f32(buf + 0x104, 0); psp_write_f32(buf + 0x108, -5e7f); psp_write_f32(buf + 0x10C, 0);
+            int r1[4], r33[4]; psp_vfpu_regs(1, 1, r1); psp_vfpu_regs(33, 1, r33);
+            psp_lv_q(0, buf + 0x100);
+            psp_vdot(1, 0, 0, 3);              printf("step dot %g\n", psp_cpu.v[r1[0]]);
+            psp_vunary(PSP_VU_ZERO, 33, 0, 1);
+            psp_vcmp(8, 1, 1, 1);              printf("step cc %08X\n", psp_cpu.vfpu_cc);
+            psp_vunary(PSP_VU_RSQ, 1, 1, 1);   printf("step rsq %g\n", psp_cpu.v[r1[0]]);
+            psp_vcmov(1, 33, 1, 0xD2A02101u);  printf("step cmov %g\n", psp_cpu.v[r1[0]]);
+            psp_vfpu_set_prefix(2, 0xFFu);
+            psp_vscl(0, 0, 1, 3);              printf("step scl %g %g %g\n", psp_cpu.v[0], psp_cpu.v[1], psp_cpu.v[2]);
+        }
+        ovCF9AF581_func_09C36758();
+        const uint32_t s = buf + 0x800 - 80;
+        printf("capsule test: v0 %u  t0 %.1f %.1f %.1f  N %g %g %g  P-? %.1f %.1f %.1f  dot76 %g abs68 %g d64 %g d60 %g\n",
+               psp_cpu.r[PSP_REG_V0], psp_read_f32(s + 16), psp_read_f32(s + 20), psp_read_f32(s + 24),
+               psp_read_f32(s + 32), psp_read_f32(s + 36), psp_read_f32(s + 40),
+               psp_read_f32(s), psp_read_f32(s + 4), psp_read_f32(s + 8),
+               psp_read_f32(s + 76), psp_read_f32(s + 68), psp_read_f32(s + 64), psp_read_f32(s + 60));
+        fflush(stdout);
+        _Exit(0);
+    }
+
     start_watchdog();
     psp_call_from_host(img.entry);
     printf("\nentry returned, v0 = 0x%08X; running the threads it started\n",
