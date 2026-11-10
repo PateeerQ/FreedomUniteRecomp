@@ -1,0 +1,390 @@
+diff --git a/include/psprecomp/dispatch.h b/include/psprecomp/dispatch.h
+index ddf9ded..d926f93 100644
+--- a/include/psprecomp/dispatch.h
++++ b/include/psprecomp/dispatch.h
+@@ -81,6 +81,13 @@ void psp_trace_reset(void);
+ uint32_t psp_trace_last(void);
+ void psp_trace_watch(uint32_t addr, void (*fn)(uint32_t));
+ void psp_trace_loop(uint32_t addr);
++/* An interrupt waits (a GE callback raised by the GE thread): the generated
++ * code checks this at every loop's back edge (PSP_LOOP), so a guest spinning
++ * on a flag the callback sets gets it, as on the hardware. psp_loop_poll runs
++ * the hook the GE registered. */
++extern volatile int psp_loop_pending;
++void psp_loop_poll(void);
++void psp_set_loop_poll(void (*fn)(void));
+ void psp_trace_mark(uint32_t addr);
+ void psp_trace_sp(uint32_t fn, uint32_t sp_in, uint32_t sp_out);
+ /* The same observation at a transfer that ends a body, where the expected
+diff --git a/include/psprecomp/hle.h b/include/psprecomp/hle.h
+index 7f7202f..f6d1224 100644
+--- a/include/psprecomp/hle.h
++++ b/include/psprecomp/hle.h
+@@ -163,6 +163,12 @@ uint64_t psp_ge_pixels(void);
+  * every wait point. */
+ void     psp_ge_deliver_pending(void);
+ uint64_t psp_ge_callbacks_run(void);
++/* PSPRECOMP_GE_THREAD=1: the lists run on a thread of their own. Waits until
++ * that thread has nothing it can run (no-op inline); sceDisplaySetFrameBuf
++ * calls it, so the frame shown is drawn. The stats: waits that blocked, and
++ * how long they blocked in all. */
++void     psp_ge_wait_idle(void);
++void     psp_ge_async_stats(uint64_t *waits, uint64_t *wait_us);
+ 
+ void psp_sas_init(void);
+ void psp_sas_register(void);
+diff --git a/src/dispatch.c b/src/dispatch.c
+index a97f784..b0684af 100644
+--- a/src/dispatch.c
++++ b/src/dispatch.c
+@@ -300,7 +300,15 @@ void psp_dispatch_reset(void) {
+ static uint32_t g_loop_addr;
+ static uint64_t g_loop_hits;
+ 
+-void psp_trace_loop(uint32_t addr) { g_loop_addr = addr; g_loop_hits++; }
++volatile int psp_loop_pending;
++static void (*g_loop_poll)(void);
++void psp_set_loop_poll(void (*fn)(void)) { g_loop_poll = fn; }
++void psp_loop_poll(void) { if (g_loop_poll) g_loop_poll(); }
++
++void psp_trace_loop(uint32_t addr) {
++    g_loop_addr = addr; g_loop_hits++;
++    if (psp_loop_pending) psp_loop_poll();
++}
+ uint32_t psp_trace_loop_addr(void) { return g_loop_addr; }
+ uint64_t psp_trace_loop_hits(void) { return g_loop_hits; }
+ 
+diff --git a/src/hle/display.c b/src/hle/display.c
+index 908a3f5..9740a26 100644
+--- a/src/hle/display.c
++++ b/src/hle/display.c
+@@ -131,6 +131,7 @@ static void hle_SetFrameBuf(void) {
+     g_fb_width  = psp_arg(1);
+     g_fb_format = psp_arg(2);
+     if (!g_fb_width) g_fb_width = 512;
++    psp_ge_wait_idle();                  /* GE thread: the lists of this frame are drawn */
+     psp_render_current()->present();
+     psp_ret(SCE_KERNEL_ERROR_OK);
+ }
+diff --git a/src/hle/ge.c b/src/hle/ge.c
+index f780f7b..534e046 100644
+--- a/src/hle/ge.c
++++ b/src/hle/ge.c
+@@ -27,6 +27,7 @@
+ #include "psprecomp/hle.h"
+ #include "psprecomp/render.h"
+ #include "psprecomp/dispatch.h"
++#include "host_thread.h"
+ 
+ #include <math.h>
+ #include <stdio.h>
+@@ -162,6 +163,8 @@ typedef struct {
+     int      sp;
+     uint32_t prev;      /* the previous command word: END reads it (SIGNAL) */
+     uint32_t start;     /* where EnQueue pointed it, for diagnostics */
++    int      queued;    /* GE thread: in g_fifo (the slot is not free until it leaves) */
++    int      base_pending;   /* GE thread: take BASE when it starts, not at EnQueue */
+ } ge_queue;
+ 
+ static ge_queue g_queue[MAX_QUEUES];
+@@ -248,21 +251,32 @@ static int      g_pending_n;
+ static int      g_ge_delivering;
+ static uint64_t g_ge_callbacks_run;
+ 
++/* The pending callbacks: raised by whoever runs the lists (the GE thread, when
++ * there is one), delivered on the guest's side. */
++static host_mutex g_plock = HOST_MUTEX_INIT;
++
+ static void raise_intr(uint32_t func, uint32_t a0, uint32_t a1, uint32_t a2) {
+     if (!func) return;
++    host_mutex_lock(&g_plock);
+     if (g_pending_n == MAX_GE_PENDING) {
++        host_mutex_unlock(&g_plock);
+         fprintf(stderr, "psprecomp: GE callback queue full, dropping 0x%08X\n", func);
+         return;
+     }
+     g_pending[g_pending_n++] = (ge_intr){ func, a0, a1, a2 };
++    psp_loop_pending = 1;                /* the guest takes it at its next loop or call */
++    host_mutex_unlock(&g_plock);
+ }
+ 
+ void psp_ge_deliver_pending(void) {
+     if (g_ge_delivering || !g_pending_n || psp_threadman_intr_disabled()) return;
+     g_ge_delivering = 1;
+-    while (g_pending_n) {
++    for (;;) {
++        host_mutex_lock(&g_plock);
++        if (!g_pending_n) { psp_loop_pending = 0; host_mutex_unlock(&g_plock); break; }
+         ge_intr in = g_pending[0];
+         memmove(g_pending, g_pending + 1, (size_t)--g_pending_n * sizeof g_pending[0]);
++        host_mutex_unlock(&g_plock);
+         if (!psp_lookup(in.func)) {
+             fprintf(stderr, "psprecomp: GE callback 0x%08X is not a recompiled function\n", in.func);
+             continue;
+@@ -579,13 +593,21 @@ void psp_ge_reset(void) {
+ }
+ 
+ static void ge_watch_init(void);
+-void psp_ge_init(void) { psp_ge_reset(); ge_watch_init(); psp_render_trace_init(); }
++void psp_ge_init(void) {
++    psp_ge_reset(); ge_watch_init(); psp_render_trace_init();
++    psp_set_loop_poll(psp_ge_deliver_pending);   /* PSP_LOOP: a callback the GE thread raised */
++}
++
++static uint64_t g_async_waits, g_async_wait_us;   /* the GE thread's (below) */
+ 
+ void psp_ge_dump_stats(FILE *out) {
+     fprintf(out, "GE: %llu lists, %llu commands, %llu finishes\n",
+             (unsigned long long)g_ge.lists,
+             (unsigned long long)g_ge.commands,
+             (unsigned long long)g_ge.finishes);
++    if (g_async_waits)
++        fprintf(out, "    GE thread: the guest waited %llu times, %.2f ms on average\n",
++                (unsigned long long)g_async_waits, g_async_wait_us / 1000.0 / (double)g_async_waits);
+     fprintf(out, "    block transfers %llu, %llu bytes\n",
+             (unsigned long long)g_trx_count, (unsigned long long)g_trx_bytes);
+     fprintf(out, "    framebuffer 0x%08X stride %u, vertex type 0x%06X\n",
+@@ -1567,11 +1589,114 @@ static ge_queue *find_queue(uint32_t id) {
+     return NULL;
+ }
+ 
++/* ---- the GE thread (PSPRECOMP_GE_THREAD=1) ---------------------------------
++ *
++ * The hardware runs a list while the CPU goes on. By default the lists are run
++ * inside EnQueue, so the game's thread pays for every vertex before it gets to
++ * its own work; MHFU enqueues the whole frame's list at the start of a frame
++ * and then runs its logic for the next one, which on the PSP overlap. With the
++ * GE thread they overlap here too: EnQueue only queues, a worker runs the
++ * lists in order (the next starts when the one before it has finished, as on
++ * the hardware; a list caught up with its stall address holds the ones behind
++ * it), and the guest waits where it could observe the GE: ListSync, DrawSync,
++ * and sceDisplaySetFrameBuf (psp_ge_wait_idle: the frame it shows is drawn).
++ * Callbacks are still run on the guest's side (psp_ge_deliver_pending): the
++ * worker only queues them. The worker never touches psp_cpu. */
++static int g_async = -1;                    /* -1: not decided yet */
++static host_mutex g_qlock = HOST_MUTEX_INIT;
++static host_cond g_qwake = HOST_COND_INIT, g_qidle = HOST_COND_INIT;
++static ge_queue *g_fifo[MAX_QUEUES];        /* in the order the lists run */
++static int g_nfifo, g_qbusy;                /* g_qbusy: the worker is inside run_list */
++
++/* The head can run: not finished and not caught up with its stall address. */
++static int head_runnable(void) {
++    if (!g_nfifo) return 0;
++    const ge_queue *q = g_fifo[0];
++    return !(q->stall && q->list == q->stall);
++}
++
++static void *ge_worker(void *arg) {
++    (void)arg;
++    host_mutex_lock(&g_qlock);
++    for (;;) {
++        while (!head_runnable()) host_cond_wait(&g_qwake, &g_qlock);
++        ge_queue *q = g_fifo[0];
++        if (q->base_pending) { q->base = g_base; q->base_pending = 0; }   /* BASE as the list before left it */
++        g_qbusy = 1;
++        host_mutex_unlock(&g_qlock);
++        run_list(q);
++        host_mutex_lock(&g_qlock);
++        g_qbusy = 0;
++        if (!q->done && !(q->stall && q->list == q->stall)) {
++            /* out of budget (a list that loops): drop it, as the inline run
++             * would have returned from it */
++            q->done = 1;
++            q->used = 0;
++        }
++        if (q->done) {
++            q->queued = 0;
++            memmove(g_fifo, g_fifo + 1, (size_t)--g_nfifo * sizeof g_fifo[0]);
++        }
++        host_cond_broadcast(&g_qidle);
++    }
++    return NULL;
++}
++
++static int async_on(void) {
++    if (g_async < 0) {
++        const char *e = getenv("PSPRECOMP_GE_THREAD");
++        g_async = e && e[0] == '1';
++        if (g_async) {
++            host_thread t;
++            if (host_thread_create(&t, 8u << 20, ge_worker, NULL) != 0) {
++                fprintf(stderr, "psprecomp: GE thread not started; lists run inline\n");
++                g_async = 0;
++            } else fprintf(stderr, "psprecomp: GE lists run on their own thread\n");
++        }
++    }
++    return g_async;
++}
++
++/* Idle: nothing queued, or the head waits for the CPU at its stall address. */
++static int idle_locked(void) { return !g_qbusy && !head_runnable(); }
++
++static void wait_locked(int (*until)(const void *), const void *arg) {
++    if (until(arg)) return;
++    const uint64_t t0 = host_epoch_us();
++    while (!until(arg)) host_cond_wait(&g_qidle, &g_qlock);
++    g_async_waits++;
++    g_async_wait_us += host_epoch_us() - t0;
++}
++static int until_idle(const void *arg) { (void)arg; return idle_locked(); }
++static int until_list(const void *arg) {
++    const ge_queue *q = (const ge_queue *)arg;
++    return q->done || !q->queued || (g_fifo[0] == q && idle_locked());
++}
++
++void psp_ge_wait_idle(void) {
++    if (g_async <= 0) return;
++    host_mutex_lock(&g_qlock);
++    wait_locked(until_idle, NULL);
++    host_mutex_unlock(&g_qlock);
++    psp_ge_deliver_pending();
++}
++
++void psp_ge_async_stats(uint64_t *waits, uint64_t *wait_us) {
++    if (waits) *waits = g_async_waits;
++    if (wait_us) *wait_us = g_async_wait_us;
++}
++
+ static void enqueue(int head) {
+     /* (list, stall, cbid, arg) */
++    const int async = async_on();
++    if (async) host_mutex_lock(&g_qlock);
+     ge_queue *q = NULL;
+-    for (int i = 0; i < MAX_QUEUES; i++) if (!g_queue[i].used) { q = &g_queue[i]; break; }
+-    if (!q) { psp_ret(SCE_KERNEL_ERROR_NO_MEMORY); return; }
++    for (int i = 0; i < MAX_QUEUES; i++) if (!g_queue[i].used && !g_queue[i].queued) { q = &g_queue[i]; break; }
++    if (!q) {
++        if (async) host_mutex_unlock(&g_qlock);
++        psp_ret(SCE_KERNEL_ERROR_NO_MEMORY);
++        return;
++    }
+ 
+     memset(q, 0, sizeof *q);
+     q->id    = g_next_id++;
+@@ -1581,7 +1706,24 @@ static void enqueue(int head) {
+     q->used  = 1;
+     q->cbid  = (int32_t)psp_arg(2);
+     q->base  = g_base;
+-    (void)head;
++
++    if (async) {
++        /* Queued behind the lists before it (EnQueueHead: before them, but
++         * after the one the worker is in). */
++        q->queued = 1;
++        q->base_pending = 1;
++        int at = g_nfifo;
++        if (head) at = g_nfifo && (g_qbusy || !head_runnable()) ? 1 : 0;
++        memmove(g_fifo + at + 1, g_fifo + at, (size_t)(g_nfifo - at) * sizeof g_fifo[0]);
++        g_fifo[at] = q;
++        g_nfifo++;
++        const uint32_t id = q->id;
++        host_cond_signal(&g_qwake);
++        host_mutex_unlock(&g_qlock);
++        psp_ret(id);
++        psp_ge_deliver_pending();
++        return;
++    }
+ 
+     /* Hardware runs the list asynchronously. We run it here and finish before
+      * returning, which is indistinguishable from the game's point of view
+@@ -1597,6 +1739,17 @@ static void hle_ListEnQueueHead(void) { enqueue(1); }
+ 
+ static void hle_ListUpdateStallAddr(void) {
+     uint32_t id = psp_arg(0);
++    if (g_async > 0) {
++        host_mutex_lock(&g_qlock);
++        ge_queue *q = NULL;
++        for (int i = 0; i < MAX_QUEUES; i++)
++            if (g_queue[i].queued && g_queue[i].id == id) q = &g_queue[i];
++        if (q) { q->stall = psp_arg(1) & ~3u; host_cond_signal(&g_qwake); }
++        host_mutex_unlock(&g_qlock);
++        psp_ret(q || (id >= 0x00080000u && id < g_next_id) ? SCE_KERNEL_ERROR_OK : SCE_KERNEL_ERROR_UNKNOWN_UID);
++        psp_ge_deliver_pending();
++        return;
++    }
+     ge_queue *q = find_queue(id);
+     if (!q) {
+         /* A list that already finished has released its slot; moving its
+@@ -1611,10 +1764,44 @@ static void hle_ListUpdateStallAddr(void) {
+     psp_ge_deliver_pending();
+ }
+ 
+-/* Lists are complete by the time they are enqueued, so every sync succeeds
+- * immediately. */
+-static void hle_ListSync(void) { psp_ge_deliver_pending(); psp_ret(SCE_KERNEL_ERROR_OK); }
+-static void hle_DrawSync(void) { psp_ge_deliver_pending(); psp_ret(SCE_KERNEL_ERROR_OK); }
++/* Inline, lists are complete by the time they are enqueued, so every sync
++ * succeeds immediately. With the GE thread, mode 0 waits and mode 1 peeks
++ * (0 completed, 1 queued, 2 drawing, 3 stalled; DrawSync: 0 or 2). */
++static void hle_ListSync(void) {
++    if (g_async > 0) {
++        const uint32_t id = psp_arg(0), mode = psp_arg(1);
++        uint32_t r = 0;
++        host_mutex_lock(&g_qlock);
++        ge_queue *q = NULL;
++        for (int i = 0; i < MAX_QUEUES; i++)
++            if (g_queue[i].queued && g_queue[i].id == id) q = &g_queue[i];
++        if (q) {
++            if (mode == 0) wait_locked(until_list, q);
++            else if (g_fifo[0] != q) r = 1;
++            else r = g_qbusy ? 2 : head_runnable() ? 1 : 3;
++        }
++        host_mutex_unlock(&g_qlock);
++        psp_ge_deliver_pending();
++        psp_ret(r);
++        return;
++    }
++    psp_ge_deliver_pending();
++    psp_ret(SCE_KERNEL_ERROR_OK);
++}
++static void hle_DrawSync(void) {
++    if (g_async > 0) {
++        uint32_t r = 0;
++        host_mutex_lock(&g_qlock);
++        if (psp_arg(0) == 0) wait_locked(until_idle, NULL);
++        else if (!idle_locked()) r = 2;
++        host_mutex_unlock(&g_qlock);
++        psp_ge_deliver_pending();
++        psp_ret(r);
++        return;
++    }
++    psp_ge_deliver_pending();
++    psp_ret(SCE_KERNEL_ERROR_OK);
++}
+ 
+ static void hle_Break(void)    { psp_ret(SCE_KERNEL_ERROR_OK); }
+ static void hle_Continue(void) { psp_ret(SCE_KERNEL_ERROR_OK); }
+diff --git a/src/hle/hle.c b/src/hle/hle.c
+index 9cff0ef..84acd1e 100644
+--- a/src/hle/hle.c
++++ b/src/hle/hle.c
+@@ -129,6 +129,7 @@ static uint64_t g_unimpl_total;
+ static uint64_t g_unimpl_logged;
+ 
+ void psp_hle_call(uint32_t nid) {
++    if (psp_loop_pending) psp_loop_poll();   /* a GE callback from the GE thread: before the call, like an interrupt */
+     if (nid == 0x237DBD4Fu)
+         fprintf(stderr, "psp_hle_call ENTERED for 0x237DBD4F (%d entries registered)\n", g_count);
+     for (int i = 0; i < g_count; i++) {
+diff --git a/tools/allegrexrecomp/emit.c b/tools/allegrexrecomp/emit.c
+index 8d08f79..128bd90 100644
+--- a/tools/allegrexrecomp/emit.c
++++ b/tools/allegrexrecomp/emit.c
+@@ -1231,7 +1231,7 @@ static void emit_header(FILE *f, const ectx *c, const emit_opts *o) {
+         " * -DPSPRECOMP_TRACE_LITE keeps only the entry ring, stored inline. */\n"
+         "#if defined(PSPRECOMP_TRACE_LITE) && !defined(PSPRECOMP_TRACE)\n"
+         "#  define PSP_ENTER(a) (psp_trace_ring[(uint32_t)psp_trace_n++ & (PSP_TRACE_DEPTH - 1)] = (a))\n"
+-        "#  define PSP_LOOP(a)  ((void)0)\n"
++        "#  define PSP_LOOP(a)  (psp_loop_pending ? psp_loop_poll() : (void)0)\n"
+         "#  define PSP_SP_ENTER()  ((void)0)\n"
+         "#  define PSP_SP_CHECK(a) ((void)0)\n"
+         "#  define PSP_SP_LEAVE(a) ((void)0)\n"
+@@ -1247,7 +1247,7 @@ static void emit_header(FILE *f, const ectx *c, const emit_opts *o) {
+         "#  define PSP_MARK(a)  psp_trace_mark(a)\n"
+         "#else\n"
+         "#  define PSP_ENTER(a) ((void)0)\n"
+-        "#  define PSP_LOOP(a)  ((void)0)\n"
++        "#  define PSP_LOOP(a)  (psp_loop_pending ? psp_loop_poll() : (void)0)\n"
+         "#  define PSP_SP_ENTER()  ((void)0)\n"
+         "#  define PSP_SP_CHECK(a) ((void)0)\n"
+         "#  define PSP_SP_LEAVE(a) ((void)0)\n"
