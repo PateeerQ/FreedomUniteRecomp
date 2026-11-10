@@ -1,0 +1,45 @@
+diff --git a/src/render_gl.c b/src/render_gl.c
+index 1138df3..be63b31 100644
+--- a/src/render_gl.c
++++ b/src/render_gl.c
+@@ -648,13 +648,30 @@ static float uv_nudge(void) {
+     return v;
+ }
+ 
++/* Depth 0..65535 as NDC z. By default each value lands in the middle of its
++ * 1/65536 step, so nothing sits exactly on the near or far plane: MHFU draws
++ * its font text at z 0 (NDC -1.0 exactly), and on AMD RX 9070 XT drivers 26.10
++ * that text was gone at 1x and in pieces at 5x (issue #6), as if pixels whose
++ * interpolated z fell a hair below -1 were clipped despite GL_DEPTH_CLAMP.
++ * Monotonic and the same for every draw, so depth tests compare as before.
++ * PSPRECOMP_Z_INSET=0 (or MHFU_Z_INSET=0): the old mapping. */
++static int z_inset(void) {
++    static int v = -1;
++    if (v < 0) {
++        const char *e = getenv("PSPRECOMP_Z_INSET");
++        if (!e || !*e) e = getenv("MHFU_Z_INSET");
++        v = !(e && *e == '0');
++    }
++    return v;
++}
++
+ static void put_vertex(gframe *f, const psp_vertex *v, uint32_t rgba, const gfb *fb,
+                        float us, float vs, float uo, float vo) {
+     gvert *o = (gvert *)gbuf_add(&f->vtx, sizeof *o);
+     const float W = v->w > 0.0f ? 1.0f / v->w : 1.0f;
+     o->x = (v->fx / (float)fb->w * 2.0f - 1.0f) * W;
+     o->y = (v->fy / (float)fb->h * 2.0f - 1.0f) * W;
+-    o->z = (v->z / 65535.0f * 2.0f - 1.0f) * W;
++    o->z = (z_inset() ? (v->z + 0.5f) / 65536.0f * 2.0f - 1.0f : v->z / 65535.0f * 2.0f - 1.0f) * W;
+     o->w = W;
+     o->rgba = rgba;
+     const float nudge = v->w <= 0.0f ? uv_nudge() : 0.0f;   /* through mode: w is 0 */
+@@ -1109,6 +1126,8 @@ static int setup(void) {
+         const char *rn = (const char *)glGetString(0x1F01 /* GL_RENDERER */);
+         const char *vs = (const char *)glGetString(0x1F02 /* GL_VERSION */);
+         fprintf(stderr, "render_gl: %s / %s / %s\n", vn ? vn : "?", rn ? rn : "?", vs ? vs : "?");
++        fprintf(stderr, "render_gl: depth inset %s, uv nudge %s\n", z_inset() ? "on" : "off",
++                uv_nudge() > 0.0f ? "on" : "off");
+     }
+     find_formats();
+     g_prog = program(VS_DRAW, FS_DRAW);
