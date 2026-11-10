@@ -1,0 +1,39 @@
+diff --git a/src/render_gl.c b/src/render_gl.c
+index 289e745..5b80b16 100644
+--- a/src/render_gl.c
++++ b/src/render_gl.c
+@@ -619,6 +619,22 @@ static void gl_target(uint32_t addr, uint32_t stride, int fmt) {
+     g_tgt_fmt = fmt;
+ }
+ 
++/* Through-mode (2D) texture coordinates land exactly on texel edges when a
++ * sprite's texels map 1:1 to pixels; which side a GPU's nearest sampling then
++ * picks is not fixed: on an AMD RX 9070 XT (driver 26.10) MHFU's text was gone at
++ * 1x and in pieces at 5x (issue #6; the software renderer was right). A nudge of
++ * 1/256 texel puts every sample inside the texel the PSP reads. PSPRECOMP_UV_NUDGE=0
++ * (or MHFU_UV_NUDGE=0) turns it off. */
++static float uv_nudge(void) {
++    static float v = -1.0f;
++    if (v < 0.0f) {
++        const char *e = getenv("PSPRECOMP_UV_NUDGE");
++        if (!e || !*e) e = getenv("MHFU_UV_NUDGE");
++        v = e && *e == '0' ? 0.0f : 1.0f / 256.0f;
++    }
++    return v;
++}
++
+ static void put_vertex(gframe *f, const psp_vertex *v, uint32_t rgba, const gfb *fb,
+                        float us, float vs, float uo, float vo) {
+     gvert *o = (gvert *)gbuf_add(&f->vtx, sizeof *o);
+@@ -628,8 +644,9 @@ static void put_vertex(gframe *f, const psp_vertex *v, uint32_t rgba, const gfb
+     o->z = (v->z / 65535.0f * 2.0f - 1.0f) * W;
+     o->w = W;
+     o->rgba = rgba;
+-    o->u = (v->u + uo) * us;
+-    o->v = (v->v + vo) * vs;
++    const float nudge = v->w <= 0.0f ? uv_nudge() : 0.0f;   /* through mode: w is 0 */
++    o->u = (v->u + uo + nudge) * us;
++    o->v = (v->v + vo + nudge) * vs;
+     o->fog = v->fog;
+ }
+ 
