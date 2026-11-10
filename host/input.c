@@ -23,6 +23,7 @@
 #include "achievements.h"
 #include "chat.h"
 #include "gamepad.h"
+#include "hle_mhfu.h"
 #include "input.h"
 #include "lobby.h"
 #include "perfhint.h"
@@ -175,6 +176,7 @@ static void hle_ReadBufferPositive(void) {
         buttons &= ~STICK_BITS;
     }
     uint32_t stamp = (uint32_t)psp_threadman_vtime_us();
+    mhfu_hunter_trace_frame(ax, ay, buttons);   /* MHFU_TRACE_HUNTER: around area changes */
 
     for (uint32_t i = 0; i < count; i++) {
         uint32_t at = buf + i * 16;
