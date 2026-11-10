@@ -352,6 +352,8 @@ static int g_wide;                   /* the widescreen mod (mhfu_mod_set_widescr
  * start (texpack_off tells mhfu_texpack_init through MHFU_TEXPACK=0), so a
  * change shows after a restart. */
 static int g_texpack = 1, g_texpack_started = -1;
+/* The GE on a thread of its own (psprecomp PSPRECOMP_GE_THREAD): read at the start. */
+static int g_gethread = 1, g_gethread_started = -1;
 static char g_texstyle[256], g_texstyle_started[256];   /* its ADDONS style ("": MAIN's own) */
 static int g_mod_set[16] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
                                      /* the built-in mods as settings.ini has them: -1 not there */
@@ -378,6 +380,7 @@ static void settings_load(void) {
         if (sscanf(line, "fps60=%d", &v) == 1) g_fps60 = v != 0;
         if (sscanf(line, "widescreen=%d", &v) == 1) g_wide = v != 0;
         if (sscanf(line, "texpack=%d", &v) == 1) g_texpack = v != 0;
+        if (sscanf(line, "ge_thread=%d", &v) == 1) g_gethread = v != 0;
         if (!strncmp(line, "texpack_style=", 14)) {
             snprintf(g_texstyle, sizeof g_texstyle, "%s", line + 14);
             g_texstyle[strcspn(g_texstyle, "\r\n")] = 0;
@@ -391,6 +394,16 @@ static void settings_load(void) {
                 if (!strcmp(name, k_group_name[g])) g_place[g] = (placed){ 1, x, y, k };
     }
     if (f) fclose(f);
+    if (g_gethread_started < 0) {
+        g_gethread_started = g_gethread;
+        if (!getenv("PSPRECOMP_GE_THREAD")) {          /* main.c turns it on when nothing says */
+#ifdef _WIN32
+            _putenv_s("PSPRECOMP_GE_THREAD", g_gethread ? "1" : "0");
+#else
+            setenv("PSPRECOMP_GE_THREAD", g_gethread ? "1" : "0", 1);
+#endif
+        }
+    }
     if (g_texpack_started < 0) {
         g_texpack_started = g_texpack;
         snprintf(g_texstyle_started, sizeof g_texstyle_started, "%s", g_texstyle);
@@ -410,7 +423,7 @@ static void settings_save(void) {
     fprintf(f, "fps60=%d\nwidescreen=%d\nweapon_buttons=%d\nbutton_style=%d\ntexpack=%d\n", g_fps60, g_wide,
             g_skills_on, g_style, g_texpack);
     if (g_texstyle[0]) fprintf(f, "texpack_style=%s\n", g_texstyle);
-    fprintf(f, "pad_combined=%d\n", g_pad_combined);
+    fprintf(f, "pad_combined=%d\nge_thread=%d\n", g_pad_combined, g_gethread);
     for (int i = 0; i < mhfu_mod_count(); i++) fprintf(f, "mod_%s=%d\n", mhfu_mod_id(i), mhfu_mod_on(i));
     for (int g = 0; g < G_COUNT; g++)
         if (g_place[g].set)
@@ -722,7 +735,7 @@ static uint32_t attack_bits(float dx, float dy) {
 /* The pictures on the buttons (icon(), below the layout): no words on them. */
 enum { ICON_CROUCH, ICON_DODGE, ICON_RUN, ICON_SHEATHE, ICON_ITEM, ICON_SWORD, ICON_GUARD, ICON_AIM, ICON_TARGET,
        ICON_DEMON, ICON_SPIRIT, ICON_DANCE, ICON_FADE, ICON_CHARGE, ICON_TALK,
-       ICON_CHEST, ICON_DOOR, ICON_CHAIR, ICON_BOARD, ICON_QUEST, ICON_TRAIN, ICON_DELIVERY, ICON_CARVE, ICON_SLEEP, ICON_BAG, ICON_KICK, ICON_CHAT, ICON_DRAW, ICON_USE, ICON_SORT, ICON_DELETE, ICON_ZOOM, ICON_NEEDS, ICON_SAVE, ICON_PICK };
+       ICON_CHEST, ICON_DOOR, ICON_CHAIR, ICON_BOARD, ICON_QUEST, ICON_TRAIN, ICON_DELIVERY, ICON_CARVE, ICON_SLEEP, ICON_BAG, ICON_KICK, ICON_CHAT, ICON_DRAW, ICON_USE, ICON_SORT, ICON_DELETE, ICON_ZOOM, ICON_NEEDS, ICON_SAVE, ICON_PICK, ICON_VIEW };
 
 /* The weapon buttons: a column left of the face buttons whose buttons follow
  * the weapon the hunter carries, each holding a PSP combination (the game
@@ -873,7 +886,7 @@ static void qstart_pos(const layout *L, float *x, float *y) { *x = L->x[G_MENU];
  * Triangle + L, page on = Triangle + R, sort), 4 the equipment sets (delete =
  * Triangle). Info is the Square already there. (The prompt byte tried first
  * follows the highlighted line's help text: the buttons blinked.) */
-enum { WX_SORT, WX_PAGE_PREV, WX_PAGE_NEXT, WX_LEFT, WX_RIGHT, WX_DELETE, WX_QTY, WX_ZOOM, WX_NEEDS };
+enum { WX_SORT, WX_PAGE_PREV, WX_PAGE_NEXT, WX_LEFT, WX_RIGHT, WX_DELETE, WX_QTY, WX_ZOOM, WX_NEEDS, WX_VIEW };
 static int g_win_id;                                     /* 1 + the sub-menu's kind, 0 none */
 /* Which of the box's screens is up (FUC dumps 20:25, 21:04, 21:11): only at
  * the item box (object kind 6 or 7; a bookshelf's Yes/No got the box's
@@ -912,7 +925,12 @@ static int win_extras(int out[6]) {
     case 2: out[0] = WX_LEFT; out[1] = WX_SORT; out[2] = WX_RIGHT; return 3;
     case 3: out[0] = WX_PAGE_PREV; out[1] = WX_LEFT; out[2] = WX_SORT; out[3] = WX_RIGHT; out[4] = WX_PAGE_NEXT; return 5;
     case 4: out[0] = WX_DELETE; return 1;
-    case 6: out[0] = WX_ZOOM; out[1] = WX_NEEDS; return 2;          /* crafting: zoom (L), requirements (R) */
+    case 6:                                                         /* crafting: zoom (L), requirements (R) */
+        out[0] = WX_ZOOM; out[1] = WX_NEEDS;
+        /* EU/US show the weapon only on View (Select); FUComplete shows it by itself
+         * (Muhammad, 2026-11-10; JP not known: it keeps FUC's two) */
+        if (!jp_buttons()) { out[2] = WX_VIEW; return 3; }
+        return 2;
     case 7: out[0] = WX_LEFT; out[1] = WX_RIGHT; return 2;          /* decorations: pages (L, R) */
     default: return 0;
     }
@@ -928,6 +946,7 @@ static uint32_t wx_bits(int k) {
     case WX_QTY: return PSP_CTRL_TRIANGLE;
     case WX_ZOOM: return PSP_CTRL_LTRIGGER;
     case WX_NEEDS: return PSP_CTRL_RTRIGGER;
+    case WX_VIEW: return PSP_CTRL_SELECT;
     }
     return 0;
 }
@@ -1315,7 +1334,7 @@ static const unsigned char k_icon_rgb[][3] = {
     [ICON_BOARD] = { 240, 228, 200 }, [ICON_QUEST] = { 255, 205, 110 }, [ICON_TRAIN] = { 225, 190, 150 }, [ICON_DELIVERY] = { 240, 200, 120 }, [ICON_CARVE] = { 235, 225, 205 }, [ICON_SLEEP] = { 190, 200, 255 }, [ICON_BAG] = { 240, 200, 120 }, [ICON_KICK] = { 235, 225, 205 },
     [ICON_CHAT] = { 250, 245, 235 }, [ICON_DRAW] = { 250, 245, 235 }, [ICON_USE] = { 150, 235, 170 },
     [ICON_SORT] = { 235, 225, 205 }, [ICON_DELETE] = { 255, 150, 130 }, [ICON_ZOOM] = { 235, 225, 205 },
-    [ICON_NEEDS] = { 240, 228, 200 }, [ICON_SAVE] = { 150, 205, 255 }, [ICON_PICK] = { 150, 235, 170 },
+    [ICON_NEEDS] = { 240, 228, 200 }, [ICON_SAVE] = { 150, 205, 255 }, [ICON_PICK] = { 150, 235, 170 }, [ICON_VIEW] = { 235, 225, 205 },
 };
 static uint32_t icon_col(int which, int a) { return va(k_icon_rgb[which][0], k_icon_rgb[which][1], k_icon_rgb[which][2], a); }
 
@@ -1655,6 +1674,7 @@ static void draw_vpad(canvas *c, float s) {
             case WX_QTY: face_shape(c, S(ex), S(ey), S(er * 0.40f), face[3].shape, t * 1.4f, face[3].tint); break;
             case WX_ZOOM: icon(c, S(ex), S(ey), S(er * 0.55f), ICON_ZOOM, t, icon_col(ICON_ZOOM, 235)); break;
             case WX_NEEDS: icon(c, S(ex), S(ey), S(er * 0.55f), ICON_NEEDS, t, icon_col(ICON_NEEDS, 235)); break;
+            case WX_VIEW: icon(c, S(ex), S(ey), S(er * 0.55f), ICON_VIEW, t, icon_col(ICON_VIEW, 235)); break;
             case WX_LEFT: case WX_RIGHT: {
                 const float d = wx[i] == WX_RIGHT ? 1.0f : -1.0f;
                 chevron(c, S(ex), S(ey), d, 0, S(er * 0.32f), t * 1.6f, white);
@@ -1966,13 +1986,14 @@ static void draw_editor(canvas *c, float s) {
  * or Back again closes. Online, sign-in and the update check are Android
  * dialogs (MhfuActivity, over JNI): they need text fields. */
 
-enum { M_NET, M_ACH, M_VPAD, M_STYLE, M_PAD, M_EDIT, M_OPACITY, M_SKILLS, M_FPS, M_RES, M_SMOOTH, M_WIDE, M_CHEATS, M_TEXPACK, M_TEXSTYLE, M_TEXINSTALL, M_MOD0, M_MOD1, M_MOD2, M_SAVES, M_FILES, M_CRASH, M_UPDATE, M_ABOUT, M_EXIT };
+enum { M_NET, M_ACH, M_VPAD, M_STYLE, M_PAD, M_EDIT, M_OPACITY, M_SKILLS, M_FPS, M_RES, M_SMOOTH, M_GETHREAD, M_WIDE, M_CHEATS, M_TEXPACK, M_TEXSTYLE, M_TEXINSTALL, M_MOD0, M_MOD1, M_MOD2, M_SAVES, M_FILES, M_CRASH, M_UPDATE, M_ABOUT, M_EXIT };
 enum { K_TOGGLE, K_CYCLE, K_STEP, K_ACTION };
 typedef struct { int id, kind, restart; const char *text, *help; } menu_item;
 
 static const menu_item k_tab_display[] = {
     { M_RES, K_STEP, 1, "Resolution", "The 3D picture's size, a multiple of the PSP's 480x272. Higher is sharper but slower on weak phones. Applies at the next start." },
     { M_SMOOTH, K_TOGGLE, 0, "60 FPS (beta)", "Runs the game at 60 frames a second. In a room, the room plays at its slowest player's rate." },
+    { M_GETHREAD, K_TOGGLE, 1, "Multi-core drawing (beta)", "Draws the picture on a second CPU core while the game runs on its own, as the PSP's graphics chip did: faster on phones with several cores. Applies at the next start." },
     { M_FPS, K_TOGGLE, 0, "Show FPS", "Shows the frame rate in the top-left corner, and the ping while you are in a room." },
 };
 static const menu_item k_tab_controls[] = {
@@ -2083,6 +2104,7 @@ static const char *menu_value(int id) {
     case M_PAD: return g_pad_combined ? "Combined" : "Separate";
     case M_SMOOTH: return !MHFU_HAS_FPS60 ? "Not in this build" : !g_fps60 ? "Off" : mhfu_fps_target() >= 60 ? "On" : "On, room at 30";
     case M_WIDE: return mhfu_mod_widescreen() ? "On" : "Off";
+    case M_GETHREAD: return g_gethread ? "On" : "Off";
 #if MHFU_TEXPACK
     case M_TEXPACK:
         if (!g_texpack) return "Off";
@@ -2143,6 +2165,7 @@ static int menu_on(int id) {
     case M_SKILLS: return g_skills_on;
     case M_SMOOTH: return MHFU_HAS_FPS60 ? g_fps60 : -1;
     case M_WIDE: return mhfu_mod_widescreen() != 0;
+    case M_GETHREAD: return g_gethread;
 #if MHFU_TEXPACK
     case M_TEXPACK: return g_texpack;
 #endif
@@ -2173,6 +2196,7 @@ static int menu_choices(int id, int *at) {
 static int menu_pending(int id) {
     switch (id) {
     case M_RES: return g_res_setting && g_res_setting != g_scale;
+    case M_GETHREAD: return g_gethread != g_gethread_started;
 #if MHFU_TEXPACK
     case M_TEXPACK: return g_texpack != g_texpack_started;
     case M_TEXSTYLE: return strcmp(g_texstyle, g_texstyle_started) != 0;
@@ -2647,6 +2671,7 @@ static void menu_act(const menu_item *it, int dir) {
         if (!MHFU_HAS_FPS60) break;
         g_fps60 = !g_fps60; mhfu_fps_set_preferred(g_fps60 ? 60 : 30); settings_save(); break;
     case M_WIDE: g_wide = !mhfu_mod_widescreen(); mhfu_mod_set_widescreen(g_wide); settings_save(); break;
+    case M_GETHREAD: g_gethread = !g_gethread; settings_save(); break;
 #if MHFU_TEXPACK
     case M_TEXPACK: g_texpack = !g_texpack; settings_save(); break;
     case M_TEXSTYLE: {                     /* the next style; after the last, the pack's default */
