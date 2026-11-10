@@ -285,13 +285,13 @@ public class MhfuActivity extends SDLActivity {
 
     /** The game, closed and started again (from SetupActivity) in a moment: it reads its files only at start. */
     private void restart() {
-        Intent start = new Intent(this, SetupActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        int flags = android.app.PendingIntent.FLAG_CANCEL_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE;
-        android.app.PendingIntent p = android.app.PendingIntent.getActivity(this, 7, start, flags);
-        android.app.AlarmManager am = (android.app.AlarmManager) getSystemService(Context.ALARM_SERVICE);
-        am.set(android.app.AlarmManager.RTC, System.currentTimeMillis() + 600, p);
-        finishAffinity();
-        System.exit(0);
+        // RestartActivity (its own process) starts SetupActivity once this process is gone.
+        startActivity(new Intent(this, RestartActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        overridePendingTransition(0, 0);
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            finishAffinity();
+            System.exit(0);
+        }, 200);
     }
 
     /** "Load from folder": the folder's saves over the app's, then the game again, to read them. */
