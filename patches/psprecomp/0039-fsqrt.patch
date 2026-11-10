@@ -1,0 +1,24 @@
+﻿diff --git a/include/psprecomp/recomp_rt.h b/include/psprecomp/recomp_rt.h
+index 132306f..9a7b42f 100644
+--- a/include/psprecomp/recomp_rt.h
++++ b/include/psprecomp/recomp_rt.h
+@@ -220,13 +220,14 @@ static inline uint32_t psp_f32_to_bits(float v) {
+ 
+ static inline float psp_fabs(float v)  { return v < 0.0f ? -v : v; }
+ 
+-/* Newton-Raphson would be faster but the host FPU is exact and this is not the
+- * hot path in any recompiled game; correctness first. */
++/* The host's IEEE square root, as the PSP's. This used to be 24 Newton steps
++ * from g = v, which halves g until it nears the root: past about 2^48 the
++ * steps ran out first (sqrt(2.5e15) gave 1.5e8, not 5e7). MHFU's area-exit
++ * capsules normalise a vector of length 5e7 that way, so the zone came out
++ * a third too big and Area 2's spawn point fell inside the exit to Area 3. */
+ static inline float psp_fsqrt(float v) {
+     if (v <= 0.0f) return 0.0f;
+-    float g = v;
+-    for (int i = 0; i < 24; i++) g = 0.5f * (g + v / g);
+-    return g;
++    return sqrtf(v);
+ }
+ 
+ /* `c.<cond>.s` condition codes. The distinction that matters is *ordered* vs
