@@ -13,6 +13,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#endif
 
 #include "adhoc.h"
 #include "hle_mhfu.h"
@@ -460,6 +465,15 @@ static void save_overlay(int slot, uint32_t hash, const uint8_t *buf, uint32_t n
     FILE *f = fopen(path, "rb");
     if (f) { fclose(f); return; }                  /* saved by an earlier run */
     if ((f = fopen(path, "wb")) == NULL) {
+        /* the folder may not exist yet (Android's files/overlays, issue #10) */
+#ifdef _WIN32
+        _mkdir(g_ovl_dir);
+#else
+        mkdir(g_ovl_dir, 0777);
+#endif
+        f = fopen(path, "wb");
+    }
+    if (f == NULL) {
         fprintf(stderr, "mhfu: cannot write %s\n", path);
         return;
     }
