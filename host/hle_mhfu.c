@@ -28,6 +28,7 @@
 
 #include "psprecomp/dispatch.h"
 #include "psprecomp/mem.h"
+#include "psprecomp/recomp_rt.h"
 
 /* ---- sceUmdUser ------------------------------------------------------------ */
 
@@ -443,6 +444,59 @@ int mhfu_overlays_missing(void) { return g_ovl_missing; }
  * hash differs: EU C5DF3522). */
 static char g_ovl_name[OVL_SLOTS][33];
 int mhfu_in_quest(void) { return g_ovl_hash[1] && !strncmp(g_ovl_name[1], "game_task", 9); }
+
+/* MHFU_TRACE_HUNTER=1: the hunter's facing (u16, 65536 a turn), position and
+ * the stick, every frame for 90 frames after each area (stage overlay) loads,
+ * and MHFU_WATCH re-armed there, so its first writes after an area change are
+ * printed. For the area changes that chain into a second one (2026-11-10). */
+#define HUNTER_YAW (MHFU_ADDR_WEAPON_CLASS + 0xCu)          /* EU 0x090B3634 */
+#define HUNTER_X   (MHFU_ADDR_WEAPON_CLASS - 0x1A8u)        /* EU 0x090B3480; z at +8 */
+static int g_hunter_frames = -1;
+static uint32_t g_hunter_x0;          /* x when the area loaded: the spawn moves it */
+static int g_hunter_dumped;
+void mhfu_hunter_trace_area(void) {
+    static int on = -1;
+    if (on < 0) on = getenv("MHFU_TRACE_HUNTER") != NULL;
+    if (getenv("MHFU_WATCH")) psp_mem_watch_write((uint32_t)strtoul(getenv("MHFU_WATCH"), NULL, 0));
+    /* MHFU_TEST_AREA_POS=1 (experiment): the hunter's old position, in the
+     * last area's coordinates, moved far outside the map until the new area
+     * places it. Does the new area's exit check see the old position? */
+    if (getenv("MHFU_TEST_AREA_POS") && mhfu_in_quest()) {
+        /* every copy of x/z seen in the hunter's struct (EU dumps, 2026-11-10) */
+        static const int32_t off[] = { -0x1A8, 0x18, 0x28, 0x10B8, 0x1308, 0x1558 };
+        for (int i = 0; i < 6; i++) {
+            const uint32_t a = MHFU_ADDR_WEAPON_CLASS + (uint32_t)off[i];
+            psp_write32(a, psp_f32_to_bits(-60000.0f));
+            psp_write32(a + 8, psp_f32_to_bits(-60000.0f));
+        }
+        fprintf(stderr, "hunter: test: old position moved away\n");
+    }
+    if (!on) return;
+    g_hunter_frames = 90;
+    g_hunter_x0 = psp_read32(HUNTER_X);
+    g_hunter_dumped = 0;
+    fprintf(stderr, "hunter: area loaded: yaw %u x %.1f z %.1f\n", psp_read16(HUNTER_YAW),
+            psp_bits_to_f32(psp_read32(HUNTER_X)), psp_bits_to_f32(psp_read32(HUNTER_X + 8)));
+}
+void mhfu_hunter_trace_frame(unsigned ax, unsigned ay, uint32_t buttons) {
+    if (g_hunter_frames <= 0) return;
+    g_hunter_frames--;
+    /* MHFU_TRACE_HUNTER=2: a memory dump once the hunter is placed in the new
+     * area (numbered: two in one second would share mhfu_mods_dump's name). */
+    if (!g_hunter_dumped && psp_read32(HUNTER_X) != g_hunter_x0 && getenv("MHFU_TRACE_HUNTER")[0] == '2') {
+        static int n;
+        char path[1100], to[1200];
+        g_hunter_dumped = 1;
+        if (mhfu_mods_dump(path, sizeof path) == 0) {
+            snprintf(to, sizeof to, "%s-area%d.bin", path, ++n);
+            remove(to);
+            rename(path, to);
+            fprintf(stderr, "hunter: placed, memory dumped to %s\n", to);
+        }
+    }
+    fprintf(stderr, "hunter: yaw %5u x %8.1f z %8.1f  stick %3u,%3u buttons %05X\n", psp_read16(HUNTER_YAW),
+            psp_bits_to_f32(psp_read32(HUNTER_X)), psp_bits_to_f32(psp_read32(HUNTER_X + 8)), ax, ay, buttons);
+}
 /* In the village or a hall (lobby_task.ovl in slot 1): not the title's menus. */
 int mhfu_in_lobby(void) { return g_ovl_hash[1] && !strncmp(g_ovl_name[1], "lobby_task", 10); }
 
@@ -519,6 +573,7 @@ static void check_overlays(void) {
             ov->reg();
             fprintf(stderr, "mhfu: overlay slot %d: %s (%08X) loaded, recompiled code switched in\n",
                     i, name, hash);
+            if (!strncmp(name, "stage", 5)) mhfu_hunter_trace_area();
         } else {
             g_ovl_missing++;
             fprintf(stderr, "mhfu: overlay slot %d: %s (%08X) loaded, NOT recompiled yet\n",
