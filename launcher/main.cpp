@@ -353,7 +353,7 @@ static void sidebar(float h) {
     rule(ImGui::GetCursorScreenPos().y + 4);
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 14);
     centred(g_body, C_TEXT, "by PateeerQ");
-    centred(g_small, C_DIM, "native recomp \xC2\xB7 Windows \xC2\xB7 v" LAUNCHER_VERSION);
+    centred(g_small, C_DIM, "native recomp \xC2\xB7 " LAUNCHER_OS " \xC2\xB7 v" LAUNCHER_VERSION);
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 16);
 
     for (int i = 0; i < NPAGES; i++) {
@@ -1280,7 +1280,7 @@ static void page_about(float w, float) {
     ImGui::PushFont(g_title);
     ImGui::TextColored(C_GOLD, "%s", MHFU_APP_NAME);
     ImGui::PopFont();
-    ImGui::TextColored(C_TEXT, "Version %s  \xC2\xB7  Windows", MHFU_VERSION);
+    ImGui::TextColored(C_TEXT, "Version %s  \xC2\xB7  " LAUNCHER_OS, MHFU_VERSION);
     ImGui::Spacing();
     ImGui::PushFont(g_big);
     ImGui::TextColored(C_TEXT, "Maintained by %s", MHFU_MAINTAINER);
@@ -1385,6 +1385,8 @@ int main(int, char **) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGui::GetIO().IniFilename = nullptr;
+    // A controller moves through the pages too (the Steam Deck in Game Mode has no mouse).
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
     style();
     fonts();
     ImGui_ImplSDL3_InitForOpenGL(g_window, gl);
