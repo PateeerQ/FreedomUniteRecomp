@@ -21,7 +21,7 @@ WHAT YOU NEED
      Not for FUComplete: its EBOOT is taken from the .iso.
   3. The PSP's fonts: the .pgf files from PPSSPP's assets/flash0/font,
      copied into work/root/flash0/font here
-  4. A 64-bit (x86_64) Linux with OpenGL 3.3 and glibc 2.39 or newer
+  4. A 64-bit (x86_64) Linux with OpenGL 3.3 and glibc 2.38 or newer
      (SteamOS 3.6+, Ubuntu 24.04+, Fedora 40+, Arch, ...). For online
      features (update check, RetroAchievements) libcurl, which nearly every
      system has.
