@@ -2,6 +2,7 @@
 #include "game.h"
 #include "keys.h"
 
+#include <cerrno>
 #include <chrono>
 #include <ctime>
 #include <filesystem>
@@ -10,6 +11,7 @@
 #include <mutex>
 #include <sstream>
 #include <thread>
+#include <vector>
 
 namespace fs = std::filesystem;
 static fs::path P(const std::string &s) { return fs::u8path(s); }
@@ -73,7 +75,11 @@ std::vector<Check> ready_check(const Config &c, const std::string &gpu) {
     else if (shared) out.push_back({true, false, "PSP fonts", std::to_string(shared) + " system fonts, from work/root/flash0/font"});
     else out.push_back({false, false, "PSP fonts", "none in work/root/flash0/font: all text would be blank"});
 
+#ifdef _WIN32
     const bool ffmpeg = file_exists((P(paths::exe_dir()) / "avcodec-61.dll").u8string());
+#else
+    const bool ffmpeg = true;          // linked in statically (deps/ffmpeg-linux)
+#endif
     out.push_back({ffmpeg, !ffmpeg, "Movies and music",
                    ffmpeg ? "FFmpeg found" : "no FFmpeg next to the game: movies black, music silent"});
 
@@ -111,8 +117,14 @@ static void keep_crash_log(int code) {
     std::time_t t = std::time(nullptr);
     std::strftime(when, sizeof when, "%Y-%m-%d %H:%M:%S", std::localtime(&t));
     char head[256];
-    std::snprintf(head, sizeof head, "MHFU Recomp %s, Windows\ncrash: exit code 0x%08X\ntime: %s\n\n",
-                  LAUNCHER_VERSION, (unsigned)code, when);
+    std::snprintf(head, sizeof head, "MHFU Recomp %s, %s\ncrash: exit code 0x%08X\ntime: %s\n\n",
+                  LAUNCHER_VERSION,
+#ifdef _WIN32
+                  "Windows",
+#else
+                  "Linux",
+#endif
+                  (unsigned)code, when);
     std::error_code e;
     fs::create_directories(P(paths::launcher()), e);
     std::ofstream out(P(crash_log_path()), std::ios::binary);
@@ -309,12 +321,170 @@ void game_stop() {
     }).detach();
 }
 
-#else
+#else   // Linux (and the Steam Deck): fork + exec, the output into work/run.log
 
-bool game_start(const Config &, std::string &err) { err = "starting the game is Windows-only for now"; return false; }
-bool game_running() { return false; }
-int game_exit_code() { return g_exit; }
-void game_stop() {}
+#include <fcntl.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+static pid_t g_child;
+
+static void copy_logs() {
+    const fs::path work = P(paths::work());
+    char tag[32];
+    std::time_t t = std::time(nullptr);
+    std::strftime(tag, sizeof tag, "%Y%m%d-%H%M%S", std::localtime(&t));
+    std::error_code e;
+    fs::create_directories(work / "logs", e);
+    fs::copy_file(P(g_log_path), work / "logs" / (std::string("run-") + tag + ".log"), fs::copy_options::overwrite_existing, e);
+}
+
+// Splits extra_args like a shell would for plain words and "quoted strings".
+static void split_args(const std::string &s, std::vector<std::string> &out) {
+    std::string cur;
+    bool in = false, any = false;
+    char q = 0;
+    for (char ch : s) {
+        if (q) { if (ch == q) q = 0; else cur += ch; continue; }
+        if (ch == '"' || ch == '\'') { q = ch; any = true; continue; }
+        if (ch == ' ' || ch == '\t') { if (in || any) out.push_back(cur); cur.clear(); in = any = false; continue; }
+        cur += ch;
+        in = true;
+    }
+    if (in || any) out.push_back(cur);
+}
+
+bool game_start(const Config &c, std::string &err) {
+    if (game_running()) { err = "The game is already running."; return false; }
+    const std::string root = paths::profile_root(c.profile);
+    std::error_code e;
+    fs::create_directories(P(root) / "ms" / "PSP" / "SAVEDATA", e);
+    const fs::path fonts = P(root) / "flash0" / "font", shared = P(paths::base()) / "work" / "root" / "flash0" / "font";
+    if (!count_files(fonts, ".pgf") && fonts != shared) {
+        fs::create_directories(fonts, e);
+        for (auto &f : fs::directory_iterator(shared, e))
+            if (f.path().extension().u8string() == ".pgf") fs::copy_file(f.path(), fonts / f.path().filename(), fs::copy_options::skip_existing, e);
+    }
+    fs::create_directories(P(paths::work()) / "overlays", e);
+
+    const std::string keys = (P(paths::launcher()) / "input.ini").u8string();
+    if (!file_exists(keys)) keys_save(keys, keys_defaults());
+    if (region().eboot_on_disc && !file_exists(paths::eboot(c)) && !eboot_from_disc(paths::iso(c), paths::eboot(c), err))
+        return false;
+
+    std::vector<std::string> args{paths::host_exe(), paths::eboot(c), root};
+    if (!paths::iso(c).empty()) { args.push_back("--iso"); args.push_back(paths::iso(c)); }
+    for (const char *a : {"--budget", "2000000000", "--seconds", "864000", "--window"}) args.push_back(a);
+    args.push_back(std::to_string(c.render_scale));
+    if (c.fullscreen) args.push_back("--fullscreen");
+    if (!c.output.empty()) { args.push_back("--size"); args.push_back(c.output); }
+    args.push_back("--keys"); args.push_back(keys);
+    if (!c.nick.empty()) { args.push_back("--nick"); args.push_back(c.nick); }
+    if (!c.extra_args.empty()) split_args(c.extra_args, args);
+
+    std::map<std::string, std::string> env{{"MHFU_RENDER", "gl"}};
+    if (c.fps60) env["MHFU_FPS"] = "60";
+    if (c.volume != 100) env["MHFU_VOLUME"] = std::to_string(c.volume);
+    if (c.mouse_sens != 100) env["MHFU_MOUSE_SENS"] = std::to_string(c.mouse_sens);
+    if (c.widescreen) env["MHFU_WIDESCREEN"] = "1";
+    if (!c.texpack) env["MHFU_TEXPACK"] = "0";
+    else if (!c.texpack_dir.empty()) env["MHFU_TEXPACK"] = c.texpack_dir;
+    if (c.texpack && !c.texpack_style.empty()) env["MHFU_TEXPACK_STYLE"] = c.texpack_style;
+    std::string mods;
+    for (auto &m : c.mods) mods += (mods.empty() ? "" : ",") + m.first + "=" + (m.second ? "1" : "0");
+    if (!mods.empty()) env["MHFU_MODS"] = mods;
+    env["MHFU_LAUNCHER_INI"] = (P(paths::launcher()) / "launcher.ini").u8string();
+    if (c.gamepad == "none") env["MHFU_NO_GAMEPAD"] = "1";
+    else if (!c.gamepad.empty()) env["MHFU_GAMEPAD_GUID"] = c.gamepad;
+    if (c.ra_ingame && !c.ra_user.empty() && !c.ra_token.empty()) {
+        env["MHFU_RA_USER"] = c.ra_user;
+        env["MHFU_RA_TOKEN"] = c.ra_token;
+    }
+    std::istringstream lines(c.extra_env);
+    for (std::string line; std::getline(lines, line);) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        const size_t eq = line.find('=');
+        if (line.empty() || line[0] == '#' || eq == std::string::npos || eq == 0) continue;
+        env[line.substr(0, eq)] = line.substr(eq + 1);
+    }
+
+    const std::string log = (P(paths::work()) / "run.log").u8string();
+    const int out = open(log.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+    if (out < 0) { err = "cannot write " + log; return false; }
+
+    // Everything the child needs is made before fork (no allocation after it).
+    std::vector<char *> argv;
+    for (auto &a : args) argv.push_back(a.data());
+    argv.push_back(nullptr);
+    const std::string dir = paths::exe_dir();
+
+    const pid_t pid = fork();
+    if (pid < 0) { close(out); err = "fork failed"; return false; }
+    if (pid == 0) {
+        dup2(out, 1);
+        dup2(out, 2);
+        for (auto &[k, v] : env) {
+            if (v.empty()) unsetenv(k.c_str());
+            else setenv(k.c_str(), v.c_str(), 1);
+        }
+        if (chdir(dir.c_str()) != 0) {}
+        execv(argv[0], argv.data());
+        _exit(127);
+    }
+    close(out);
+    {
+        std::lock_guard<std::mutex> l(g_lock);
+        g_child = pid;
+        g_log_path = log;
+        g_log_off = 0;
+        g_log_reset = true;
+        g_exit = -1;
+        g_stopping = false;
+    }
+    std::thread([pid] {
+        int st = 0;
+        while (waitpid(pid, &st, 0) < 0 && errno == EINTR) {}
+        const int code = WIFEXITED(st) ? WEXITSTATUS(st) : 128 + (WIFSIGNALED(st) ? WTERMSIG(st) : 0);
+        std::lock_guard<std::mutex> l(g_lock);
+        g_exit = code;
+        copy_logs();
+        if (code != 0 && !g_stopping) keep_crash_log(code);
+        if (g_child == pid) g_child = 0;
+    }).detach();
+    return true;
+}
+
+bool game_running() {
+    std::lock_guard<std::mutex> l(g_lock);
+    return g_child != 0;
+}
+
+int game_exit_code() {
+    std::lock_guard<std::mutex> l(g_lock);
+    return g_child ? -1 : g_exit;
+}
+
+void game_stop() {
+    pid_t pid;
+    {
+        std::lock_guard<std::mutex> l(g_lock);
+        pid = g_child;
+        if (!pid) return;
+        g_stopping = true;
+    }
+    kill(pid, SIGTERM);                 // the host's SIGTERM: the window closes, the report is written
+    std::thread([pid] {
+        for (int i = 0; i < 80; i++) {
+            {
+                std::lock_guard<std::mutex> l(g_lock);
+                if (g_child != pid) return;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        kill(pid, SIGKILL);
+    }).detach();
+}
 
 #endif
 
