@@ -69,9 +69,25 @@ bool image_save_png(const std::string &path, const uint8_t *rgba, int w, int h) 
     return ok;
 }
 
-#else
+#else   // stb_image / stb_image_write (fetched by launcher/CMakeLists.txt)
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_PNG
+#define STBI_ONLY_JPEG
+#include "stb_image.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
-bool image_load(const std::string &, std::vector<uint8_t> &, int &, int &) { return false; }
-bool image_save_png(const std::string &, const uint8_t *, int, int) { return false; }
+bool image_load(const std::string &path, std::vector<uint8_t> &rgba, int &w, int &h) {
+    int n = 0;
+    stbi_uc *px = stbi_load(path.c_str(), &w, &h, &n, 4);
+    if (!px) return false;
+    rgba.assign(px, px + (size_t)w * h * 4);
+    stbi_image_free(px);
+    return true;
+}
+
+bool image_save_png(const std::string &path, const uint8_t *rgba, int w, int h) {
+    return stbi_write_png(path.c_str(), w, h, 4, rgba, w * 4) != 0;
+}
 
 #endif
