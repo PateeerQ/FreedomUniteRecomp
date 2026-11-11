@@ -189,7 +189,7 @@ endif()
 # What every host shares, made once.
 set(MHFU_HOST_SOURCES host/main.c host/achievements.c host/chat.c host/hle_mhfu.c host/input.c host/keys.c
     host/stats.c host/libfont.c host/utility.c host/adhoc.c host/lobby.c host/mods.c host/audio.c host/atrac.c
-    host/mpeg.c host/prof.c host/chnnlsv.c host/perfhint.c)
+    host/mpeg.c host/prof.c host/chnnlsv.c host/perfhint.c host/curl_dl.c)
 set(MHFU_HOST_DEPS_READY OFF)
 
 # The PSP's KIRK crypto engine (PPSSPP's ext/libkirk, GPL v3): decrypts save data
@@ -208,7 +208,7 @@ macro(mhfu_host_deps)
         set(MHFU_HOST_DEPS_READY ON)
         # RetroAchievements while playing (host/achievements.c): rcheevos'
         # rc_client, built from source; the launcher signs the player in.
-        if(MHFU_RCHEEVOS AND (WIN32 OR ANDROID))
+        if(MHFU_RCHEEVOS)
             include(FetchContent)
             FetchContent_Declare(rcheevos
                 GIT_REPOSITORY https://github.com/RetroAchievements/rcheevos.git
@@ -317,6 +317,9 @@ function(mhfu_add_host target gen_dir ovl_dir)
     endif()
     if(TARGET rcheevos)
         target_link_libraries(${target} PRIVATE rcheevos $<$<BOOL:${WIN32}>:winhttp>)
+        if(UNIX AND NOT ANDROID)
+            target_link_libraries(${target} PRIVATE ${CMAKE_DL_LIBS})    # libcurl, opened at run time
+        endif()
         target_compile_definitions(${target} PRIVATE MHFU_RCHEEVOS=1)
     endif()
     # The window: Win32 (host/window.c: the Multiplayer menu and dialogs) on
