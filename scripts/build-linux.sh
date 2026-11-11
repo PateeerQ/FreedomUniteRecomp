@@ -59,7 +59,7 @@ cmake --build "$build" --target "${targets[@]}" -j"$(nproc)"
 [ $package = 1 ] || { echo "Done: $build/mhfu_launcher"; exit 0; }
 
 # ---- the package: one folder to unpack anywhere (home, an SD card) ----
-version="$(sed -n 's/^#define MHFU_VERSION "\(.*\)".*/\1/p' "$repo/host/about.h")"
+version="$(sed -n 's/^#define MHFU_VERSION[[:space:]]*"\([^"]*\)".*/\1/p' "$repo/host/about.h" | tr -d '\r')"
 name="FreedomUniteRecomp-v$version"
 suffix=""; [ $universal = 1 ] && suffix="-universal"
 out="$repo/release/v$version"
