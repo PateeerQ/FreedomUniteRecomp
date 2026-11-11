@@ -52,40 +52,88 @@ static int read_stick(SDL_Gamepad *pad) {
     return ((x + 32768) >> 8) | ((y + 32768) >> 8) << 8;
 }
 
-/* The controller in use, chosen among those connected. */
-static SDL_Gamepad *g_pad;
+/* The controllers in use. Every one connected is read and their buttons
+ * combined: Android handhelds (AYN Thor, Odin, Retroid) show more than one
+ * "gamepad" to SDL (a fingerprint sensor or a remote that sends d-pad keys
+ * counts as one too), and taking only the first one connected left the
+ * built-in controller unread. */
+#define MAX_PADS 8
+static SDL_Gamepad *g_pads[MAX_PADS];
 static int g_external;               /* the SDL window's loop feeds the events */
+
+/* A real controller has face buttons and a stick; a d-pad-only device (a
+ * fingerprint sensor, a TV remote) is read but does not hide the touch
+ * controls. */
+static int pad_is_full(SDL_Gamepad *p) {
+    return SDL_GamepadHasButton(p, SDL_GAMEPAD_BUTTON_SOUTH) && SDL_GamepadHasAxis(p, SDL_GAMEPAD_AXIS_LEFTX);
+}
 
 void mhfu_gamepad_event(const SDL_Event *e) {
     /* MHFU_GAMEPAD_GUID (the launcher's Controller page): only that device;
-     * otherwise the first one connected. */
+     * otherwise every one connected. */
     static const char *want;
     static int got_want;
     if (!got_want) { want = getenv("MHFU_GAMEPAD_GUID"); got_want = 1; }
     if (getenv("MHFU_NO_GAMEPAD")) return;
-    if (e->type == SDL_EVENT_GAMEPAD_ADDED && !g_pad) {
-        if (want && *want) {
-            char guid[64];
-            SDL_GUIDToString(SDL_GetGamepadGUIDForID(e->gdevice.which), guid, sizeof guid);
-            if (SDL_strcasecmp(guid, want) != 0) return;
+    if (e->type == SDL_EVENT_GAMEPAD_ADDED) {
+        const SDL_JoystickID id = e->gdevice.which;
+        char guid[64];
+        SDL_GUIDToString(SDL_GetGamepadGUIDForID(id), guid, sizeof guid);
+        const char *name = SDL_GetGamepadNameForID(id);
+        if (!name) name = "?";
+        int free_slot = -1;
+        for (int i = 0; i < MAX_PADS; i++) {
+            if (g_pads[i] && SDL_GetGamepadID(g_pads[i]) == id) return;   /* already open */
+            if (!g_pads[i] && free_slot < 0) free_slot = i;
         }
-        g_pad = SDL_OpenGamepad(e->gdevice.which);
-        if (g_pad) { printf("gamepad: %s connected\n", SDL_GetGamepadName(g_pad)); fflush(stdout); }
-    } else if (e->type == SDL_EVENT_GAMEPAD_REMOVED && g_pad && e->gdevice.which == SDL_GetGamepadID(g_pad)) {
-        printf("gamepad: %s removed\n", SDL_GetGamepadName(g_pad));
+        if (want && *want && SDL_strcasecmp(guid, want) != 0) {
+            printf("gamepad: %s (%04x:%04x, %s) ignored: not the chosen one\n", name,
+                   SDL_GetGamepadVendorForID(id), SDL_GetGamepadProductForID(id), guid);
+            fflush(stdout);
+            return;
+        }
+        if (free_slot < 0) return;
+        SDL_Gamepad *p = SDL_OpenGamepad(id);
+        if (!p) {
+            printf("gamepad: %s could not be opened: %s\n", name, SDL_GetError());
+            fflush(stdout);
+            return;
+        }
+        g_pads[free_slot] = p;
+        printf("gamepad: %s connected (%04x:%04x, %s)%s\n", name,
+               SDL_GetGamepadVendor(p), SDL_GetGamepadProduct(p), guid,
+               pad_is_full(p) ? "" : ", d-pad only");
         fflush(stdout);
-        SDL_CloseGamepad(g_pad);
-        g_pad = NULL;
+    } else if (e->type == SDL_EVENT_GAMEPAD_REMOVED) {
+        for (int i = 0; i < MAX_PADS; i++) {
+            if (g_pads[i] && SDL_GetGamepadID(g_pads[i]) == e->gdevice.which) {
+                printf("gamepad: %s removed\n", SDL_GetGamepadName(g_pads[i]));
+                fflush(stdout);
+                SDL_CloseGamepad(g_pads[i]);
+                g_pads[i] = NULL;
+            }
+        }
     }
 }
 
 void mhfu_gamepad_update(void) {
-    SDL_SetAtomicInt(&g_buttons, g_pad ? (int)read_buttons(g_pad) : 0);
-    SDL_SetAtomicInt(&g_stick, g_pad ? read_stick(g_pad) : -1);
+    uint32_t b = 0;
+    int stick = -1;
+    for (int i = 0; i < MAX_PADS; i++) {
+        if (!g_pads[i]) continue;
+        b |= read_buttons(g_pads[i]);
+        if (stick < 0) stick = read_stick(g_pads[i]);     /* the first stick pushed */
+    }
+    SDL_SetAtomicInt(&g_buttons, (int)b);
+    SDL_SetAtomicInt(&g_stick, stick);
 }
 
 void mhfu_gamepad_external(void) { g_external = 1; }
-int mhfu_gamepad_connected(void) { return g_pad != NULL; }
+int mhfu_gamepad_connected(void) {
+    for (int i = 0; i < MAX_PADS; i++)
+        if (g_pads[i] && pad_is_full(g_pads[i])) return 1;
+    return 0;
+}
 
 static int SDLCALL pad_thread(void *arg) {
     (void)arg;
