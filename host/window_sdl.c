@@ -39,7 +39,9 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_system.h>
 
+#include <ctype.h>
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1993,8 +1995,9 @@ static void draw_editor(canvas *c, float s) {
  * or Back again closes. Online, sign-in and the update check are Android
  * dialogs (MhfuActivity, over JNI): they need text fields. */
 
-enum { M_NET, M_ACH, M_VPAD, M_STYLE, M_PAD, M_EDIT, M_OPACITY, M_SKILLS, M_FPS, M_RES, M_SMOOTH, M_GETHREAD, M_WIDE, M_CHEATS, M_TEXPACK, M_TEXSTYLE, M_TEXINSTALL, M_MOD0, M_MOD1, M_MOD2, M_SAVES, M_FILES, M_CRASH, M_UPDATE, M_ABOUT, M_EXIT };
+enum { M_NET, M_NET_CREATE, M_NET_JOIN, M_NET_LEAVE, M_ACH, M_VPAD, M_STYLE, M_PAD, M_EDIT, M_OPACITY, M_SKILLS, M_FPS, M_RES, M_SMOOTH, M_GETHREAD, M_WIDE, M_CHEATS, M_TEXPACK, M_TEXSTYLE, M_TEXINSTALL, M_MOD0, M_MOD1, M_MOD2, M_SAVES, M_FILES, M_CRASH, M_UPDATE, M_ABOUT, M_EXIT };
 enum { K_TOGGLE, K_CYCLE, K_STEP, K_ACTION };
+static SDL_AtomicInt g_net_busy;        /* a desktop room action is under way */
 typedef struct { int id, kind, restart; const char *text, *help; } menu_item;
 
 static const menu_item k_tab_display[] = {
@@ -2014,6 +2017,13 @@ static const menu_item k_tab_controls[] = {
 #ifdef __ANDROID__
 static const menu_item k_tab_online[] = {
     { M_NET, K_ACTION, 0, "Multiplayer", "Create a room or join one with its code, over the internet or the same Wi-Fi. No port forwarding." },
+};
+#else
+/* The desktop (Linux, the Steam Deck): the room's own buttons; the code is typed in the text box. */
+static const menu_item k_tab_online[] = {
+    { M_NET_CREATE, K_ACTION, 0, "Create Server", "Opens a room over the internet (or on this network without a relay). Others join with its code, MH-XXXX. No port forwarding." },
+    { M_NET_JOIN, K_ACTION, 0, "Join Server", "Joins a room by its code (MH-XXXX), asked for in a text box." },
+    { M_NET_LEAVE, K_ACTION, 0, "Leave room", "Leaves the room you are in." },
 };
 #endif
 static const menu_item k_tab_mods[] = {
@@ -2047,9 +2057,7 @@ typedef struct { const char *name; const menu_item *items; int n; } menu_tab;
 #define TAB(name, a) { name, a, (int)(sizeof a / sizeof a[0]) }
 static const menu_tab k_tabs[] = {
     TAB("Display", k_tab_display), TAB("Controls", k_tab_controls),
-#ifdef __ANDROID__
     TAB("Online", k_tab_online),
-#endif
     { "Achievements", NULL, 0 },
     TAB("Mods", k_tab_mods), TAB("System", k_tab_system),
 };
@@ -2153,6 +2161,19 @@ static const char *menu_value(int id) {
         snprintf(pct, sizeof pct, "%d%%", g_vpad_alpha);
         return pct;
     }
+    case M_NET_CREATE: {
+        static char v[32];
+        char code[8];
+        mhfu_lobby_code(code);
+        if (SDL_GetAtomicInt(&g_net_busy)) return "Wait...";
+        if (!code[0]) return "Create";
+        const int ms = mhn_client_ping_ms();
+        if (ms >= 0) snprintf(v, sizeof v, "%s  %d ms", code, ms);
+        else snprintf(v, sizeof v, "%s", code);
+        return v;
+    }
+    case M_NET_JOIN: return SDL_GetAtomicInt(&g_net_busy) ? "Wait..." : "Join";
+    case M_NET_LEAVE: return "Leave";
     case M_EDIT: return "Open editor";
     case M_SAVES: return "Choose folder";
     case M_FILES: return "Pick folder";
@@ -2667,6 +2688,63 @@ static void draw_menu(canvas *c, float s, float prog) {
 #undef MS
 
 /* What a tap on a setting does; dir is -1 or +1 for the - and + buttons, 0 for a tap on the card. */
+#ifndef __ANDROID__
+/* Desktop rooms (the Online tab): create, join and leave block for a few
+ * seconds, so they run on a thread of their own; the answer is a toast. */
+static int SDLCALL net_thread(void *arg) {
+    const int id = (int)(intptr_t)arg;
+    char err[160] = "", code[8];
+    if (id == M_NET_CREATE) {
+        mhfu_lobby_code(code);
+        if (code[0]) snprintf(err, sizeof err, "Already in room %s: leave it first.", code);
+        else if (mhfu_lobby_create(NULL, mhfu_lobby_has_relay(), err, sizeof err) == 0) {
+            mhfu_lobby_code(code);
+            mhfu_window_notify("MULTIPLAYER", "Room created", code, NULL);
+            err[0] = 0;
+            SDL_SetAtomicInt(&g_net_busy, 0);
+            return 0;
+        }
+    } else if (id == M_NET_JOIN) {
+        uint16_t w[16];
+        int n;
+        while ((n = mhfu_window_text_result(w, 16)) == -1) SDL_Delay(50);   /* the box is open */
+        char typed[16] = "";
+        for (int i = 0; i < n && i < 15; i++) typed[i] = (char)(w[i] < 0x80 ? toupper(w[i]) : '?');
+        if (n > 0 && typed[0]) {
+            if (strncmp(typed, "MH-", 3) && strlen(typed) == 4) {      /* "4K7Q" alone */
+                char full[16];
+                snprintf(full, sizeof full, "MH-%s", typed);
+                snprintf(typed, sizeof typed, "%s", full);
+            }
+            mhfu_lobby_code(code);
+            if (code[0]) mhfu_lobby_leave();
+            if (mhfu_lobby_join(typed, NULL, err, sizeof err) == 0) {
+                mhfu_window_notify("MULTIPLAYER", "Joined room", typed, NULL);
+                err[0] = 0;
+            }
+        }
+    } else {
+        mhfu_lobby_code(code);
+        if (code[0]) mhfu_lobby_leave();
+    }
+    if (err[0]) mhfu_window_notify("MULTIPLAYER", "Could not do that", err, NULL);
+    SDL_SetAtomicInt(&g_net_busy, 0);
+    return 0;
+}
+
+static void net_action(int id) {
+    if (!SDL_CompareAndSwapAtomicInt(&g_net_busy, 0, 1)) return;
+    if (id == M_NET_JOIN) {
+        static const uint16_t empty[1] = {0};
+        if (mhfu_window_ask_text("Room code (MH-XXXX):", empty, 7) != 0) { SDL_SetAtomicInt(&g_net_busy, 0); return; }
+    }
+    menu_set(0);
+    SDL_Thread *t = SDL_CreateThread(net_thread, "rooms", (void *)(intptr_t)id);
+    if (t) SDL_DetachThread(t);
+    else SDL_SetAtomicInt(&g_net_busy, 0);
+}
+#endif
+
 static void menu_act(const menu_item *it, int dir) {
     switch (it->id) {
     case M_VPAD: g_vpad_mode = (g_vpad_mode + 1) % 3; settings_save(); break;
@@ -2707,6 +2785,9 @@ static void menu_act(const menu_item *it, int dir) {
         break;
     }
     case M_EDIT: menu_set(0); edit_open(); break;
+#ifndef __ANDROID__
+    case M_NET_CREATE: case M_NET_JOIN: case M_NET_LEAVE: net_action(it->id); break;
+#endif
 #ifdef __ANDROID__
     case M_UPDATE: menu_set(0); android_call("checkUpdates"); break;
     case M_CHEATS: menu_set(0); android_call("openCheats"); break;
@@ -3492,6 +3573,10 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
     SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
     SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");      /* Back opens the menu */
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+#ifndef __ANDROID__
+    /* Desktop Linux: the menu is drawn for fingers; the mouse's clicks count as one. */
+    SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "1");
+#endif
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD | SDL_INIT_AUDIO)) {
         fprintf(stderr, "window: SDL: %s\n", SDL_GetError());
         return game(argc, argv);                  /* run without a window */
@@ -3680,6 +3765,14 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
                     break;
                 }
                 default:
+                    /* R3 (the right stick pressed; the PSP has none) opens the menu: on the
+                     * Steam Deck a controller is always there and there is no F1. */
+                    if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN && e.gbutton.button == SDL_GAMEPAD_BUTTON_RIGHT_STICK) {
+                        if (g_edit) edit_close();
+                        else menu_set(!g_menu_open);
+                        moving = 1;
+                        break;
+                    }
                     mhfu_gamepad_event(&e);
                     /* With one connected the touch controls step aside (Automatic). */
                     if (e.type == SDL_EVENT_GAMEPAD_ADDED || e.type == SDL_EVENT_GAMEPAD_REMOVED) moving = 1;
