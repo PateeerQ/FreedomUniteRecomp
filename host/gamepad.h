@@ -12,8 +12,8 @@
 
 #if MHFU_GAMEPAD
 
-/* Start watching for controllers; one is used at a time, plugged in or
- * removed whenever. 0 on success. */
+/* Start watching for controllers; every one connected is read (buttons
+ * combined), plugged in or removed whenever. 0 on success. */
 int mhfu_gamepad_start(void);
 
 /* PSP buttons held on the controller. The stick is written to *ax/*ay (0-255,
