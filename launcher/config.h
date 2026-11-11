@@ -15,6 +15,15 @@
 #include "../host/about.h"
 #include "../host/region.h"
 #include "regions.h"
+
+// The game's executable: mhfu_host.exe on Windows, mhfu_host on Linux.
+#ifdef _WIN32
+#define MHFU_EXE_SUFFIX ".exe"
+#define LAUNCHER_OS "Windows"
+#else
+#define MHFU_EXE_SUFFIX ""
+#define LAUNCHER_OS "Linux"
+#endif
 #define LAUNCHER_VERSION MHFU_VERSION
 
 struct Config {
