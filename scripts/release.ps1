@@ -7,7 +7,7 @@
 #   .\scripts\release.ps1 -Region US        # the USA build (setup.ps1 with its EBOOT:
 #                                           # build-us, work\us): ...-us.zip / -us.apk
 #   .\scripts\release.ps1 -Region ALL       # the universal one: every release set up so far
-#                                           # (build-universal.ps1: build-all; the APK with
+#                                           # (build-universal.ps1: build-all-ninja; the APK with
 #                                           # every libmain_<tag>.so): ...-universal.zip / .apk
 #
 # Both contain the game's code recompiled from your EBOOT (mhfu_host.exe,
@@ -26,7 +26,7 @@ if ($version -ne $gradleVersion) { throw "host/about.h says $version, android/ap
 $all = $Region -eq "ALL"
 $us = $Region -ne "EU" -and -not $all      # a build in a region subfolder (USA, Japan, FUComplete)
 $sub = $Region.ToLower()
-$buildDir = if ($all) { "$repo\build-all" } elseif ($us) { "$repo\build-$sub" } else { "$repo\build" }
+$buildDir = if ($all) { "$repo\build-all-ninja" } elseif ($us) { "$repo\build-$sub" } else { "$repo\build" }
 $suffix = if ($all) { "-universal" } elseif ($us) { "-$sub" } else { "" }
 $workSub = if ($us) { "work\$sub" } else { "work" }
 if ($us -and -not (Test-Path "$repo\$workSub\gen\mhfu_region_gen.h")) { throw "no $Region build: run setup.ps1 with that region's EBOOT first" }
