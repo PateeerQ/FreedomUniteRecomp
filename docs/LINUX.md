@@ -37,7 +37,7 @@ On Linux itself: `scripts/build-linux.sh [--universal] [--package]`.
 - HTTP (update check, RetroAchievements) goes through the system's
   `libcurl.so.4`, opened at run time (`host/curl_dl.c`); without it the game
   still runs.
-- The binaries need glibc 2.39+ (built on Ubuntu 24.04): SteamOS 3.6+,
+- The binaries need glibc 2.38+ (built on Ubuntu 24.04; they link only libc, libm, libstdc++, libgcc_s and, for the launcher, libGL): SteamOS 3.6+,
   Ubuntu 24.04+, Fedora 40+, Arch. For older systems, build in an older
   distro (e.g. a Steam Runtime "sniper" container).
 
