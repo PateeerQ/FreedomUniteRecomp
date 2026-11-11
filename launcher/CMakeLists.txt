@@ -28,6 +28,19 @@ add_executable(mhfu_launcher WIN32
 target_include_directories(mhfu_launcher PRIVATE "${MHFU_GEN_DIR}"
     ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends ${imgui_SOURCE_DIR}/misc/cpp)
 target_link_libraries(mhfu_launcher PRIVATE SDL3::SDL3-static nlohmann_json::nlohmann_json)
+if(UNIX AND NOT APPLE)
+    # Linux / Steam Deck: HTTP through the system's libcurl (opened at run time),
+    # PNG through stb, the crest beside the launcher.
+    FetchContent_Declare(stb
+        URL https://github.com/nothings/stb/archive/2c980bb59875b0d32144a71867fbdebb2f77cd20.tar.gz)
+    FetchContent_MakeAvailable(stb)
+    target_sources(mhfu_launcher PRIVATE ${CMAKE_SOURCE_DIR}/host/curl_dl.c)
+    target_include_directories(mhfu_launcher PRIVATE "${stb_SOURCE_DIR}" ${CMAKE_SOURCE_DIR}/host)
+    find_package(OpenGL REQUIRED)
+    target_link_libraries(mhfu_launcher PRIVATE OpenGL::GL ${CMAKE_DL_LIBS})
+    add_custom_command(TARGET mhfu_launcher POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/assets/icon/mhfu.png $<TARGET_FILE_DIR:mhfu_launcher>/mhfu.png)
+endif()
 set_target_properties(mhfu_launcher PROPERTIES
     CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
