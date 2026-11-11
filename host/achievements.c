@@ -28,7 +28,12 @@
 #else
 #include <SDL3/SDL.h>
 #include <sys/stat.h>
+#ifdef __ANDROID__
 #define PLATFORM "Android"
+#else
+#define PLATFORM "Linux"
+#include "curl_dl.h"
+#endif
 #endif
 #ifdef __ANDROID__
 #include <jni.h>
@@ -228,9 +233,18 @@ static int http(const char *url, const char *post, const char *ctype, char **bod
     (*env)->DeleteLocalRef(env, act);
     return status;
 }
+#else
+/* Linux and the Steam Deck: the system's libcurl (host/curl_dl.c). */
+static int http(const char *url, const char *post, const char *ctype, char **body, size_t *len) {
+    char err[160];
+    const int st = mhfu_curl_request(url, post, post ? strlen(post) : 0, ctype, NULL, g_agent[0] ? g_agent : USER_AGENT,
+                                     body, len, err, sizeof err);
+    if (!st && err[0]) printf("achievements: %s\n", err);
+    return st;
+}
 #endif
 
-#if defined(_WIN32) || defined(__ANDROID__)
+#if 1   /* every platform has http() now (Linux: libcurl) */
 typedef struct {
     char *url, *post, *ctype;
     rc_client_server_callback_t callback;
@@ -303,7 +317,7 @@ typedef struct {
     int chime;
 } toast;
 
-#if defined(_WIN32) || defined(__ANDROID__)
+#if 1   /* every platform has http() now (Linux: libcurl) */
 /* The badge is fetched off the game's thread, then the toast is shown. */
 THREAD(toast_thread) {
     toast *t = (toast *)arg;
@@ -325,7 +339,7 @@ static void show(const char *head, const char *title, const char *text, const ch
     snprintf(t->url, sizeof t->url, "%s", url ? url : "");
     snprintf(t->name, sizeof t->name, "%s", name ? name : "");
     t->chime = chime;
-#if defined(_WIN32) || defined(__ANDROID__)
+#if 1   /* every platform has http() now (Linux: libcurl) */
     if (spawn(toast_thread, t) != 0) free(t);
 #else
     free(t);
@@ -461,7 +475,7 @@ void mhfu_ach_logout(void) {
 
 const char *mhfu_ach_user(void) { return g_user; }
 
-#if defined(_WIN32) || defined(__ANDROID__)
+#if 1   /* every platform has http() now (Linux: libcurl) */
 /* The badges for the menu's list, one after another on a thread of their own. */
 typedef struct { int n; char (*url)[512]; char (*name)[16]; } badge_job;
 THREAD(badges_thread) {
@@ -498,7 +512,7 @@ int mhfu_ach_items(mhfu_ach_game *game, mhfu_ach_item *out, int cap) {
     if (!l) return 0;
     int n = 0, all = 0;
     for (uint32_t b = 0; b < l->num_buckets; b++) all += (int)l->buckets[b].num_achievements;
-#if defined(_WIN32) || defined(__ANDROID__)
+#if 1   /* every platform has http() now (Linux: libcurl) */
     static uint32_t fetched_for;       /* the game whose badges are fetched */
     badge_job *job = NULL;
     if (g && fetched_for != g->id && all > 0) {
@@ -519,7 +533,7 @@ int mhfu_ach_items(mhfu_ach_game *game, mhfu_ach_item *out, int cap) {
                 const rc_client_achievement_t *a = k->achievements[i];
                 const int got = a->unlocked != RC_CLIENT_ACHIEVEMENT_UNLOCKED_NONE;
                 if (got != !pass) continue;
-#if defined(_WIN32) || defined(__ANDROID__)
+#if 1   /* every platform has http() now (Linux: libcurl) */
                 if (job && job->n < all) {
                     rc_client_achievement_get_image_url(a, RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED, job->url[job->n], 512);
                     snprintf(job->name[job->n], 16, "%s", a->badge_name);
@@ -538,7 +552,7 @@ int mhfu_ach_items(mhfu_ach_game *game, mhfu_ach_item *out, int cap) {
             }
         }
     rc_client_destroy_achievement_list(l);
-#if defined(_WIN32) || defined(__ANDROID__)
+#if 1   /* every platform has http() now (Linux: libcurl) */
     if (job && spawn(badges_thread, job) != 0) { free(job->url); free(job->name); free(job); }
 #endif
     return n;
