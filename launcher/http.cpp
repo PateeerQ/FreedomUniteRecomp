@@ -68,15 +68,28 @@ bool http_post(const std::string &url, const std::string &form, std::string &bod
     return request(url, &form, body, err);
 }
 
-#else
+#else   // Linux and the Steam Deck: the system's libcurl, opened at run time (host/curl_dl.c)
+#include "curl_dl.h"
+#include <cstdlib>
 
-bool http_get(const std::string &, std::string &body, std::string &err) {
+static bool request(const std::string &url, const std::string *form, std::string &body, std::string &err) {
     body.clear();
-    err = "online features are Windows-only for now";
+    char *b = nullptr;
+    size_t n = 0;
+    char e[160];
+    const int status = mhfu_curl_request(url.c_str(), form ? form->data() : nullptr, form ? form->size() : 0, nullptr,
+                                         "application/json, */*", "FreedomUniteRecomp-Launcher/" LAUNCHER_VERSION, &b, &n,
+                                         e, sizeof e);
+    if (b) body.assign(b, n);
+    std::free(b);
+    if (status == 200) return true;
+    err = status ? "HTTP " + std::to_string(status) : std::string(e[0] ? e : "no connection");
     return false;
 }
-bool http_post(const std::string &url, const std::string &, std::string &body, std::string &err) {
-    return http_get(url, body, err);
+
+bool http_get(const std::string &url, std::string &body, std::string &err) { return request(url, nullptr, body, err); }
+bool http_post(const std::string &url, const std::string &form, std::string &body, std::string &err) {
+    return request(url, &form, body, err);
 }
 
 #endif
