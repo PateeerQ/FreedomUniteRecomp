@@ -27,6 +27,30 @@ if(NOT EXISTS "${PSPRECOMP_DIR}/CMakeLists.txt")
         "    git submodule update --init --recursive")
 endif()
 
+# ccache: every object kept by its contents, so a build after setup.ps1 re-emits the
+# recompiled C (new timestamps, mostly the same code), a fresh build folder, or the
+# switch between regions compiles only what really changed. Ninja and Makefiles
+# only (CMake's Visual Studio generators run no launcher: scripts\build-universal.ps1
+# builds with Ninja for that). Android's Gradle uses Ninja, Linux too.
+option(MHFU_CCACHE "Compile through ccache when it is installed (Ninja/Makefile builds)" ON)
+if(MHFU_CCACHE AND NOT CMAKE_C_COMPILER_LAUNCHER AND NOT CMAKE_GENERATOR MATCHES "Visual Studio")
+    file(GLOB _mhfu_winget_ccache "$ENV{LOCALAPPDATA}/Microsoft/WinGet/Packages/Ccache.Ccache_*/ccache-*")
+    find_program(MHFU_CCACHE_EXE ccache HINTS "$ENV{LOCALAPPDATA}/Microsoft/WinGet/Links" ${_mhfu_winget_ccache})
+    if(MHFU_CCACHE_EXE)
+        message(STATUS "ccache: ${MHFU_CCACHE_EXE}")
+        set(CMAKE_C_COMPILER_LAUNCHER "${MHFU_CCACHE_EXE}")
+        set(CMAKE_CXX_COMPILER_LAUNCHER "${MHFU_CCACHE_EXE}")
+    endif()
+endif()
+# MSVC's debug info: /Zi writes one shared PDB, which ccache cannot keep (and which
+# Ninja's parallel compiles contend for); /Z7 puts it in each object. The link's
+# /DEBUG still makes the exe's PDB (host/prof.c).
+if(MSVC AND NOT CMAKE_GENERATOR MATCHES "Visual Studio")
+    set(MHFU_MSVC_DEBUG_INFO /Z7)
+else()
+    set(MHFU_MSVC_DEBUG_INFO /Zi)
+endif()
+
 # psprecomp only got as far as gameplay in its own test game with real guest
 # threads, so they are on by default here.
 set(PSPRECOMP_REAL_THREADS ON CACHE BOOL "Enable cooperative host-thread scheduling")
@@ -34,7 +58,7 @@ set(PSPRECOMP_REAL_THREADS ON CACHE BOOL "Enable cooperative host-thread schedul
 add_subdirectory("${PSPRECOMP_DIR}" psprecomp)
 if(MSVC)
     # Full debug info for the runtime (small), so host/prof.c names its static functions too.
-    target_compile_options(psprecomp PRIVATE /Zi)
+    target_compile_options(psprecomp PRIVATE ${MHFU_MSVC_DEBUG_INFO})
 endif()
 
 # Profile-guided optimisation (clang: Android; scripts/pgo-android.ps1). GEN builds a
@@ -401,7 +425,7 @@ function(mhfu_add_host target gen_dir ovl_dir)
         target_link_options(${target} PRIVATE /DEBUG /OPT:REF /OPT:ICF)
         target_link_libraries(${target} PRIVATE dbghelp winmm)
         set_source_files_properties(${gen_sources} PROPERTIES COMPILE_OPTIONS "/W0")
-        set_property(SOURCE ${MHFU_HOST_SOURCES} APPEND PROPERTY COMPILE_OPTIONS /Zi)
+        set_property(SOURCE ${MHFU_HOST_SOURCES} APPEND PROPERTY COMPILE_OPTIONS ${MHFU_MSVC_DEBUG_INFO})
     else()
         set_source_files_properties(${gen_sources} PROPERTIES COMPILE_OPTIONS "-w")
     endif()
