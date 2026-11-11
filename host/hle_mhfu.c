@@ -569,6 +569,27 @@ static void check_overlays(void) {
         for (int k = 0; k < 32; k++) name[k] = (char)psp_read8(a + 32 + (uint32_t)k);
         memcpy(g_ovl_name[i], name, sizeof name);
         const mhfu_overlay *ov = find_overlay(hash);
+        if (!ov) {
+            /* Issue #10: an EU player's game_sub.ovl hashed 80892198, not
+             * CF9AF581, yet held our code at the address it missed. Another
+             * dump of the disc, or a few words the game wrote first? The
+             * recompiled one of that name and load address is still far
+             * closer than none (a dispatch miss at once). Saved all the same,
+             * so the copy can be compared and set up. */
+            const mhfu_overlay *same = NULL;
+            const uint32_t load = psp_read32(a + 8);
+            for (int k = 0; k < mhfu_noverlays; k++)
+                if (mhfu_overlays[k].base == load && !strncmp(mhfu_overlays[k].name, name, sizeof name - 1))
+                    same = &mhfu_overlays[k];
+            if (same) {
+                same->reg();
+                fprintf(stderr, "mhfu: overlay slot %d: %s (%08X) loaded, differs from the recompiled one "
+                        "(%08X); using that one's code anyway\n", i, name, hash, same->hash);
+                save_overlay(i, hash, buf, n);
+                free(buf);
+                continue;
+            }
+        }
         if (ov) {
             ov->reg();
             fprintf(stderr, "mhfu: overlay slot %d: %s (%08X) loaded, recompiled code switched in\n",
