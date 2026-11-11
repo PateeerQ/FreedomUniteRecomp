@@ -63,7 +63,7 @@ std::string work() { return region().sub[0] ? S(P(g_base) / "work" / region().su
 std::string launcher() { return S(P(g_base) / "work" / "launcher"); }
 std::string host_exe() {
     const std::string h = region_host_exe(region_index());
-    return h.empty() ? S(P(g_exe) / "mhfu_host.exe") : h;
+    return h.empty() ? S(P(g_exe) / "mhfu_host" MHFU_EXE_SUFFIX) : h;
 }
 
 std::string iso(const Config &c) {
