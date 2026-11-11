@@ -7,6 +7,10 @@
 #include <filesystem>
 #include <fstream>
 #include <vector>
+#ifndef _WIN32
+#include <strings.h>
+#define _stricmp strcasecmp
+#endif
 
 namespace fs = std::filesystem;
 
@@ -40,9 +44,9 @@ std::string region_host_exe(int i) {
     for (auto &ch : tag) ch = (char)tolower((unsigned char)ch);
     const fs::path dir = fs::u8path(paths::exe_dir());
     std::error_code e;
-    const fs::path own = dir / ("mhfu_host_" + tag + ".exe");
+    const fs::path own = dir / ("mhfu_host_" + tag + MHFU_EXE_SUFFIX);
     if (fs::exists(own, e)) return own.u8string();
-    const fs::path one = dir / "mhfu_host.exe";                      // a single-release install
+    const fs::path one = dir / ("mhfu_host" MHFU_EXE_SUFFIX);                      // a single-release install
     if (i == built_with() && fs::exists(one, e)) return one.u8string();
     return "";
 }
