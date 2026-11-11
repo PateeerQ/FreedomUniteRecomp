@@ -29,7 +29,10 @@ for a in "$@"; do
         *) echo "unknown option $a"; exit 2 ;;
     esac
 done
-[ -n "$build" ] || build="$HOME/.cache/mhfu/build-linux$([ $universal = 1 ] && echo -universal)"
+if [ -z "$build" ]; then
+    build="$HOME/.cache/mhfu/build-linux"
+    if [ $universal = 1 ]; then build="$build-universal"; fi
+fi
 
 [ -f "$repo/deps/ffmpeg-linux/lib/libavcodec.a" ] || bash "$repo/scripts/build-ffmpeg-linux.sh"
 
