@@ -37,7 +37,12 @@ param(
     # EU, US or JP; by default told from the EBOOT (its size). FUC is the
     # English FUComplete disc of MHP2G: -Iso that disc, -Eboot the same .iso
     # (its EBOOT is taken from it by tools\fuc_prepare.py).
-    [ValidateSet("", "EU", "US", "JP", "FUC")] [string]$Region = ""
+    [ValidateSet("", "EU", "US", "JP", "FUC")] [string]$Region = "",
+    # Ninja (the default): MSVC through ccache, so a setup that re-emits the C
+    # compiles only what changed (scripts\ninja-msvc.ps1). VS: the Visual Studio
+    # solution, as before (no cache). A build folder made by VS is kept as
+    # build-vs (build-us-vs, ...) the first time Ninja takes its place.
+    [ValidateSet("Ninja", "VS")] [string]$Generator = "Ninja"
 )
 
 $ErrorActionPreference = 'Stop'
@@ -82,6 +87,15 @@ if ($Region -eq "FUC") {
 }
 # CMake takes the generated code from this work folder.
 $cmakeDirs = @("-DMHFU_GEN_DIR=$gen", "-DMHFU_OVL_DIR=$ovlGen")
+. (Join-Path $PSScriptRoot "ninja-msvc.ps1")
+if ($Generator -eq "Ninja" -and -not (Test-NinjaMsvc)) {
+    Write-Warning "no ninja (winget install Ninja-build.Ninja Ccache.Ccache): building with Visual Studio, uncached"
+    $Generator = "VS"
+}
+if ($Generator -eq "Ninja") {
+    $cmakeDirs += Move-VsBuildAside $build
+    $cmakeDirs += Get-NinjaMsvcArgs -BuildDir $build -Config $Config
+}
 
 function Step($msg) { Write-Host "`n=== $msg ===" -ForegroundColor Cyan }
 
@@ -127,7 +141,8 @@ if ($LASTEXITCODE) { throw "allegrexrecomp build failed" }
 
 $tool = @(
     "$build\psprecomp\tools\allegrexrecomp\$Config\allegrexrecomp.exe",
-    "$build\psprecomp\tools\allegrexrecomp\allegrexrecomp.exe"
+    "$build\psprecomp\tools\allegrexrecomp\allegrexrecomp.exe",
+    "$build\$Config\allegrexrecomp.exe"          # Ninja: every executable in <build>\<Config>
 ) | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $tool) { throw "allegrexrecomp.exe not found under $build" }
 
