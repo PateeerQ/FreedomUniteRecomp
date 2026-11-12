@@ -1,0 +1,264 @@
+diff --git a/src/hle/ge.c b/src/hle/ge.c
+index 534e046..fc63763 100644
+--- a/src/hle/ge.c
++++ b/src/hle/ge.c
+@@ -1644,8 +1644,14 @@ static void *ge_worker(void *arg) {
+ 
+ static int async_on(void) {
+     if (g_async < 0) {
++        /* "1" on, "auto" on with 4 or more CPUs: with fewer, the worker,
++         * the guest (which spins on the GE's finish flag) and the render
++         * thread fight over the same cores, and lists inline are faster. */
+         const char *e = getenv("PSPRECOMP_GE_THREAD");
+-        g_async = e && e[0] == '1';
++        const int cpus = host_cpu_count();
++        g_async = e && (e[0] == '1' || (!strcmp(e, "auto") && cpus >= 4));
++        if (e && !strcmp(e, "auto") && !g_async)
++            fprintf(stderr, "psprecomp: %d CPU(s): GE lists run inline\n", cpus);
+         if (g_async) {
+             host_thread t;
+             if (host_thread_create(&t, 8u << 20, ge_worker, NULL) != 0) {
+diff --git a/src/hle/host_thread.h b/src/hle/host_thread.h
+index 419b8d2..aa52fce 100644
+--- a/src/hle/host_thread.h
++++ b/src/hle/host_thread.h
+@@ -92,6 +92,12 @@ static int host_thread_create(host_thread *thread, size_t stack,
+     *thread = (HANDLE)handle;
+     return 0;
+ }
++/* Logical CPUs the process may run on (at least 1). */
++static inline int host_cpu_count(void) {
++    SYSTEM_INFO si;
++    GetSystemInfo(&si);
++    return si.dwNumberOfProcessors > 0 ? (int)si.dwNumberOfProcessors : 1;
++}
+ static void host_thread_join(host_thread thread) {
+     if (WaitForSingleObject(thread, INFINITE) != WAIT_OBJECT_0) host_thread_error();
+     if (!CloseHandle(thread)) host_thread_error();
+@@ -141,5 +147,11 @@ static int host_thread_create(host_thread *thread, size_t stack,
+     return rc;
+ }
+ static void host_thread_join(host_thread thread) { if (pthread_join(thread, NULL)) host_thread_error(); }
++#include <unistd.h>
++/* Logical CPUs online (at least 1). */
++static inline int host_cpu_count(void) {
++    const long n = sysconf(_SC_NPROCESSORS_ONLN);
++    return n > 0 ? (int)n : 1;
++}
+ #endif
+ #endif
+diff --git a/src/render_gl.c b/src/render_gl.c
+index be63b31..c84734d 100644
+--- a/src/render_gl.c
++++ b/src/render_gl.c
+@@ -279,6 +279,7 @@ typedef struct {
+     uint32_t addr;
+     int      stride, fmt, w, h, id;
+     int      drawn;
++    uint64_t used;                       /* g_flip of the last draw into it, read from it or show */
+ } gfb;
+ 
+ #define MAX_FB 32
+@@ -335,6 +336,7 @@ static gfb *fb_target(const psp_draw_state *st) {
+         g_bound = f->id;
+     }
+     f->drawn = 1;
++    f->used = g_flip;
+     return f;
+ }
+ 
+@@ -349,6 +351,7 @@ static gfb *fb_for_texture(uint32_t addr, int *ox, int *oy) {
+         const uint32_t px = (addr - f->addr) / (uint32_t)fb_bytes(f->fmt);
+         *ox = (int)(px % (uint32_t)f->stride);
+         *oy = (int)(px / (uint32_t)f->stride);
++        f->used = g_flip;
+         return f;
+     }
+     return NULL;
+@@ -368,6 +371,7 @@ typedef struct {
+      * declare 512 for a 480x272 picture; texture packs are keyed that way. 0:
+      * not known yet; tex_h once a draw went further or was not 2D. */
+     int      seen_v;                     /* the picture still stands for all tex_h rows */
++    uint32_t bytes;                      /* what its GL texture holds, about */
+ } gtex;
+ 
+ static psp_texture_replacer volatile g_replacer;    /* psp_render_gl_set_replacer */
+@@ -378,6 +382,34 @@ static gtex g_tex[MAX_TEX];
+ static int  g_ntex, g_next_tex = 1;
+ static int  g_last_tex = -1;             /* the cache entry of the previous draw */
+ static uint64_t g_uploads, g_upload_bytes;
++static uint64_t g_tex_bytes;             /* sum of g_tex[].bytes */
++
++/* How much the texture cache may hold on the GPU before the least recently
++ * used textures go: PSPRECOMP_TEX_MB (or MHFU_TEX_MB), else 128 MB on Android
++ * and 384 MB elsewhere. Phones share that memory with everything else, and a
++ * low-end one (3-4 GB) was left with no limit but 1024 textures. */
++static uint64_t tex_budget(void) {
++    static uint64_t v;
++    if (!v) {
++        const char *e = getenv("PSPRECOMP_TEX_MB");
++        if (!e || !*e) e = getenv("MHFU_TEX_MB");
++        long mb = e && *e ? strtol(e, NULL, 10) : 0;
++#if defined(__ANDROID__)
++        if (mb <= 0) mb = 128;
++#else
++        if (mb <= 0) mb = 384;
++#endif
++        if (mb < 16) mb = 16;
++        v = (uint64_t)mb << 20;
++    }
++    return v;
++}
++
++static void tex_set_bytes(gtex *t, uint64_t bytes) {
++    g_tex_bytes -= t->bytes;
++    t->bytes = bytes > 0xFFFFFFFFu ? 0xFFFFFFFFu : (uint32_t)bytes;
++    g_tex_bytes += t->bytes;
++}
+ 
+ static const int TEX_BITS[8] = { 16, 16, 16, 32, 4, 8, 16, 32 };
+ 
+@@ -448,6 +480,7 @@ static int tex_replace(gtex *t, const psp_draw_state *st) {
+     c->bytes = bytes;
+     g_uploads++;
+     g_upload_bytes += gl_fmt ? bytes : (uint64_t)rw * (uint64_t)rh * 4;
++    tex_set_bytes(t, gl_fmt ? bytes : (uint64_t)rw * (uint64_t)rh * 4);
+     return 1;
+ }
+ 
+@@ -465,6 +498,7 @@ static void tex_upload(gtex *t, const psp_draw_state *st) {
+     c->pixels = px;
+     g_uploads++;
+     g_upload_bytes += (uint64_t)st->tex_w * (uint64_t)st->tex_h * 4;
++    tex_set_bytes(t, (uint64_t)st->tex_w * (uint64_t)st->tex_h * 4);
+ }
+ 
+ /* The cached texture for the current state: found, checked against memory
+@@ -494,6 +528,30 @@ static int tex_recheck(void) {
+     return v;
+ }
+ 
++static void tex_drop(int i) {
++    c_id *c = (c_id *)cmd_add(C_TEX_FREE, sizeof *c);
++    c->id = g_tex[i].id;
++    g_tex_bytes -= g_tex[i].bytes;
++    g_tex[i] = g_tex[--g_ntex];
++    if (g_last_tex == g_ntex) g_last_tex = i;
++    else if (g_last_tex == i) g_last_tex = -1;
++}
++
++/* Drops the least recently used texture not used in this frame (when the
++ * cache is full, any): the index it had (where the last entry now is), or -1
++ * if every texture was used in this frame. */
++static int tex_drop_lru(void) {
++    int old = -1;
++    for (int i = 0; i < g_ntex; i++)
++        if (g_tex[i].used != g_flip && (old < 0 || g_tex[i].used < g_tex[old].used)) old = i;
++    if (old < 0) {
++        if (g_ntex < MAX_TEX) return -1;  /* only this frame's textures: let it run over */
++        old = 0;
++    }
++    tex_drop(old);
++    return old;
++}
++
+ static int tex_lookup(const psp_draw_state *st, int max_v) {
+     if (st->tex_fmt > PSP_TPSM_T32 || st->tex_w <= 0 || st->tex_h <= 0 || st->tex_bw <= 0) return 0;
+     const uint64_t ck = clut_key(st);
+@@ -512,15 +570,7 @@ static int tex_lookup(const psp_draw_state *st, int max_v) {
+     const uint32_t span = tex_span(st);
+     const uint8_t *mem = (const uint8_t *)psp_mem_ptr(st->tex_addr, span);
+     if (!t) {
+-        if (g_ntex == MAX_TEX) {
+-            /* Full: drop the least recently used. */
+-            int old = 0;
+-            for (int i = 1; i < g_ntex; i++) if (g_tex[i].used < g_tex[old].used) old = i;
+-            c_id *c = (c_id *)cmd_add(C_TEX_FREE, sizeof *c);
+-            c->id = g_tex[old].id;
+-            g_tex[old] = g_tex[--g_ntex];
+-            if (g_last_tex == g_ntex) g_last_tex = old;
+-        }
++        if (g_ntex == MAX_TEX) tex_drop_lru();   /* full */
+         idx = g_ntex++;
+         t = &g_tex[idx];
+         memset(t, 0, sizeof *t);
+@@ -531,6 +581,15 @@ static int tex_lookup(const psp_draw_state *st, int max_v) {
+         t->checked = g_flip;
+         seen_v_update(t, st, max_v);
+         tex_upload(t, st);
++        /* Over the budget: the least recently used go, never one used this frame. */
++        t->used = g_flip;
++        while (g_tex_bytes > tex_budget() && g_ntex > 1) {
++            const int was_last = idx == g_ntex - 1;
++            const int old = tex_drop_lru();
++            if (old < 0) break;
++            if (was_last) idx = old;      /* the last entry moved into the dropped one's place */
++            t = &g_tex[idx];
++        }
+     } else {
+         const int seen = t->seen_v;
+         seen_v_update(t, st, max_v);
+@@ -556,14 +615,34 @@ static int tex_lookup(const psp_draw_state *st, int max_v) {
+ static void tex_evict(void) {
+     for (int i = 0; i < g_ntex; ) {
+         if (g_flip - g_tex[i].used > 600) {
+-            c_id *c = (c_id *)cmd_add(C_TEX_FREE, sizeof *c);
+-            c->id = g_tex[i].id;
+-            g_tex[i] = g_tex[--g_ntex];
++            tex_drop(i);
+             g_last_tex = -1;
+         } else {
+             i++;
+         }
+     }
++    /* Framebuffers nothing drew into, read from or showed for 300 frames
++     * (PPSSPP drops them after a few): each is a colour texture and a depth
++     * buffer at the internal resolution, 8 MB at 2x and 32 MB at 4x, and up
++     * to 32 of them were kept for good. */
++    for (int i = 0; i < g_nfb; ) {
++        if (g_flip - g_fbs[i].used > 300) {
++            c_id *c = (c_id *)cmd_add(C_FB_FREE, sizeof *c);
++            c->id = g_fbs[i].id;
++            g_fbs[i] = g_fbs[--g_nfb];
++            g_bound = -1;
++        } else {
++            i++;
++        }
++    }
++    if ((g_flip & 2047) == 0) {
++        uint64_t fbb = 0;
++        for (int i = 0; i < g_nfb; i++) fbb += (uint64_t)g_fbs[i].w * (uint64_t)g_fbs[i].h * 8;
++        fbb *= (uint64_t)g_scale * (uint64_t)g_scale;
++        fprintf(stderr, "render_gl: %d framebuffers (%.0f MB), %d textures (%.0f of %.0f MB)\n", g_nfb,
++                (double)fbb / 1048576.0, g_ntex, (double)g_tex_bytes / 1048576.0,
++                (double)tex_budget() / 1048576.0);
++    }
+ }
+ 
+ /* ---- GE side: state ------------------------------------------------------ */
+@@ -867,6 +946,7 @@ static void gl_present(void) {
+     c_present *c = (c_present *)cmd_add(C_PRESENT, sizeof *c);
+     gfb *f = fb_find(addr);
+     if (f && f->drawn) {
++        f->used = g_flip;
+         c->fb = f->id;
+     } else {
+         c->fb = -1;
+@@ -1300,6 +1380,17 @@ static void present(const c_present *c) {
+     g_host.size(g_host.user, &ww, &wh);
+     if (ww <= 0 || wh <= 0) { free(c->pixels); return; }
+ 
++    /* Once in 256 frames: a driver that ran out of memory says so only here
++     * (low-end phones then draw black or lose textures, then get killed). */
++    static unsigned shown;
++    if ((++shown & 255) == 0) {
++        GLenum e;
++        int n = 0;
++        while ((e = glGetError()) != 0 && n++ < 8)
++            fprintf(stderr, "render_gl: GL error 0x%04X%s\n", (unsigned)e,
++                    e == 0x0505 ? " (out of GPU memory)" : "");
++    }
++
+     GLuint src_tex = 0, src_fbo = 0;
+     float u1 = 1, v1 = 1;
+     if (c->fb >= 0 && c->fb < g_nrfb && g_rfb[c->fb].fbo) {
