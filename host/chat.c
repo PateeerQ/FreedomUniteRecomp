@@ -28,6 +28,7 @@ static const char *chat_key_name(void) {
     return k && k[0] && mhfu_keys_vk(k) >= 0 ? k : "f1";
 }
 int mhfu_chat_key_vk(void) { return mhfu_keys_vk(chat_key_name()); }
+const char *mhfu_chat_key_name(void) { return chat_key_name(); }
 const char *mhfu_chat_key_label(void) {
     static char label[24];
     const char *k = chat_key_name();
