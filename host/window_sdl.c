@@ -29,6 +29,8 @@
 #include "keys.h"
 #include "lobby.h"
 #include "mods.h"
+#include "audio.h"
+#include "options.h"
 #include "net/client.h"
 #include "perfhint.h"
 #include "stats.h"
@@ -398,11 +400,13 @@ static void settings_load(void) {
     if (f) fclose(f);
     if (g_gethread_started < 0) {
         g_gethread_started = g_gethread;
-        if (!getenv("PSPRECOMP_GE_THREAD")) {          /* main.c turns it on when nothing says */
+        /* On = "auto": psprecomp runs the GE on its own thread only with 4 or
+         * more CPUs (main.c does the same when nothing says). */
+        if (!getenv("PSPRECOMP_GE_THREAD")) {
 #ifdef _WIN32
-            _putenv_s("PSPRECOMP_GE_THREAD", g_gethread ? "1" : "0");
+            _putenv_s("PSPRECOMP_GE_THREAD", g_gethread ? "auto" : "0");
 #else
-            setenv("PSPRECOMP_GE_THREAD", g_gethread ? "1" : "0", 1);
+            setenv("PSPRECOMP_GE_THREAD", g_gethread ? "auto" : "0", 1);
 #endif
         }
     }
@@ -1995,10 +1999,24 @@ static void draw_editor(canvas *c, float s) {
  * or Back again closes. Online, sign-in and the update check are Android
  * dialogs (MhfuActivity, over JNI): they need text fields. */
 
-enum { M_NET, M_NET_CREATE, M_NET_JOIN, M_NET_LEAVE, M_ACH, M_VPAD, M_STYLE, M_PAD, M_EDIT, M_OPACITY, M_SKILLS, M_FPS, M_RES, M_SMOOTH, M_GETHREAD, M_WIDE, M_CHEATS, M_TEXPACK, M_TEXSTYLE, M_TEXINSTALL, M_MOD0, M_MOD1, M_MOD2, M_SAVES, M_FILES, M_CRASH, M_UPDATE, M_ABOUT, M_EXIT };
+enum { M_NET, M_NET_CREATE, M_NET_JOIN, M_NET_LEAVE, M_ACH, M_VPAD, M_STYLE, M_PAD, M_EDIT, M_OPACITY, M_SKILLS, M_FPS, M_RES, M_SMOOTH, M_GETHREAD, M_WIDE, M_CHEATS, M_TEXPACK, M_TEXSTYLE, M_TEXINSTALL, M_MOD0, M_MOD1, M_MOD2, M_SAVES, M_FILES, M_CRASH, M_UPDATE, M_ABOUT, M_EXIT,
+       M_NET_FIND, M_ROOM0, M_ROOM_END = M_ROOM0 + 8, M_NET_WHERE, M_VOLUME, M_MSENS, M_MLOOK };
 enum { K_TOGGLE, K_CYCLE, K_STEP, K_ACTION };
 static SDL_AtomicInt g_net_busy;        /* a desktop room action is under way */
 typedef struct { int id, kind, restart; const char *text, *help; } menu_item;
+#ifndef __ANDROID__
+static int g_mlook_lock;                /* F7's mouse look (the menu's switch too) */
+static int g_msens;                     /* the mouse camera's speed, percent; 0: MHFU_MOUSE_SENS not read yet */
+static int g_net_lan;                   /* Create Server makes the room on this network, not the relay */
+static int mouse_sens(void) {
+    if (!g_msens) {
+        const char *e = getenv("MHFU_MOUSE_SENS");
+        const int v = e && atoi(e) > 0 ? atoi(e) : 100;
+        g_msens = v < 25 ? 25 : v > 300 ? 300 : v;
+    }
+    return g_msens;
+}
+#endif
 
 static const menu_item k_tab_display[] = {
     { M_RES, K_STEP, 1, "Resolution", "The 3D picture's size, a multiple of the PSP's 480x272. Higher is sharper but slower on weak phones. Applies at the next start." },
@@ -2013,18 +2031,30 @@ static const menu_item k_tab_controls[] = {
     { M_OPACITY, K_STEP, 0, "Button opacity", "How solid the on-screen buttons are." },
     { M_SKILLS, K_TOGGLE, 0, "Weapon buttons", "Buttons for your weapon's moves (guard, aim, charge, demon mode, spirit) while it is drawn." },
     { M_EDIT, K_ACTION, 0, "Edit button layout", "Move and resize every on-screen button: touch one to pick it, drag it, and make it smaller or bigger." },
+#ifndef __ANDROID__
+    { M_VOLUME, K_STEP, 0, "Volume", "How loud the game is. F5 and F6 change it too." },
+    { M_MSENS, K_STEP, 0, "Mouse camera speed", "How fast moving the mouse turns the camera while the right button is held or mouse look is on." },
+    { M_MLOOK, K_TOGGLE, 0, "Mouse look", "The mouse turns the camera without holding the right button; the cursor hides. F7 turns it on and off." },
+#endif
 };
 #ifdef __ANDROID__
 static const menu_item k_tab_online[] = {
     { M_NET, K_ACTION, 0, "Multiplayer", "Create a room or join one with its code, over the internet or the same Wi-Fi. No port forwarding." },
 };
 #else
-/* The desktop (Linux, the Steam Deck): the room's own buttons; the code is typed in the text box. */
+/* The desktop (Linux, the Steam Deck): the room's own buttons, then the
+ * rooms Find rooms found (menu_cur adds them as cards: a tap joins). */
 static const menu_item k_tab_online[] = {
-    { M_NET_CREATE, K_ACTION, 0, "Create Server", "Opens a room over the internet (or on this network without a relay). Others join with its code, MH-XXXX. No port forwarding." },
-    { M_NET_JOIN, K_ACTION, 0, "Join Server", "Joins a room by its code (MH-XXXX), asked for in a text box." },
+    { M_NET_CREATE, K_ACTION, 0, "Create Server", "Opens a room; a text box asks for a 4-digit passcode (leave it empty for a public room). Others join with its code, MH-XXXX. No port forwarding." },
+    { M_NET_WHERE, K_CYCLE, 0, "New rooms on", "Internet: anyone can join through the relay. This network: only players on the same Wi-Fi or LAN see it." },
+    { M_NET_FIND, K_ACTION, 0, "Join Server", "Looks for open rooms on this network and on the internet; they show below as cards, nearest first. Tap one to join it." },
+    { M_NET_JOIN, K_ACTION, 0, "Join by code", "Joins a room by its code (MH-XXXX), asked for in a text box. For a room the list does not show." },
     { M_NET_LEAVE, K_ACTION, 0, "Leave room", "Leaves the room you are in." },
 };
+#define MAX_FOUND (M_ROOM_END - M_ROOM0)
+static mhfu_room    g_found[MAX_FOUND], g_found_new[MAX_FOUND];   /* shown; just found (net_thread) */
+static int          g_nfound, g_nfound_new;
+static SDL_AtomicInt g_found_ready;          /* g_found_new is filled */
 #endif
 static const menu_item k_tab_mods[] = {
     { M_WIDE, K_TOGGLE, 0, "Widescreen", "Widens the 3D view to the screen's shape; menus and the HUD keep the PSP's shape in the middle." },
@@ -2050,6 +2080,9 @@ static const menu_item k_tab_system[] = {
     { M_CRASH, K_ACTION, 0, "Copy crash log", "Copies the last crash's log, to paste into a bug report." },
     { M_UPDATE, K_ACTION, 0, "Check for updates", "Looks for a newer release on GitHub and installs it." },
     { M_ABOUT, K_ACTION, 0, "About", "The version, credits and licences." },
+#endif
+#ifndef __ANDROID__
+    { M_ABOUT, K_ACTION, 0, "About", MHFU_APP_NAME ", maintained by " MHFU_MAINTAINER ". " MHFU_REPO_URL " . Free software under the GPL v3; the game itself is Capcom's." },
 #endif
     { M_EXIT, K_ACTION, 0, "Exit game", "Closes the game. Save first: what is not saved is lost." },
 };
@@ -2172,7 +2205,39 @@ static const char *menu_value(int id) {
         else snprintf(v, sizeof v, "%s", code);
         return v;
     }
-    case M_NET_JOIN: return SDL_GetAtomicInt(&g_net_busy) ? "Wait..." : "Join";
+    case M_NET_JOIN: return SDL_GetAtomicInt(&g_net_busy) ? "Wait..." : "Type code";
+#ifndef __ANDROID__
+    case M_VOLUME: {
+        static char v[8];
+        snprintf(v, sizeof v, "%d%%", mhfu_audio_volume());
+        return v;
+    }
+    case M_MSENS: {
+        static char v[8];
+        snprintf(v, sizeof v, "%d%%", mouse_sens());
+        return v;
+    }
+    case M_NET_WHERE: return g_net_lan || !mhfu_lobby_has_relay() ? "This network" : "Internet";
+    case M_NET_FIND: {
+        static char v[32];
+        if (SDL_GetAtomicInt(&g_net_busy)) return "Searching...";
+        if (!g_nfound) return "Find rooms";
+        snprintf(v, sizeof v, "%d room%s  -  again", g_nfound, g_nfound == 1 ? "" : "s");
+        return v;
+    }
+    case M_ROOM0: case M_ROOM0 + 1: case M_ROOM0 + 2: case M_ROOM0 + 3:
+    case M_ROOM0 + 4: case M_ROOM0 + 5: case M_ROOM0 + 6: case M_ROOM0 + 7: {
+        static char v[48];
+        const int i = id - M_ROOM0;
+        if (i >= g_nfound) return "";
+        const mhfu_room *r = &g_found[i];
+        char ping[16] = "";
+        if (r->ping_ms >= 0) snprintf(ping, sizeof ping, "  %d ms", r->ping_ms);
+        snprintf(v, sizeof v, "%d/4%s%s  %s", r->players, r->fps >= 60 ? "  60 FPS" : "", ping,
+                 r->internet ? "Internet" : "LAN");
+        return v;
+    }
+#endif
     case M_NET_LEAVE: return "Leave";
     case M_EDIT: return "Open editor";
     case M_SAVES: return "Choose folder";
@@ -2197,6 +2262,9 @@ static int menu_on(int id) {
 #if MHFU_TEXPACK
     case M_TEXPACK: return g_texpack;
 #endif
+#ifndef __ANDROID__
+    case M_MLOOK: return g_mlook_lock;
+#endif
     case M_MOD0: case M_MOD1: case M_MOD2: return id - M_MOD0 >= mhfu_mod_count() ? -1 : mhfu_mod_on(id - M_MOD0) != 0;
     default: return -1;
     }
@@ -2209,6 +2277,9 @@ static int menu_choices(int id, int *at) {
     case M_VPAD: *at = g_vpad_mode; return 3;
     case M_STYLE: *at = g_style == STYLE_MOBILE; return 2;
     case M_PAD: *at = !g_pad_combined; return 2;
+#ifndef __ANDROID__
+    case M_NET_WHERE: *at = g_net_lan || !mhfu_lobby_has_relay(); return 2;
+#endif
 #if MHFU_TEXPACK
     case M_TEXSTYLE: {
         const int n = mhfu_texpack_styles();
@@ -2266,8 +2337,41 @@ static menu_geom menu_layout(float w, float h) {
     return g;
 }
 
+static int room_order(const void *a, const void *b) {   /* nearest first; not known last */
+    const int x = ((const mhfu_room *)a)->ping_ms, y = ((const mhfu_room *)b)->ping_ms;
+    return (x < 0 ? 1 << 30 : x) - (y < 0 ? 1 << 30 : y);
+}
+
 static const menu_tab *menu_cur(void) {
     if (g_mtab < 0 || g_mtab >= MENU_TABS) g_mtab = 0;
+#ifndef __ANDROID__
+    if (k_tabs[g_mtab].items == k_tab_online) {
+        static menu_item items[sizeof k_tab_online / sizeof k_tab_online[0] + MAX_FOUND];
+        static char title[MAX_FOUND][48], help[MAX_FOUND][200];
+        static menu_tab tab;
+        if (SDL_GetAtomicInt(&g_found_ready)) {       /* a search ended: its rooms replace the old */
+            g_nfound = g_nfound_new;
+            memcpy(g_found, g_found_new, (size_t)g_nfound * sizeof *g_found);
+            qsort(g_found, (size_t)g_nfound, sizeof *g_found, room_order);
+            SDL_SetAtomicInt(&g_found_ready, 0);
+        }
+        const int base = (int)(sizeof k_tab_online / sizeof k_tab_online[0]);
+        memcpy(items, k_tab_online, sizeof k_tab_online);
+        for (int i = 0; i < g_nfound; i++) {
+            const mhfu_room *r = &g_found[i];
+            snprintf(title[i], sizeof title[i], "%s%s", r->locked ? "[locked] " : "", r->name[0] ? r->name : r->code);
+            snprintf(help[i], sizeof help[i], "Room %s%s, %s. %d of 4 hunters%s.%s", r->code,
+                     r->internet ? "" : " on this network", r->game[0] ? mhfu_game_label(r->game) : "an older game",
+                     r->players, r->fps ? (r->fps >= 60 ? ", plays at 60 FPS" : ", plays at 30 FPS") : "",
+                     r->locked ? " Asks for its 4-digit passcode." : "");
+            items[base + i] = (menu_item){ M_ROOM0 + i, K_ACTION, 0, title[i], help[i] };
+        }
+        tab = k_tabs[g_mtab];
+        tab.items = items;
+        tab.n = base + g_nfound;
+        return &tab;
+    }
+#endif
     return &k_tabs[g_mtab];
 }
 static int menu_on_ach(void) { return menu_cur()->items == NULL; }
@@ -2697,13 +2801,46 @@ static int SDLCALL net_thread(void *arg) {
     if (id == M_NET_CREATE) {
         mhfu_lobby_code(code);
         if (code[0]) snprintf(err, sizeof err, "Already in room %s: leave it first.", code);
-        else if (mhfu_lobby_create(NULL, mhfu_lobby_has_relay(), err, sizeof err) == 0) {
-            mhfu_lobby_code(code);
-            mhfu_window_notify("MULTIPLAYER", "Room created", code, NULL);
-            err[0] = 0;
-            SDL_SetAtomicInt(&g_net_busy, 0);
-            return 0;
+        else {
+            uint16_t w[8];
+            int n;
+            char pass[8] = "";
+            while ((n = mhfu_window_text_result(w, 8)) == -1) SDL_Delay(50);   /* the passcode box is open */
+            if (n < 0) { SDL_SetAtomicInt(&g_net_busy, 0); return 0; }       /* cancelled */
+            for (int k = 0; k < n && k < 4; k++) pass[k] = (char)(w[k] < 0x80 ? w[k] : '?');
+            if (mhfu_lobby_check_passcode(pass) != 0)
+                snprintf(err, sizeof err, "A passcode is 4 digits, or empty for a public room.");
+            else if (mhfu_lobby_create(pass, mhfu_lobby_has_relay() && !g_net_lan, err, sizeof err) == 0) {
+                mhfu_lobby_code(code);
+                mhfu_window_notify("MULTIPLAYER", "Room created", code, NULL);
+                SDL_SetAtomicInt(&g_net_busy, 0);
+                return 0;
+            }
         }
+    } else if (id == M_NET_FIND) {
+        const int n = mhfu_lobby_list(g_found_new, MAX_FOUND);
+        g_nfound_new = n > 0 ? n : 0;
+        SDL_SetAtomicInt(&g_found_ready, 1);
+        if (!g_nfound_new) snprintf(err, sizeof err, "No open rooms found. Create one, or join by its code.");
+    } else if (id >= M_ROOM0 && id < M_ROOM_END) {
+        const int i = id - M_ROOM0;
+        char room[8], pass[8] = "";
+        snprintf(room, sizeof room, "%s", g_found[i].code);
+        if (g_found[i].locked) {
+            uint16_t w[8];
+            int n;
+            while ((n = mhfu_window_text_result(w, 8)) == -1) SDL_Delay(50);   /* the box is open */
+            if (n <= 0) { SDL_SetAtomicInt(&g_net_busy, 0); return 0; }      /* cancelled */
+            for (int k = 0; k < n && k < 4; k++) pass[k] = (char)(w[k] < 0x80 ? w[k] : '?');
+        }
+        mhfu_lobby_code(code);
+        if (strcmp(code, room)) {
+            if (code[0]) mhfu_lobby_leave();
+            if (mhfu_lobby_join(room, pass, err, sizeof err) == 0) {
+                mhfu_window_notify("MULTIPLAYER", "Joined room", room, NULL);
+                err[0] = 0;
+            }
+        } else snprintf(err, sizeof err, "You are already in room %s.", room);
     } else if (id == M_NET_JOIN) {
         uint16_t w[16];
         int n;
@@ -2738,7 +2875,24 @@ static void net_action(int id) {
         static const uint16_t empty[1] = {0};
         if (mhfu_window_ask_text("Room code (MH-XXXX):", empty, 7) != 0) { SDL_SetAtomicInt(&g_net_busy, 0); return; }
     }
-    menu_set(0);
+    if (id == M_NET_CREATE) {
+        char code[8];
+        static const uint16_t empty[1] = {0};
+        mhfu_lobby_code(code);
+        if (!code[0] && mhfu_window_ask_text("Passcode (4 digits), or empty for a public room:", empty, 4) != 0) {
+            SDL_SetAtomicInt(&g_net_busy, 0);
+            return;
+        }
+    }
+    if (id >= M_ROOM0 && id < M_ROOM_END) {
+        if (id - M_ROOM0 >= g_nfound) { SDL_SetAtomicInt(&g_net_busy, 0); return; }
+        static const uint16_t empty[1] = {0};
+        if (g_found[id - M_ROOM0].locked && mhfu_window_ask_text("Passcode (4 digits):", empty, 4) != 0) {
+            SDL_SetAtomicInt(&g_net_busy, 0);
+            return;
+        }
+    }
+    if (id != M_NET_FIND) menu_set(0);       /* the search's rooms show in the menu */
     SDL_Thread *t = SDL_CreateThread(net_thread, "rooms", (void *)(intptr_t)id);
     if (t) SDL_DetachThread(t);
     else SDL_SetAtomicInt(&g_net_busy, 0);
@@ -2787,6 +2941,22 @@ static void menu_act(const menu_item *it, int dir) {
     case M_EDIT: menu_set(0); edit_open(); break;
 #ifndef __ANDROID__
     case M_NET_CREATE: case M_NET_JOIN: case M_NET_LEAVE: net_action(it->id); break;
+    case M_NET_FIND: net_action(it->id); break;
+    case M_NET_WHERE: if (mhfu_lobby_has_relay()) g_net_lan = !g_net_lan; break;
+    case M_MLOOK: g_mlook_lock = !g_mlook_lock; break;   /* takes the mouse once the menu closes */
+    case M_VOLUME: {
+        const int v = mhfu_audio_volume() + dir * 10;
+        if (dir && v >= 0 && v <= 100) { mhfu_audio_set_volume(v); mhfu_option_save("volume", mhfu_audio_volume()); }
+        break;
+    }
+    case M_MSENS: {
+        const int v = mouse_sens() + dir * 25;
+        if (dir && v >= 25 && v <= 300) { g_msens = v; mhfu_option_save("mouse_sens", v); }
+        break;
+    }
+    case M_ABOUT: mhfu_window_notify("ABOUT", MHFU_APP_NAME " v" MHFU_VERSION, "Maintained by " MHFU_MAINTAINER ". " MHFU_REPO_URL, NULL); break;
+    case M_ROOM0: case M_ROOM0 + 1: case M_ROOM0 + 2: case M_ROOM0 + 3:
+    case M_ROOM0 + 4: case M_ROOM0 + 5: case M_ROOM0 + 6: case M_ROOM0 + 7: net_action(it->id); break;
 #endif
 #ifdef __ANDROID__
     case M_UPDATE: menu_set(0); android_call("checkUpdates"); break;
@@ -3431,13 +3601,66 @@ int mhfu_window_gl(void) {
 int mhfu_window_closed(void) { return SDL_GetAtomicInt(&g_closed); }
 void mhfu_window_on_close(void (*fn)(void)) { g_on_close = fn; }
 
+#ifndef __ANDROID__
+/* The mouse camera, as window.c has it: with the right button held, or with
+ * F7's mouse look on, moving the mouse turns the camera. MHFU turns it with
+ * the d-pad, so the movement becomes the d-pad held that way for as long as
+ * it takes: MOUSE_PX_PER_S pixels make a second of turning (divided by
+ * MHFU_MOUSE_SENS percent, the launcher's slider). The cursor is hidden and
+ * held in place (SDL's relative mouse mode). Left clicks stay touches. */
+#define MOUSE_PX_PER_S 600
+static SDL_AtomicInt g_mouse_dx, g_mouse_dy;   /* pixels moved, not yet handed to the game */
+static int g_mlook_held, g_mlook_on;
+
+/* Main thread only (relative mode is the window's). */
+static void mlook_update(void) {
+    const int want = (g_mlook_held || g_mlook_lock) && !g_menu_open && !g_edit &&
+                     SDL_GetAtomicInt(&g_tb_state) != 1;
+    if (want == g_mlook_on || !g_window) return;
+    g_mlook_on = want;
+    SDL_SetWindowRelativeMouseMode(g_window, want);
+    if (!want) { SDL_SetAtomicInt(&g_mouse_dx, 0); SDL_SetAtomicInt(&g_mouse_dy, 0); }
+}
+
+/* The mouse's movement as d-pad, once a game frame: each axis holds its
+ * direction while pixels are left, and real time uses them up. At most half a
+ * second of turning waits, so a big flick does not spin on and on. */
+static uint32_t mouse_dpad(void) {
+    static long x, y;
+    static uint64_t last;
+    const long px_per_s = MOUSE_PX_PER_S * 100 / mouse_sens();
+    const uint64_t now = SDL_GetTicks();
+    const long ms = last ? (long)(now - last > 100 ? 100 : now - last) : 0;
+    last = now;
+    x += SDL_SetAtomicInt(&g_mouse_dx, 0);
+    y += SDL_SetAtomicInt(&g_mouse_dy, 0);
+    const long cap = px_per_s / 2;
+    if (x > cap) x = cap;
+    if (x < -cap) x = -cap;
+    if (y > cap) y = cap;
+    if (y < -cap) y = -cap;
+    uint32_t b = 0;
+    /* Up and down need a little more, so a sideways move does not tilt too. */
+    if (x > 2) b |= PSP_CTRL_RIGHT;
+    if (x < -2) b |= PSP_CTRL_LEFT;
+    if (y > 6) b |= PSP_CTRL_DOWN;
+    if (y < -6) b |= PSP_CTRL_UP;
+    const long use = ms * px_per_s / 1000 + 1;
+    x = x > use ? x - use : x < -use ? x + use : 0;
+    y = y > use ? y - use : y < -use ? y + use : 0;
+    return b;
+}
+#else
+static uint32_t mouse_dpad(void) { return 0; }
+#endif
+
 uint32_t mhfu_window_buttons(uint8_t *ax, uint8_t *ay) {
     const int s = SDL_GetAtomicInt(&g_stick);
     *ax = (s & 1) ? 0 : (s & 2) ? 255 : 128;
     *ay = (s & 4) ? 0 : (s & 8) ? 255 : 128;
     const int t = SDL_GetAtomicInt(&g_touch_stick_atomic);
     if (t >= 0) { *ax = (uint8_t)(t & 0xFF); *ay = (uint8_t)(t >> 8); }
-    return (uint32_t)SDL_GetAtomicInt(&g_buttons) | (uint32_t)SDL_GetAtomicInt(&g_touch_btn_atomic);
+    return (uint32_t)SDL_GetAtomicInt(&g_buttons) | (uint32_t)SDL_GetAtomicInt(&g_touch_btn_atomic) | mouse_dpad();
 }
 
 int mhfu_window_ask_text(const char *prompt, const uint16_t *initial, int limit) {
@@ -3639,7 +3862,26 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
                     memset(g_held, 0, sizeof g_held);
                     keys_changed();
                     touch_release_all();
+#ifndef __ANDROID__
+                    g_mlook_held = g_mlook_lock = 0;   /* another window: the cursor comes back */
+                    mlook_update();
+#endif
                     break;
+#ifndef __ANDROID__
+                case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                case SDL_EVENT_MOUSE_BUTTON_UP:
+                    if (e.button.which != SDL_TOUCH_MOUSEID && e.button.button == SDL_BUTTON_RIGHT) {
+                        g_mlook_held = e.type == SDL_EVENT_MOUSE_BUTTON_DOWN;
+                        mlook_update();
+                    }
+                    break;
+                case SDL_EVENT_MOUSE_MOTION:
+                    if (g_mlook_on && e.motion.which != SDL_TOUCH_MOUSEID) {
+                        SDL_AddAtomicInt(&g_mouse_dx, (int)lroundf(e.motion.xrel));
+                        SDL_AddAtomicInt(&g_mouse_dy, (int)lroundf(e.motion.yrel));
+                    }
+                    break;
+#endif
                 case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
                 case SDL_EVENT_WINDOW_RESIZED:
                 case SDL_EVENT_WINDOW_SHOWN:
@@ -3742,10 +3984,42 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
                         break;
                     }
                     if (down && !e.key.repeat && e.key.scancode == SDL_SCANCODE_F3) { g_show_fps = !g_show_fps; moving = 1; break; }
-                    if (down && !e.key.repeat && e.key.scancode == SDL_SCANCODE_F1 && mhfu_chat_available()) {
-                        mhfu_chat_request();                     /* in a room F1 is the chat's */
+                    if (down && !e.key.repeat && mhfu_chat_available() && key_name(e.key.scancode) &&
+                        !SDL_strcasecmp(key_name(e.key.scancode), mhfu_chat_key_name())) {
+                        mhfu_chat_request();                     /* in a room the chat key (MHFU_CHAT_KEY, F1) is the chat's */
                         break;
                     }
+#ifndef __ANDROID__
+                    if (down && !e.key.repeat && e.key.scancode == SDL_SCANCODE_F4 && MHFU_HAS_FPS60) {
+                        g_fps60 = mhfu_fps_preferred() < 60;   /* 60 fps mode (in a room: as the room allows) */
+                        mhfu_fps_set_preferred(g_fps60 ? 60 : 30);
+                        settings_save();
+                        mhfu_window_chat(NULL, g_fps60 ? "60 FPS on" : "60 FPS off (30)", 1);
+                        moving = 1;
+                        break;
+                    }
+                    if (down && (e.key.scancode == SDL_SCANCODE_F5 || e.key.scancode == SDL_SCANCODE_F6)) {
+                        mhfu_audio_set_volume(mhfu_audio_volume() + (e.key.scancode == SDL_SCANCODE_F6 ? 10 : -10));
+                        mhfu_option_save("volume", mhfu_audio_volume());
+                        char v[32];
+                        snprintf(v, sizeof v, "Volume %d%%", mhfu_audio_volume());
+                        mhfu_window_chat(NULL, v, 1);
+                        moving = 1;
+                        break;
+                    }
+                    if (down && !e.key.repeat && e.key.scancode == SDL_SCANCODE_F7) {   /* mouse look on / off */
+                        g_mlook_lock = !g_mlook_lock;
+                        mlook_update();
+                        break;
+                    }
+                    if (down && !e.key.repeat && e.key.scancode == SDL_SCANCODE_F9) {   /* a memory dump (mods.c) */
+                        char path[1100];
+                        const int r = mhfu_mods_dump(path, sizeof path);
+                        mhfu_window_chat(NULL, r == 0 ? "Memory dump saved (work/memdump)" : "Memory dump failed", 1);
+                        moving = 1;
+                        break;
+                    }
+#endif
                     if (down && !e.key.repeat && (e.key.scancode == SDL_SCANCODE_AC_BACK || e.key.scancode == SDL_SCANCODE_F1)) {
                         if (g_edit) edit_close();
                         else menu_set(!g_menu_open);
@@ -3781,6 +4055,9 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
             } while (!quit && SDL_PollEvent(&e));
         }
         mhfu_gamepad_update();
+#ifndef __ANDROID__
+        mlook_update();                         /* off while the menu, the editor or a text box is up */
+#endif
         if (g_window && target_pending()) {      /* the target button's hold and tap run on time */
             int ww = 0, wh = 0;
             SDL_GetWindowSizeInPixels(g_window, &ww, &wh);
