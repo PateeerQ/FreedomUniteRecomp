@@ -72,3 +72,10 @@ On Linux itself: `scripts/build-linux.sh [--universal] [--package]`.
 - **Join Server** (menu > Online) lists the open rooms on this network and the
   relay as cards, nearest first, with players, ping, 60 FPS and the release; a
   tap joins (a locked room asks for its passcode). "Join by code" types one.
+- **Create Server** asks for a 4-digit passcode (empty: a public room);
+  "New rooms on" picks Internet (the relay) or This network.
+- Menu > Controls: Volume, Mouse camera speed and Mouse look (kept in the
+  launcher's settings like F5/F6); System > About.
+- Under WSLg the picture may be drawn by Mesa's llvmpipe (on the CPU: the log
+  says `render_gl: Mesa / llvmpipe`), too slow for 60 FPS; `GALLIUM_DRIVER=d3d12`
+  (launcher > Advanced > extra environment) asks for the GPU instead.
