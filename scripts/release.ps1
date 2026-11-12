@@ -33,7 +33,7 @@ if ($us -and -not (Test-Path "$repo\$workSub\gen\mhfu_region_gen.h")) { throw "n
 
 if (-not $NoBuild) {
     if ($all) { & "$repo\scripts\build-universal.ps1" }
-    else { cmake --build $buildDir --config Release --target mhfu_host mhfu_launcher }
+    else { & "$repo\scripts\build.ps1" -BuildDir $buildDir -Target mhfu_host, mhfu_launcher }   # Ninja or VS
     if ($LASTEXITCODE) { throw "the Windows build failed" }
     # AGP 8.7's Gradle runs on JDK 17-21; Android Studio's own JBR became 25. A JBR 21 under ~/.jdks first.
     $jdk = Get-ChildItem "$env:USERPROFILE\.jdks\jbr-21*", "$env:USERPROFILE\.jdks\*-21*" -Directory -ErrorAction SilentlyContinue |
