@@ -4,7 +4,7 @@
 </h1>
 
 <p align="center">
-  <b>Monster Hunter Freedom Unite on PC and Android: an unofficial native port through static recompilation.</b>
+  <b>Monster Hunter Freedom Unite on Windows, Linux, Steam Deck and Android: an unofficial native port through static recompilation.</b>
 </p>
 
 <p align="center">
@@ -12,6 +12,7 @@
   <a href="https://github.com/PateeerQ/FreedomUniteRecomp/releases"><img src="https://img.shields.io/github/downloads/PateeerQ/FreedomUniteRecomp/total?color=8a6d3b" alt="Downloads"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="License: GPL-3.0"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20x64-0078d6" alt="Windows x64">
+  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20Steam%20Deck-fcc624" alt="Linux and Steam Deck x64">
   <img src="https://img.shields.io/badge/platform-Android%208%2B%20(arm64)-3ddc84" alt="Android 8+ arm64">
   <a href="https://github.com/sp00nznet/psprecomp"><img src="https://img.shields.io/badge/built%20with-psprecomp-555" alt="Built with psprecomp"></a>
   <a href="https://discord.gg/gCqSPkfUhj"><img src="https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
@@ -30,7 +31,7 @@
 ---
 
 *Monster Hunter Freedom Unite* (PSP) recompiled ahead of time from its MIPS code into C, then built as a native
-program for **Windows** and **Android**: no emulator runs the game. It adds what the PSP never had: online rooms
+program for **Windows**, **Linux** (Steam Deck too) and **Android**: no emulator runs the game. It adds what the PSP never had: online rooms
 anyone can join with a code, 60 FPS, widescreen, controllers, rearrangeable touch buttons and RetroAchievements.
 
 **Maintained by [PateeerQ](https://github.com/PateeerQ).**
@@ -47,13 +48,14 @@ Questions, bug reports, finding other hunters: join the **[Discord server](https
 |  |  |
 |---|---|
 | **Native** | The EBOOT and all 298 overlays (menus, stages, monsters) recompiled to C; firmware reimplemented in the host |
-| **Online play** | **Create Server / Join Server** with room codes and optional passcodes, on your Wi-Fi or over the internet relay; no port forwarding. PC and phone in the same room. Room chat and ping |
+| **Online play** | **Create Server / Join Server** with room codes and optional passcodes, on your Wi-Fi or over the internet relay; no port forwarding. Windows, Linux and Android in the same room. Room chat and ping |
 | **60 FPS (beta)** | The game at 60 fps and normal speed. A room plays at its slowest player's rate |
 | **One app, every release** | Europe, USA, Japan and the FUComplete translation from one launcher and one app, told from your disc; every release can share a room |
 | **Mods** | Widescreen, CWCheat cheats, and built-in mods: Target Camera + Crosshair, Damage Numbers, Gathering Node Indicators |
 | **Texture packs** | HD packs made for PPSSPP (PNG or KTX2, with their style variants), optional |
 | **Android** | Touch buttons you can move and resize, a swipe camera, weapon buttons that change with your weapon, a save folder you choose |
-| **PC launcher** | Profiles, upscaling, fullscreen, key bindings, controller tester, RetroAchievements, update check, log |
+| **PC launcher** | Windows and Linux: profiles, upscaling, fullscreen, key bindings, controller tester, RetroAchievements, update check, log |
+| **Linux and Steam Deck** | A native x86_64 build with the same launcher; the Deck's controls, R3 for the menu, touch screen, mouse camera |
 | **Controllers** | DualSense, DualShock, Xbox and more (SDL3); the right stick moves the camera |
 | **RetroAchievements** | Sign in once; unlocks pop up in game (softcore) |
 
@@ -73,19 +75,20 @@ Get the newest build from **[Releases](https://github.com/PateeerQ/FreedomUniteR
 | Platform | File | Needs |
 |---|---|---|
 | Windows 10/11 x64 | `FreedomUniteRecomp-v<version>-windows-x64-universal.zip` | OpenGL 3.3 GPU |
+| Linux x64 / Steam Deck | `FreedomUniteRecomp-v<version>-linux-x64-universal.tar.gz` | OpenGL 3.3 GPU, glibc 2.38+ (SteamOS 3.6+, Ubuntu 24.04+, Fedora 40+, Arch) |
 | Android 8+ arm64 | `FreedomUniteRecomp-v<version>-android-arm64-universal.apk` | OpenGL ES 3.0 GPU |
 
-Both check for updates by themselves (the launcher on PC, the app at start or from its menu).
+All of them check for updates by themselves (the launcher on PC, the app at start or from its menu).
 
 ## Status
 
-Version **0.4.3**. The game boots, plays its movies, creates and saves a character, and runs the village,
+Version **0.4.7**. The game boots, plays its movies, creates and saves a character, and runs the village,
 the Gathering Hall and quests in 3D at its own 30 fps, or 60 in 60 FPS mode, with sound, music, keyboard,
 controllers and touch buttons. Quests have been played start to finish, alone and together through a room, on
-PC and on Android (Poco X7 Pro).
+PC and on Android (Poco X7 Pro). The Linux build is new (v0.4.7): checked in WSL, not yet on a real Steam Deck.
 
 <details>
-<summary><b>Progress by area</b> (rough estimates, 2026-11-06)</summary>
+<summary><b>Progress by area</b> (rough estimates, 2026-11-12)</summary>
 
 <br>
 
@@ -105,11 +108,12 @@ PC and on Android (Poco X7 Pro).
 | Multiplayer (ad hoc over rooms) | ![88%](https://img.shields.io/badge/88%25-brightgreen?style=flat-square) | LAN and internet rooms, passcodes, chat, ping, 60 fps rooms, every release in one room with its name shown; Gathering Hall and quests together; movement in the hall lags |
 | Mods | ![80%](https://img.shields.io/badge/80%25-brightgreen?style=flat-square) | widescreen, CWCheat cheats, three built-in code mods in every release |
 | Texture packs | ![70%](https://img.shields.io/badge/70%25-yellow?style=flat-square) | PPSSPP packs (quick/xxh32/xxh64 hashes, PNG, KTX2 as ASTC/BC7), styles from ADDONS; tested on PC, not yet on a phone |
-| Performance | ![40%](https://img.shields.io/badge/40%25-yellow?style=flat-square) | being worked on for low-end phones: the GE's vertex work is done on the CPU; vertex reads made direct (village about 18% lighter on PC) |
+| Performance | ![50%](https://img.shields.io/badge/50%25-yellow?style=flat-square) | being worked on for low-end phones: the GE's vertex work is done on the CPU; vertex reads made direct, lighting prepared once per draw, multi-core drawing (on 4+ cores), graphics memory kept within limits |
 | RetroAchievements | ![70%](https://img.shields.io/badge/70%25-yellow?style=flat-square) | sign-in, game identified, unlock toasts (softcore); not yet checked against a real unlock |
 | Gameplay coverage | ![40%](https://img.shields.io/badge/40%25-yellow?style=flat-square) | village life, full quests, the Gathering Hall together; more maps and monsters untested |
 | PC release (launcher) | ![85%](https://img.shields.io/badge/85%25-brightgreen?style=flat-square) | launcher, profiles, keys, controllers, achievements, mods, 60 FPS, updates, log, crash report |
-| Android port | ![75%](https://img.shields.io/badge/75%25-yellow?style=flat-square) | 30 or 60 fps, touch buttons, layout editor, drawer menu, multiplayer, achievements, mods, save folder, crash log, updates |
+| Android port | ![80%](https://img.shields.io/badge/80%25-brightgreen?style=flat-square) | 30 or 60 fps, touch buttons that follow what you can do, layout editor, settings menu, multiplayer, achievements, mods, save folder, crash log, updates |
+| Linux / Steam Deck | ![60%](https://img.shields.io/badge/60%25-yellow?style=flat-square) | launcher, every release, keyboard and mouse camera, controllers, room list; checked in WSL, not yet on a real Deck |
 | USA release (`ULUS10391`) | ![75%](https://img.shields.io/badge/75%25-yellow?style=flat-square) | 60 FPS and the built-in mods; quests on Android with the mods and weapon buttons, in one room with an EU player |
 | Japan release (`ULJM05500`) | ![75%](https://img.shields.io/badge/75%25-yellow?style=flat-square) | 60 FPS and the built-in mods; quests and area changes on PC and Android, in one room with an EU player |
 | FUComplete | ![70%](https://img.shields.io/badge/70%25-yellow?style=flat-square) | the English translation's own code and voices; checked on PC and Android |
@@ -153,9 +157,22 @@ You need your own copy of the game and three files made from it:
 | F9 | memory dump (for cheat makers) |
 
 Keys can be rebound on the launcher's Keyboard page. The game window's **Options** menu sets the volume, the mouse
-camera's sensitivity, mouse look and mods.
+camera's sensitivity, mouse look and mods. In a room, **F1** opens the room chat (another key can be chosen).
 
 </details>
+
+### Linux and Steam Deck
+
+1. Extract `FreedomUniteRecomp-v<version>-linux-x64-universal.tar.gz` (on the Deck: in Desktop Mode).
+2. Put the fonts in `work/root/flash0/font`.
+3. Run `./start.sh` (or `./install-desktop-entry.sh` once, for a menu entry), choose the ISO and the EBOOT under
+   **Advanced**, then press **DEPART**.
+
+The keys are the same as on Windows. **F1** (or **R3** on a controller) opens the in-game menu: Online (Create
+Server with an optional passcode, Join Server with the list of rooms), Controls (volume, mouse camera speed, mouse
+look), Display, Mods. On the Steam Deck the built-in controls work as a controller and the touch screen works in the
+menu; add `start.sh` to Steam as a non-Steam game and choose *Fullscreen* on the Play page for Game Mode. See
+[docs/LINUX.md](docs/LINUX.md).
 
 ### Android
 
@@ -196,8 +213,9 @@ the recompiled code. Online, a room runs at its slowest player's rate (the chat 
 3. Everyone goes online in the game as usual: the Gathering Hall.
 
 Rooms work on the same Wi-Fi or hotspot, or **over the internet** through the project's relay, between PCs and
-phones; nobody forwards a port. On PC it is the game window's **Multiplayer** menu, on Android the menu's
-*Multiplayer*. In a room, **Select** opens the room chat. Another relay can be set with `relay=host:port` in
+phones; nobody forwards a port. On Windows it is the game window's **Multiplayer** menu, on Linux the menu's
+*Online* tab (F1), on Android the menu's *Multiplayer*. In a room, **F1** on PC (or the chat bubble on a phone)
+opens the room chat. Another relay can be set with `relay=host:port` in
 `<root>/net.cfg`.
 
 ## Building from source
@@ -236,15 +254,28 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 
 See [android/README.md](android/README.md).
 
+### Linux
+
+Built from Windows in WSL (Ubuntu 24.04), from the same generated C as the Windows build; FFmpeg is built static
+the first time. The packages to install and the details are in [docs/LINUX.md](docs/LINUX.md).
+
+```powershell
+.\scripts\build-linux.ps1                       # Europe only
+.\scripts\build-linux.ps1 -Universal -Package   # every release set up: the Linux tarball
+```
+
+On Linux itself: `scripts/build-linux.sh [--universal] [--package]`.
+
 ### Packaging a release
 
 ```powershell
-.\scripts\release.ps1            # -Region US for the USA build
+.\scripts\release.ps1 -Region ALL     # every release set up: the universal zip and APK
+.\scripts\build-linux.ps1 -Universal -Package
 ```
 
-writes `release\v<version>\`: the Windows zip and the APK. The version is `MHFU_VERSION` in `host/about.h` and
+writes `release\v<version>\`: the Windows zip, the APK and the Linux tarball. The version is `MHFU_VERSION` in `host/about.h` and
 `versionName` in `android/app/build.gradle`; they must match. Both packages contain code recompiled from your EBOOT
-(though no game files): keep that in mind before publishing them.
+(though no game files): keep that in mind before publishing them. Builds use ccache and Ninja when installed.
 
 <details>
 <summary><b>Repository layout</b></summary>
@@ -254,7 +285,7 @@ writes `release\v<version>\`: the Windows zip and the APK. The version is `MHFU_
 | Path | What |
 |---|---|
 | `psprecomp/` | the recompiler toolkit, as a git submodule |
-| `launcher/` | the PC launcher (`mhfu_launcher.exe`, Dear ImGui) |
+| `launcher/` | the PC launcher (`mhfu_launcher`, Dear ImGui; Windows and Linux) |
 | `android/` | the Android app: `SetupActivity` (game folder), `MhfuActivity` (the game, its dialogs), `RoomPicker`, `SaveSync`, `CheatsDialog`, `CrashLog`, `Updater` |
 | `host/main.c` | loads the EBOOT, sets up the boot thread, runs, reports |
 | `host/window.c`, `host/window_sdl.c` | the Win32 window; the SDL3 window (Android, Linux) with touch buttons, layout editor and menu |
@@ -267,6 +298,7 @@ writes `release\v<version>\`: the Windows zip and the APK. The version is `MHFU_
 | `host/mods.c` | widescreen, cheats, built-in code mods |
 | `host/achievements.c` | RetroAchievements through rcheevos |
 | `host/lobby.c`, `host/chat.c`, `host/stats.c` | Create/Join Server, room chat, FPS and ping line |
+| `host/options.c`, `host/curl_dl.c` | options saved to the launcher's settings; HTTP on Linux through the system's libcurl |
 | `host/adhoc.c` | sceNet, sceNetAdhoc (PDP/PTP), sceNetAdhocctl, sceWlan and Netconf over the room network |
 | `host/net/` | the room network: protocol (`proto.h`), hub, client, sockets and threads |
 | `seeds/` | functions only reached through a pointer built at run time (`seeds/us/` for the USA build) |
@@ -277,7 +309,8 @@ writes `release\v<version>\`: the Windows zip and the APK. The version is `MHFU_
 | `tools/mhfu_netcheck.c` | end-to-end check of the room network without the game |
 | `tools/make_icon.py`, `tools/touch_icons.py` | the app icon; the touch button icons |
 | `patches/psprecomp/` | the changes made to psprecomp, as patches |
-| `scripts/` | `setup.ps1`, `run.ps1`, `harvest.ps1`, `release.ps1` |
+| `scripts/` | `setup.ps1`, `run.ps1`, `harvest.ps1`, `release.ps1`, `build.ps1`, `build-linux.ps1`/`.sh` |
+| `docs/LINUX.md` | the Linux and Steam Deck build |
 | `work/` | everything made from the game (never committed) |
 
 </details>
@@ -315,7 +348,7 @@ yet, GE work, and a framebuffer capture. A `dispatch miss` names an address that
 - **[SDL3](https://libsdl.org)** (zlib), **[FFmpeg](https://ffmpeg.org)** (LGPL 2.1),
   **[rcheevos](https://github.com/RetroAchievements/rcheevos)** (MIT), **[Dear ImGui](https://github.com/ocornut/imgui)** (MIT),
   **[nlohmann/json](https://github.com/nlohmann/json)** (MIT), **[stb](https://github.com/nothings/stb)** (MIT / public domain)
-- **Touch button icons** by Lorc and Delapouite, [game-icons.net](https://game-icons.net) (CC BY 3.0)
+- **Touch button icons** by Lorc, Delapouite and SeregaCthtuf, [game-icons.net](https://game-icons.net) (CC BY 3.0)
 - The **"60 FPS" cheat** and the **CWCheat Database** by the PSP cheat community; the built-in code mods by the MHFU
   modding community
 - Everyone who tested and reported bugs
