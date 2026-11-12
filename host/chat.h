@@ -21,6 +21,8 @@ void mhfu_chat_request(void);
 /* The chat key: its Windows virtual-key code (keys.h), and its name for the
  * room's hint ("F1"). */
 int mhfu_chat_key_vk(void);
+/* The chat key's name as input.ini spells it ("f1"). */
+const char *mhfu_chat_key_name(void);
 const char *mhfu_chat_key_label(void);
 
 /* 1 while in a room (the phone's chat bubble shows then). */
