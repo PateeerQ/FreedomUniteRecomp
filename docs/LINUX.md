@@ -58,3 +58,17 @@ On Linux itself: `scripts/build-linux.sh [--universal] [--package]`.
     navigation) or the touch screen. Game Mode runs it under gamescope;
     "Fullscreen" on the Play page is best there.
   - The Deck's screen is 1280x800 (16:10): Widescreen fits it.
+
+## Desktop keys and mouse (as in the Windows window)
+
+- **Mouse camera:** hold the right button and move the mouse, or press **F7**
+  for mouse look (the cursor hides; F7 again, or leaving the window, ends it).
+  Speed: the launcher's "Mouse camera" slider (`MHFU_MOUSE_SENS`). Left clicks
+  are still touches.
+- **F1** the menu (in a room: the chat, or the key `MHFU_CHAT_KEY` names),
+  **F3** the FPS line, **F4** 60 FPS on/off, **F5/F6** volume -/+ 10 % (kept in
+  the launcher's settings), **F9** a memory dump into `work/memdump`, **F11**
+  or Alt+Enter fullscreen.
+- **Join Server** (menu > Online) lists the open rooms on this network and the
+  relay as cards, nearest first, with players, ping, 60 FPS and the release; a
+  tap joins (a locked room asks for its passcode). "Join by code" types one.
