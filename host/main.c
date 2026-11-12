@@ -564,14 +564,16 @@ int main(int argc, char **argv) {
 #ifdef __ANDROID__
     if (argc < 3) android_args(&argc, &argv);
 #endif
-    /* The GE on a thread of its own (psprecomp's PSPRECOMP_GE_THREAD), on unless
-     * MHFU_GE_THREAD=0 or the phone's menu turned it off (window_sdl.c sets it). */
+    /* The GE on a thread of its own (psprecomp's PSPRECOMP_GE_THREAD): "auto"
+     * (on with 4 or more CPUs; on 1-3 the extra thread only takes cores from
+     * the game) unless MHFU_GE_THREAD=0/1 or the phone's menu says (window_sdl.c). */
     if (!getenv("PSPRECOMP_GE_THREAD")) {
         const char *g = getenv("MHFU_GE_THREAD");
+        const char *v = g && g[0] == '0' ? "0" : g && g[0] == '1' ? "1" : "auto";
 #ifdef _WIN32
-        _putenv_s("PSPRECOMP_GE_THREAD", g && g[0] == '0' ? "0" : "1");
+        _putenv_s("PSPRECOMP_GE_THREAD", v);
 #else
-        setenv("PSPRECOMP_GE_THREAD", g && g[0] == '0' ? "0" : "1", 1);
+        setenv("PSPRECOMP_GE_THREAD", v, 1);
 #endif
     }
     if (argc < 3) {
