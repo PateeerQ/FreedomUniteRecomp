@@ -213,7 +213,7 @@ endif()
 # What every host shares, made once.
 set(MHFU_HOST_SOURCES host/main.c host/achievements.c host/chat.c host/hle_mhfu.c host/input.c host/keys.c
     host/stats.c host/libfont.c host/utility.c host/adhoc.c host/lobby.c host/mods.c host/audio.c host/atrac.c
-    host/mpeg.c host/prof.c host/chnnlsv.c host/perfhint.c host/curl_dl.c)
+    host/mpeg.c host/prof.c host/chnnlsv.c host/perfhint.c host/curl_dl.c host/options.c)
 set(MHFU_HOST_DEPS_READY OFF)
 
 # The PSP's KIRK crypto engine (PPSSPP's ext/libkirk, GPL v3): decrypts save data
