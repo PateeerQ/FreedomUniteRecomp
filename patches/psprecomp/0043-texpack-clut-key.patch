@@ -1,0 +1,79 @@
+diff --git a/include/psprecomp/render.h b/include/psprecomp/render.h
+index d576f8f..0db2e84 100644
+--- a/include/psprecomp/render.h
++++ b/include/psprecomp/render.h
+@@ -81,6 +81,8 @@ typedef struct {
+     int      clut_mask;      /* CMODE bits 8-15 */
+     int      clut_start;     /* CMODE bits 16-20, in units of 16 entries */
+     uint32_t clut_version;   /* changes whenever a CLOAD changed `clut`'s bytes */
++    uint32_t clut_load_bytes;/* bytes the last CLOAD loaded (PPSSPP's clutTotalBytes_) */
++    uint32_t clut_max_bytes; /* the most any CLOAD loaded (clutMaxBytes_): texture packs' CLUT hash */
+ 
+     int      blend;          /* ABE */
+     int      blend_src, blend_dst, blend_op;   /* ALPHA */
+@@ -181,9 +183,13 @@ void psp_render_gl_set_stretch(int on);
+  * or PSP_REPLACE_READY, with *w, *h and *data (malloc'd, the backend frees
+  * it) set: RGBA8 when *gl_fmt is 0, else blocks of that compressed GL format
+  * (one psp_render_gl_compressed_formats() offered), *bytes long. NULL turns
+- * it off. */
++ * it off. `dim` is TSIZE0's log2 sizes (h << 8 | w), and a paletted texture
++ * comes with the CLUT bytes PPSSPP hashes for its key (`clut`, `clut_bytes`:
++ * the last load plus the start offset, at most the largest load; NULL, 0 for
++ * the others). */
+ enum { PSP_REPLACE_NONE = 0, PSP_REPLACE_PENDING = 1, PSP_REPLACE_READY = 2 };
+ typedef int (*psp_texture_replacer)(uint32_t addr, int bufw, int w, int h, int fmt, int swizzled,
++                                    uint32_t dim, const uint8_t *clut, uint32_t clut_bytes,
+                                     int *out_w, int *out_h, uint32_t **data, uint32_t *gl_fmt, uint32_t *bytes);
+ void psp_render_gl_set_replacer(psp_texture_replacer fn);
+ 
+diff --git a/src/hle/ge.c b/src/hle/ge.c
+index 7fe2532..c7829c9 100644
+--- a/src/hle/ge.c
++++ b/src/hle/ge.c
+@@ -307,7 +307,7 @@ static uint64_t g_unsupported;     /* vertices in a format we do not read */
+  * is decoded from where one value spans two commands. */
+ static psp_draw_state g_ds;
+ static uint32_t g_tbp, g_tbw, g_cbp, g_psm;
+-static uint8_t  g_clut[1024];      /* the GE's CLUT cache, filled by CLOAD */
++static uint8_t  g_clut[2048];      /* the GE's CLUT cache, filled by CLOAD (up to 63 blocks of 32) */
+ /* A vertex with no colour takes the material colour: AMC's RGB, AMA's alpha. */
+ static uint32_t g_material = 0xFFFFFFFFu;
+ 
+@@ -1511,6 +1511,10 @@ static void run_list(ge_queue *q) {
+                 for (uint32_t i = 0; i < n; i++) g_clut[i] = psp_read8(g_cbp + i);
+                 g_ds.clut_version++;
+             }
++            if (n) {                                      /* PPSSPP keeps both for its CLUT hash */
++                g_ds.clut_load_bytes = n;
++                if (n > g_ds.clut_max_bytes) g_ds.clut_max_bytes = n;
++            }
+             break;
+         }
+         case GE_CMODE:
+diff --git a/src/render_gl.c b/src/render_gl.c
+index a81d62b..fb8065d 100644
+--- a/src/render_gl.c
++++ b/src/render_gl.c
+@@ -463,8 +463,20 @@ static int tex_replace(gtex *t, const psp_draw_state *st) {
+     int rw = 0, rh = 0;
+     uint32_t *rpx = NULL, gl_fmt = 0, bytes = 0;
+     const int hh = t->seen_v > 0 && t->seen_v < st->tex_h ? t->seen_v : st->tex_h;
+-    t->repl = rep(st->tex_addr, st->tex_bw, st->tex_w, hh, st->tex_fmt, st->tex_swizzle, &rw, &rh, &rpx,
+-                  &gl_fmt, &bytes);
++    uint32_t lw = 0, lh = 0;
++    while (lw < 15 && (1 << lw) < st->tex_w) lw++;
++    while (lh < 15 && (1 << lh) < st->tex_h) lh++;
++    const uint8_t *clut = NULL;
++    uint32_t clut_bytes = 0;
++    if (st->tex_fmt >= PSP_TPSM_T4 && st->tex_fmt <= PSP_TPSM_T32 && st->clut) {
++        /* PPSSPP's UpdateCurrentClut: the last load plus the start's bytes, at most the largest load. */
++        const uint32_t base = (uint32_t)st->clut_start * 16u * (st->clut_fmt == 3 ? 4u : 2u);
++        clut_bytes = st->clut_load_bytes + base;
++        if (clut_bytes > st->clut_max_bytes) clut_bytes = st->clut_max_bytes;
++        clut = st->clut;
++    }
++    t->repl = rep(st->tex_addr, st->tex_bw, st->tex_w, hh, st->tex_fmt, st->tex_swizzle, lh << 8 | lw, clut,
++                  clut_bytes, &rw, &rh, &rpx, &gl_fmt, &bytes);
+     if (t->repl != PSP_REPLACE_READY) return 0;
+     if (!rpx || rw <= 0 || rh <= 0 || (gl_fmt && !bytes)) {                          /* said ready, gave nothing */
+         free(rpx);
