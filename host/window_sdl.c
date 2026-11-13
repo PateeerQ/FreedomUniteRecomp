@@ -284,13 +284,22 @@ static void text_centered(canvas *c, float cx, float cy, int px, uint32_t col, c
 
 enum { T_NONE, T_STICK, T_DPAD, T_CROSS, T_CIRCLE, T_SQUARE, T_TRIANGLE, T_L, T_R, T_SELECT, T_START, T_MENU, T_EDGE, T_RSTICK, T_SWIPE,
        T_SKILL0, T_SKILL1, T_SKILL2, T_ATTACK, T_ROLL, T_ITEM, T_RUN, T_YES, T_NO, T_ACT, T_ACT2, T_DETAIL, T_LLEFT, T_LRIGHT, T_CHAT,
-       T_DRAW, T_USE, T_KICK, T_BAG, T_PICK, T_QSTART, T_WX0, T_WX1, T_WX2, T_WX3, T_WX4, T_WX5 };
+       T_DRAW, T_USE, T_KICK, T_BAG, T_PICK, T_QSTART, T_WX0, T_WX1, T_WX2, T_WX3, T_WX4, T_WX5,
+       T_COMBO0, T_COMBO1, T_COMBO2 };
 enum { VPAD_AUTO, VPAD_ON, VPAD_OFF };
 enum { G_STICK, G_DPAD, G_FACE, G_L, G_R, G_SELECT, G_START, G_MENU, G_RSTICK, G_SKILL, G_ATTACK, G_ROLL, G_ITEM, G_RUN,
-       G_DRAW, G_USE, G_KICK, G_BAG, G_YESNO, G_EXTRAS, G_ACT, G_PICK, G_COUNT };
+       G_DRAW, G_USE, G_KICK, G_BAG, G_YESNO, G_EXTRAS, G_ACT, G_PICK, G_COMBO, G_COUNT };
 static const char *const k_group_name[G_COUNT] = { "stick", "dpad", "face", "l", "r", "select", "start", "menu", "rstick", "skill",
                                                    "attack", "roll", "item", "run",
-                                                   "draw", "use", "kick", "bag", "yesno", "extras", "act", "pick" };
+                                                   "draw", "use", "kick", "bag", "yesno", "extras", "act", "pick", "combo" };
+/* Combo buttons (Legacy PSP style; issue #13): each holds the PSP buttons the
+ * player chose together, so Triangle + Circle (or any set) is one thumb. A row
+ * above the face buttons; chosen in the menu (Android's dialog). */
+#define COMBOS 3
+static uint32_t g_combo[COMBOS] = { 0x1000u | 0x2000u, 0, 0 };   /* Triangle + Circle by default */
+static SDL_AtomicInt g_combo_dirty;                    /* set from Java: save on the SDL thread */
+/* A short buzz when a button is touched: 0 off, 1 light, 2 medium, 3 strong. */
+static int g_vibe;
 /* The button styles, chosen in the drawer: the PSP's face buttons and d-pad
  * everywhere, or the mobile one: in a quest with the weapon out, the attack
  * pad, Dodge (Cross), Sheathe (Square) and the weapon buttons (R is on the pad
@@ -385,6 +394,12 @@ static void settings_load(void) {
         if (sscanf(line, "widescreen=%d", &v) == 1) g_wide = v != 0;
         if (sscanf(line, "texpack=%d", &v) == 1) g_texpack = v != 0;
         if (sscanf(line, "ge_thread=%d", &v) == 1) g_gethread = v != 0;
+        if (sscanf(line, "vibration=%d", &v) == 1 && v >= 0 && v <= 3) g_vibe = v;
+        {
+            int slot;
+            unsigned bits;
+            if (sscanf(line, "combo%d=%x", &slot, &bits) == 2 && slot >= 1 && slot <= COMBOS) g_combo[slot - 1] = bits & 0xF3F9u;
+        }
         if (!strncmp(line, "texpack_style=", 14)) {
             snprintf(g_texstyle, sizeof g_texstyle, "%s", line + 14);
             g_texstyle[strcspn(g_texstyle, "\r\n")] = 0;
@@ -429,7 +444,8 @@ static void settings_save(void) {
     fprintf(f, "fps60=%d\nwidescreen=%d\nweapon_buttons=%d\nbutton_style=%d\ntexpack=%d\n", g_fps60, g_wide,
             g_skills_on, g_style, g_texpack);
     if (g_texstyle[0]) fprintf(f, "texpack_style=%s\n", g_texstyle);
-    fprintf(f, "pad_combined=%d\nge_thread=%d\n", g_pad_combined, g_gethread);
+    fprintf(f, "pad_combined=%d\nge_thread=%d\nvibration=%d\n", g_pad_combined, g_gethread, g_vibe);
+    for (int i = 0; i < COMBOS; i++) fprintf(f, "combo%d=%x\n", i + 1, (unsigned)g_combo[i]);
     for (int i = 0; i < mhfu_mod_count(); i++) fprintf(f, "mod_%s=%d\n", mhfu_mod_id(i), mhfu_mod_on(i));
     for (int g = 0; g < G_COUNT; g++)
         if (g_place[g].set)
@@ -455,6 +471,7 @@ static layout layout_for(float w, float h) {
         { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },        /* draw, use, kick, bag: from the face buttons, below */
         { 0, 0 }, { 0, 0 }, { 0, 0 },                  /* yes/no, the menus' row, the action button: likewise */
         { 0, 0 },                                      /* pick up: the face buttons' middle */
+        { 0, 0 },                                      /* the combo buttons: above the face buttons */
     };
     for (int g = 0; g < G_COUNT; g++) {
         L.x[g] = g_place[g].set ? g_place[g].cx * w : def[g][0];
@@ -483,6 +500,7 @@ static layout layout_for(float w, float h) {
         L.y[g] = L.y[G_FACE] + roff[i][1] * fo;
     }
     if (!g_place[G_PICK].set) { L.x[G_PICK] = L.x[G_FACE]; L.y[G_PICK] = L.y[G_FACE]; }   /* amid draw/use/kick/bag */
+    if (!g_place[G_COMBO].set) { L.x[G_COMBO] = L.x[G_FACE]; L.y[G_COMBO] = L.y[G_FACE] - 2.2f * fo; }
     return L;
 }
 
@@ -497,6 +515,18 @@ static float menu_r(const layout *L)  { return 0.055f * L->h * L->k[G_MENU]; }
 static float skill_r(const layout *L) { return 0.062f * L->h * L->k[G_SKILL]; }
 static float attack_r(const layout *L) { return 0.16f * L->h * L->k[G_ATTACK]; }
 static float small_r(const layout *L, int g) { return (g == G_RUN ? 0.092f : 0.068f) * L->h * L->k[g]; }   /* Roll, Item, Run */
+static float combo_r(const layout *L) { return 0.062f * L->h * L->k[G_COMBO]; }
+/* The combo slots in use, in order; their buttons sit in a row centred on the group. */
+static int combos_now(int out[COMBOS]) {
+    int n = 0;
+    for (int i = 0; i < COMBOS; i++)
+        if (g_combo[i]) out[n++] = i;
+    return n;
+}
+static void combo_pos(const layout *L, int i, int n, float *x, float *y) {
+    *x = L->x[G_COMBO] + (i - (n - 1) / 2.0f) * combo_r(L) * 2.4f;
+    *y = L->y[G_COMBO];
+}
 
 /* Where the hunter is: in a quest (game_task.ovl loaded, hle_mhfu.c) or not,
  * and with the weapon out: the hunter's weapon state at 0x090B3A52 is not 0
@@ -692,7 +722,7 @@ static int edit_page_has(int g) {
     if (g == G_MENU) return 1;
     if (g_style != STYLE_MOBILE)
         return g == G_STICK || g == G_DPAD || g == G_FACE || g == G_L || g == G_R || g == G_SELECT || g == G_START ||
-               g == G_SKILL;
+               g == G_SKILL || g == G_COMBO;
     switch (g_edit_page) {
     case EP_SHEATHED: return g == G_STICK || g == G_DRAW || g == G_USE || g == G_KICK || g == G_BAG || g == G_PICK ||
                              g == G_ROLL;
@@ -706,6 +736,11 @@ static int edit_page_has(int g) {
 static int group_shown(int g) {
     if (g == G_RSTICK) return 0;                       /* the camera is a swipe now */
     if (g == G_DPAD && pad_combined()) return 0;       /* it is the stick's ring */
+    if (g == G_COMBO) {                                /* Legacy PSP: with the face buttons */
+        int cs[COMBOS];
+        if (g_style == STYLE_MOBILE) return 0;
+        return g_edit ? edit_page_has(G_COMBO) : combos_now(cs) > 0 && group_shown(G_FACE);
+    }
     const int hunt_new = g == G_DRAW || g == G_USE || g == G_KICK || g == G_BAG || g == G_PICK;
     const int ctx_group = g == G_YESNO || g == G_EXTRAS || g == G_ACT;
     if (ctx_group && !g_edit) return 0;               /* placed in the editor; drawn by the context */
@@ -816,6 +851,7 @@ static void group_box(const layout *L, int g, float *x0, float *y0, float *x1, f
     case G_FACE: rx = ry = face_o(L) + face_r(L); break;
     case G_MENU: rx = ry = menu_r(L); break;
     case G_SKILL: rx = skill_r(L); ry = skill_r(L) * 3.4f; break;      /* room for all three */
+    case G_COMBO: rx = combo_r(L) * 3.4f; ry = combo_r(L); break;      /* a row of up to three */
     case G_ATTACK: rx = ry = attack_r(L); break;
     case G_ROLL: case G_ITEM: case G_RUN: rx = ry = small_r(L, g); break;
     case G_DRAW: case G_USE: case G_KICK: case G_BAG: case G_PICK: rx = ry = 0.06f * L->h * L->k[g]; break;
@@ -1035,6 +1071,14 @@ static int hit(const layout *L, float x, float y) {
     } else if (group_shown(G_RUN) && dist(x, y, L->x[G_RUN], L->y[G_RUN]) < small_r(L, G_RUN) * 1.3f) {
         return T_RUN;
     } else if (group_shown(G_FACE)) {
+        if (group_shown(G_COMBO)) {
+            int cs[COMBOS];
+            const int nc = combos_now(cs);
+            for (int i = 0; i < nc; i++) {
+                combo_pos(L, i, nc, &bx, &by);
+                if (dist(x, y, bx, by) < combo_r(L) * 1.15f) return T_COMBO0 + i;
+            }
+        }
         const float fo = face_o(L);
         const struct { float ox, oy; int e; } face[4] = {
             { 0, fo, T_CROSS }, { fo, 0, T_CIRCLE }, { -fo, 0, T_SQUARE }, { 0, -fo, T_TRIANGLE } };
@@ -1093,6 +1137,10 @@ static uint32_t elem_button(int e) {
     case T_SKILL0: case T_SKILL1: case T_SKILL2: {
         skill sk[SKILLS];
         return e - T_SKILL0 < skills_now(sk) ? sk[e - T_SKILL0].bits : 0;
+    }
+    case T_COMBO0: case T_COMBO1: case T_COMBO2: {
+        int cs[COMBOS];
+        return group_shown(G_COMBO) && e - T_COMBO0 < combos_now(cs) ? g_combo[cs[e - T_COMBO0]] : 0;
     }
     default: return 0;
     }
@@ -1634,6 +1682,50 @@ static void draw_vpad(canvas *c, float s) {
         ring(c, S(cx), S(cy), S(r), t, line);
         face_shape(c, S(cx), S(cy), S(k), face[i].shape, t * 1.4f, face[i].tint);
     }
+    /* the combo buttons: each shows the marks of the buttons it holds, side by
+     * side (two in a row, more in two rows); in the editor, one sample */
+    if (group_shown(G_COMBO)) {
+        int cs[COMBOS];
+        int nc = combos_now(cs);
+        uint32_t sample = 0;
+        if (!nc && g_edit) { nc = 1; cs[0] = -1; sample = PSP_CTRL_TRIANGLE | PSP_CTRL_CIRCLE; }
+        const float cr = combo_r(&L);
+        for (int i = 0; i < nc; i++) {
+            float cx, cy;
+            combo_pos(&L, i, nc, &cx, &cy);
+            const uint32_t bits = cs[i] >= 0 ? g_combo[cs[i]] : sample;
+            disc(c, S(cx), S(cy), S(cr), elem_held(T_COMBO0 + i) ? on : fillc);
+            ring(c, S(cx), S(cy), S(cr), t, line);
+            ring(c, S(cx), S(cy), S(cr * 0.84f), t * 0.5f, va(236, 194, 104, 70));
+            static const uint32_t order[12] = { PSP_CTRL_TRIANGLE, PSP_CTRL_CIRCLE, PSP_CTRL_CROSS, PSP_CTRL_SQUARE,
+                                                PSP_CTRL_LTRIGGER, PSP_CTRL_RTRIGGER, PSP_CTRL_UP, PSP_CTRL_DOWN,
+                                                PSP_CTRL_LEFT, PSP_CTRL_RIGHT, PSP_CTRL_SELECT, PSP_CTRL_START };
+            uint32_t list[12];
+            int n = 0;
+            for (int k = 0; k < 12; k++) if (bits & order[k]) list[n++] = order[k];
+            if (n > 4) n = 4;                          /* room for four marks */
+            const int rows = n > 2 ? 2 : 1, per = (n + rows - 1) / rows;
+            const float step = cr * (n > 1 ? 0.78f : 0), mk = cr * (n > 1 ? 0.25f : 0.38f);
+            for (int k = 0; k < n; k++) {
+                const int row = k / per, col = k % per, in_row = row == rows - 1 ? n - row * per : per;
+                const float mx = cx + (col - (in_row - 1) / 2.0f) * step;
+                const float my = cy + (rows > 1 ? (row ? 0.36f : -0.36f) * cr : 0);
+                const uint32_t b = list[k];
+                const int fi = b == PSP_CTRL_CROSS ? 0 : b == PSP_CTRL_CIRCLE ? 1 : b == PSP_CTRL_SQUARE ? 2 :
+                               b == PSP_CTRL_TRIANGLE ? 3 : -1;
+                if (fi >= 0) face_shape(c, S(mx), S(my), S(mk), face[fi].shape, t * 1.2f, face[fi].tint);
+                else if (b & (PSP_CTRL_UP | PSP_CTRL_DOWN | PSP_CTRL_LEFT | PSP_CTRL_RIGHT)) {
+                    const float dx = b == PSP_CTRL_LEFT ? -1.0f : b == PSP_CTRL_RIGHT ? 1.0f : 0;
+                    const float dy = b == PSP_CTRL_UP ? -1.0f : b == PSP_CTRL_DOWN ? 1.0f : 0;
+                    chevron(c, S(mx), S(my), dx, dy, S(mk * 0.9f), t * 1.3f, white);
+                } else {
+                    const char *lb = b == PSP_CTRL_LTRIGGER ? "L" : b == PSP_CTRL_RTRIGGER ? "R" :
+                                     b == PSP_CTRL_SELECT ? "SE" : "ST";
+                    text_centered(c, S(mx), S(my), (int)S(mk * 1.9f), white, lb);
+                }
+            }
+        }
+    }
     /* L held (item bar): Square (left) and Circle (right) beside it */
     if (l_side_shown()) {
         const float lr = l_side_r(&L);
@@ -2000,7 +2092,7 @@ static void draw_editor(canvas *c, float s) {
  * dialogs (MhfuActivity, over JNI): they need text fields. */
 
 enum { M_NET, M_NET_CREATE, M_NET_JOIN, M_NET_LEAVE, M_ACH, M_VPAD, M_STYLE, M_PAD, M_EDIT, M_OPACITY, M_SKILLS, M_FPS, M_RES, M_SMOOTH, M_GETHREAD, M_WIDE, M_CHEATS, M_TEXPACK, M_TEXSTYLE, M_TEXINSTALL, M_MOD0, M_MOD1, M_MOD2, M_SAVES, M_FILES, M_CRASH, M_UPDATE, M_ABOUT, M_EXIT,
-       M_NET_FIND, M_ROOM0, M_ROOM_END = M_ROOM0 + 8, M_NET_WHERE, M_VOLUME, M_MSENS, M_MLOOK };
+       M_NET_FIND, M_ROOM0, M_ROOM_END = M_ROOM0 + 8, M_NET_WHERE, M_VOLUME, M_MSENS, M_MLOOK, M_COMBO, M_VIBE };
 enum { K_TOGGLE, K_CYCLE, K_STEP, K_ACTION };
 static SDL_AtomicInt g_net_busy;        /* a desktop room action is under way */
 typedef struct { int id, kind, restart; const char *text, *help; } menu_item;
@@ -2031,6 +2123,10 @@ static const menu_item k_tab_controls[] = {
     { M_OPACITY, K_STEP, 0, "Button opacity", "How solid the on-screen buttons are." },
     { M_SKILLS, K_TOGGLE, 0, "Weapon buttons", "Buttons for your weapon's moves (guard, aim, charge, demon mode, spirit) while it is drawn." },
     { M_EDIT, K_ACTION, 0, "Edit button layout", "Move and resize every on-screen button: touch one to pick it, drag it, and make it smaller or bigger." },
+#ifdef __ANDROID__
+    { M_COMBO, K_ACTION, 0, "Combo buttons", "Up to three buttons that each press several PSP buttons at once (Triangle + Circle, R + Cross, ...), above the face buttons. Legacy PSP style." },
+    { M_VIBE, K_CYCLE, 0, "Vibration", "A short buzz when a finger lands on an on-screen button: Off, Light, Medium or Strong." },
+#endif
 #ifndef __ANDROID__
     { M_VOLUME, K_STEP, 0, "Volume", "How loud the game is. F5 and F6 change it too." },
     { M_MSENS, K_STEP, 0, "Mouse camera speed", "How fast moving the mouse turns the camera while the right button is held or mouse look is on." },
@@ -2122,6 +2218,31 @@ static void android_call(const char *method) {
     (*env)->DeleteLocalRef(env, act);
 }
 #endif
+
+/* A short buzz as a finger lands on a button (the menu's Vibration). */
+static void haptic(void) {
+#ifdef __ANDROID__
+    static const int ms[4] = { 0, 12, 18, 26 }, amp[4] = { 0, 70, 150, 255 };
+    if (g_vibe <= 0 || g_vibe > 3) return;
+    JNIEnv *env = (JNIEnv *)SDL_GetAndroidJNIEnv();
+    jobject act = (jobject)SDL_GetAndroidActivity();
+    if (!env || !act) return;
+    static jmethodID m;
+    jclass cls = (*env)->GetObjectClass(env, act);
+    if (!m) m = (*env)->GetMethodID(env, cls, "vibrate", "(II)V");
+    if (m) (*env)->CallVoidMethod(env, act, m, (jint)ms[g_vibe], (jint)amp[g_vibe]);
+    if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+    (*env)->DeleteLocalRef(env, cls);
+    (*env)->DeleteLocalRef(env, act);
+#endif
+}
+
+uint32_t mhfu_window_combo_get(int slot) { return slot >= 0 && slot < COMBOS ? g_combo[slot] : 0; }
+void mhfu_window_combo_set(int slot, uint32_t bits) {
+    if (slot < 0 || slot >= COMBOS) return;
+    g_combo[slot] = bits & 0xF3F9u;
+    SDL_SetAtomicInt(&g_combo_dirty, 1);                /* saved (and redrawn) by the SDL thread */
+}
 
 static void menu_set(int open) {
     if (open == g_menu_open) return;
@@ -2240,6 +2361,16 @@ static const char *menu_value(int id) {
 #endif
     case M_NET_LEAVE: return "Leave";
     case M_EDIT: return "Open editor";
+    case M_VIBE: { static const char *const vb[4] = { "Off", "Light", "Medium", "Strong" }; return vb[g_vibe & 3]; }
+    case M_COMBO: {
+        static char v[32];
+        int cs[COMBOS];
+        const int n = combos_now(cs);
+        if (!n) return "None";
+        if (g_style == STYLE_MOBILE) return "Legacy PSP only";
+        snprintf(v, sizeof v, "%d set", n);
+        return v;
+    }
     case M_SAVES: return "Choose folder";
     case M_FILES: return "Pick folder";
     case M_CRASH: return "Copy";
@@ -2939,6 +3070,10 @@ static void menu_act(const menu_item *it, int dir) {
         break;
     }
     case M_EDIT: menu_set(0); edit_open(); break;
+    case M_VIBE: g_vibe = (g_vibe + 1) % 4; settings_save(); haptic(); break;   /* a buzz of the new strength */
+#ifdef __ANDROID__
+    case M_COMBO: android_call("openCombos"); break;
+#endif
 #ifndef __ANDROID__
     case M_NET_CREATE: case M_NET_JOIN: case M_NET_LEAVE: net_action(it->id); break;
     case M_NET_FIND: net_action(it->id); break;
@@ -3271,7 +3406,7 @@ static int wait_event(SDL_Event *e, int ms) {
  * editor animate: always. */
 typedef struct {
     int ctx, okind, odest, ax, ay, rheld, sx, sy, ah, akx, aky, skills, mobile, lobby, group, vis, w, h;
-    uint32_t buttons;
+    uint32_t buttons, combos;
 } overlay_sig;
 static int overlay_sig_now(overlay_sig *g) {
     memset(g, 0, sizeof *g);
@@ -3295,6 +3430,7 @@ static int overlay_sig_now(overlay_sig *g) {
     g->buttons = g_touch_buttons ^ (uint32_t)g_held_elems ^ (uint32_t)(g_held_elems >> 32);
     g->rheld |= g_stick_run << 1;
     g->okind |= (g_uictx == UI_WINDOW ? box_menu() : 0) << 16;
+    g->combos = g_combo[0] ^ g_combo[1] << 3 ^ g_combo[2] << 7;
     return 1;
 }
 
@@ -3930,12 +4066,14 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
                             break;
                         }
                         if (el == T_BAG && l_toggles() && vpad_visible()) {   /* the bag: a toggle, no finger kept */
+                            haptic();
                             g_l_held = !g_l_held;
                             touch_update((float)ww, (float)wh);
                             moving = 1;
                             break;
                         }
                         if (el && vpad_visible()) {
+                            haptic();
                             g_fingers[free_slot].id = e.tfinger.fingerID;
                             g_fingers[free_slot].elem = el;
                             g_fingers[free_slot].x = g_fingers[free_slot].sx = px;
@@ -3960,7 +4098,10 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
                         if (f->elem != T_STICK && f->elem != T_DPAD && f->elem != T_SWIPE && f->elem != T_ATTACK &&
                             !is_target_elem(f->elem)) {        /* the target button keeps its finger: it is slid */
                             const int el = hit(&L, px, py);
-                            if (el && el != T_MENU && el != T_STICK && el != T_DPAD && el != T_RSTICK && el != T_ATTACK) f->elem = el;
+                            if (el && el != T_MENU && el != T_STICK && el != T_DPAD && el != T_RSTICK && el != T_ATTACK) {
+                                if (el != f->elem) haptic();   /* slid onto another button */
+                                f->elem = el;
+                            }
                         }
                     } else if (slot >= 0) {
                         /* A target button let go before it was told: a tap, lock on. */
@@ -4053,6 +4194,10 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
                     break;
                 }
             } while (!quit && SDL_PollEvent(&e));
+        }
+        if (SDL_GetAtomicInt(&g_combo_dirty) && SDL_CompareAndSwapAtomicInt(&g_combo_dirty, 1, 0)) {
+            touch_release_all();                       /* a finger on a combo that changed */
+            settings_save();
         }
         mhfu_gamepad_update();
 #ifndef __ANDROID__
