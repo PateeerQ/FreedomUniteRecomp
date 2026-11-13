@@ -65,6 +65,9 @@ public class MhfuActivity extends SDLActivity {
     static native void achLogin(String user, String token);
     static native void achLogout();
     static native String achUser();
+    /** The combo buttons (window_sdl.c): slot 0-2, PSP button bits (0 = off). */
+    static native int comboGet(int slot);
+    static native void comboSet(int slot, int bits);
 
     @Override
     protected String[] getLibraries() {
@@ -217,6 +220,52 @@ public class MhfuActivity extends SDLActivity {
     }
 
     // ---- the drawer's items (window_sdl.c, over JNI) ---------------------------------------
+
+    /** A short buzz when an on-screen button is touched (window_sdl.c, any thread). */
+    private android.os.Vibrator vibrator;
+    public void vibrate(int ms, int amplitude) {
+        try {
+            if (vibrator == null) vibrator = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+            if (vibrator == null || !vibrator.hasVibrator()) return;
+            vibrator.vibrate(android.os.VibrationEffect.createOneShot(ms, Math.max(1, Math.min(255, amplitude))));
+        } catch (Exception ignored) { }
+    }
+
+    /** Combo buttons: one on-screen button that holds several PSP buttons (Legacy PSP style). */
+    private static final int[] PSP_BITS = { 0x1000, 0x2000, 0x4000, 0x8000, 0x100, 0x200, 0x10, 0x40, 0x80, 0x20, 0x1, 0x8 };
+    private static final String[] PSP_NAMES = { "Triangle", "Circle", "Cross", "Square", "L", "R",
+            "Up", "Down", "Left", "Right", "Select", "Start" };
+    static String comboName(int bits) {
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < PSP_BITS.length; i++)
+            if ((bits & PSP_BITS[i]) != 0) b.append(b.length() > 0 ? " + " : "").append(PSP_NAMES[i]);
+        return b.length() > 0 ? b.toString() : "Off";
+    }
+    public void openCombos() { runOnUiThread(this::comboList); }
+    private void comboList() {
+        String[] rows = new String[3];
+        for (int i = 0; i < 3; i++) rows[i] = "Combo " + (i + 1) + ":  " + comboName(comboGet(i));
+        dialog("Combo buttons")
+                .setItems(rows, (d, which) -> comboPick(which))
+                .setNegativeButton("Done", null)
+                .show();
+    }
+    private void comboPick(int slot) {
+        final int bits = comboGet(slot);
+        final boolean[] on = new boolean[PSP_BITS.length];
+        for (int i = 0; i < PSP_BITS.length; i++) on[i] = (bits & PSP_BITS[i]) != 0;
+        dialog("Combo " + (slot + 1) + ": pressed together")
+                .setMultiChoiceItems(PSP_NAMES, on, (d, which, checked) -> on[which] = checked)
+                .setPositiveButton("OK", (d, w) -> {
+                    int b = 0;
+                    for (int i = 0; i < PSP_BITS.length; i++) if (on[i]) b |= PSP_BITS[i];
+                    comboSet(slot, b);
+                    comboList();
+                })
+                .setNeutralButton("Off", (d, w) -> { comboSet(slot, 0); comboList(); })
+                .setNegativeButton("Cancel", (d, w) -> comboList())
+                .show();
+    }
 
     /** "Check for updates". */
     /** The drawer's Cheats (over JNI): the cheat list (CheatsDialog). */
