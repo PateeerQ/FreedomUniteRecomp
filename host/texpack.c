@@ -8,6 +8,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#ifndef _WIN32
+#include <dirent.h>
+#include <strings.h>
+#endif
 
 #include <SDL3/SDL.h>
 
@@ -136,6 +140,7 @@ static uint64_t xxh64(const uint8_t *p, size_t len, uint64_t seed) {
 
 enum { HASH_QUICK, HASH_XXH32, HASH_XXH64 };
 static int g_hash = HASH_QUICK;                         /* the pack's [options] hash */
+static int g_ignore_addr;                               /* [options] ignoreAddress (not with the quick hash) */
 
 static uint32_t data_hash(const uint8_t *p, uint32_t guest, uint32_t size) {
     switch (g_hash) {
@@ -242,31 +247,59 @@ static char *trim(char *s) {
     return s;
 }
 
+static int ini_lines(const char *path) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return 0;
+    int count = 0;
+    char line[2048];
+    while (fgets(line, sizeof line, f)) if (strchr(line, '=')) count++;
+    fclose(f);
+    return count;
+}
+
+/* [games] <game id> = <another ini>: PPSSPP's per-game override, read after
+ * textures.ini (its keys win). "" if none. */
+static void ini_games(const char *path, char *out, size_t cap) {
+    out[0] = 0;
+    FILE *f = fopen(path, "rb");
+    if (!f) return;
+    char line[2048];
+    int in_games = 0;
+    while (fgets(line, sizeof line, f)) {
+        char *s = trim(line);
+        if (*s == '[') { in_games = !SDL_strncasecmp(s, "[games]", 7); continue; }
+        char *eq = in_games ? strchr(s, '=') : NULL;
+        if (!eq) continue;
+        *eq = 0;
+        char *key = trim(s), *val = trim(eq + 1);
+        if (!SDL_strcasecmp(key, MHFU_GAME_ID) && *val && strcmp(val, "true") && SDL_strcasecmp(val, "textures.ini") &&
+            !strstr(val, ".."))
+            snprintf(out, cap, "%s", val);
+    }
+    fclose(f);
+}
+
 /* The [hashes] section: "<key> = <file>[|mip files]". Others are left alone. */
-static int read_ini(const char *path) {
+static int ini_parse(const char *path, int *with_clut, int *with_addr) {
     FILE *f = fopen(path, "rb");
     if (!f) return -1;
-    int count = 0, in_hashes = 0;
+    int in_hashes = 0;
     char line[2048];
-    /* Two passes: count, then fill a table twice as large. */
-    while (fgets(line, sizeof line, f)) if (strchr(line, '=')) count++;
-    g_cap = 16;
-    while (g_cap < (uint32_t)count * 2 + 16) g_cap <<= 1;
-    g_tab = (pentry *)malloc(sizeof *g_tab * g_cap);
-    for (uint32_t i = 0; i < g_cap; i++) g_tab[i].file = -1;
-    rewind(f);
     int n = 0;
     while (fgets(line, sizeof line, f)) {
         char *s = trim(line);
         if (!*s || *s == '#' || *s == ';') continue;
-        if (*s == '[') { in_hashes = !strncmp(s, "[hashes]", 8); continue; }
+        if (*s == '[') { in_hashes = !SDL_strncasecmp(s, "[hashes]", 8); continue; }
         char *eq = strchr(s, '=');
         if (!eq) continue;
         *eq = 0;
         char *key = trim(s), *val = trim(eq + 1);
         if (!in_hashes) {
-            if (!strcmp(key, "hash"))
-                g_hash = !strcmp(val, "xxh32") ? HASH_XXH32 : !strcmp(val, "xxh64") ? HASH_XXH64 : HASH_QUICK;
+            if (!SDL_strcasecmp(key, "hash"))
+                g_hash = !SDL_strcasecmp(val, "xxh32") ? HASH_XXH32 : !SDL_strcasecmp(val, "xxh64") ? HASH_XXH64
+                                                                                                     : HASH_QUICK;
+            else if (!SDL_strcasecmp(key, "ignoreAddress"))
+                g_ignore_addr = !SDL_strcasecmp(val, "true") || !strcmp(val, "1");
             continue;
         }
         if (strchr(key, '_')) continue;                 /* a mip level of its own: the base is enough */
@@ -280,9 +313,36 @@ static int read_ini(const char *path) {
         for (char *c = val; *c; c++) if (*c == '\\') *c = '/';
         insert(ckey, hash, file_index(val));
         n++;
+        if (ckey & 0xFFFFFFFFull) (*with_clut)++;
+        if (ckey >> 32) (*with_addr)++;
     }
     fclose(f);
-    printf("texpack: %s hash\n", g_hash == HASH_XXH32 ? "xxh32" : g_hash == HASH_XXH64 ? "xxh64" : "quick");
+    return n;
+}
+
+static int read_ini(const char *path) {
+    char over[512], opath[1600] = "";
+    ini_games(path, over, sizeof over);
+    if (over[0]) snprintf(opath, sizeof opath, "%s/%s", g_dir, over);
+    /* A table twice as large as both lists. */
+    const int count = ini_lines(path) + (opath[0] ? ini_lines(opath) : 0);
+    g_cap = 16;
+    while (g_cap < (uint32_t)count * 2 + 16) g_cap <<= 1;
+    g_tab = (pentry *)malloc(sizeof *g_tab * g_cap);
+    for (uint32_t i = 0; i < g_cap; i++) g_tab[i].file = -1;
+    int with_clut = 0, with_addr = 0;
+    int n = ini_parse(path, &with_clut, &with_addr);
+    if (n < 0) return -1;
+    if (opath[0]) {
+        const int m = ini_parse(opath, &with_clut, &with_addr);
+        printf("texpack: [games] %s = %s: %d more\n", MHFU_GAME_ID, over, m);
+        if (m > 0) n += m;
+    }
+    if (g_ignore_addr && g_hash == HASH_QUICK) g_ignore_addr = 0;   /* as PPSSPP: needs a safer hash */
+    printf("texpack: %s hash%s\n", g_hash == HASH_XXH32 ? "xxh32" : g_hash == HASH_XXH64 ? "xxh64" : "quick",
+           g_ignore_addr ? ", ignoreAddress" : "");
+    /* Issue #14's pack lists its title and button icons by address and CLUT hash. */
+    if (with_clut || with_addr) printf("texpack: %d keys with a CLUT hash, %d with an address\n", with_clut, with_addr);
     return n;
 }
 
@@ -293,8 +353,54 @@ static int exists(const char *p) {
 
 /* ---- loading -------------------------------------------------------------------- */
 
+#ifndef _WIN32
+/* PPSSPP reads a pack's files ignoring case (its DirectoryReader), and packs
+ * made on Windows name them as they like (issue #14 on Linux: "could not read
+ * allarmorhdmale/....PNG"). Each part of the path matched without case. */
+static FILE *open_nocase(const char *path) {
+    char out[2048], part[512];
+    const char *p = path;
+    size_t o = 0;
+    if (*p == '/') { out[o++] = '/'; p++; }
+    out[o] = 0;
+    while (*p) {
+        const char *e = strchr(p, '/');
+        size_t len = e ? (size_t)(e - p) : strlen(p);
+        if (len >= sizeof part) return NULL;
+        memcpy(part, p, len);
+        part[len] = 0;
+        p += len + (e ? 1 : 0);
+        if (!len) continue;
+        DIR *d = opendir(o ? out : ".");
+        if (!d) return NULL;
+        char hit[512];
+        int found = 0;                                  /* 2: exact, 1: without case */
+        struct dirent *de;
+        while (found < 2 && (de = readdir(d)) != NULL) {
+            if (!strcmp(de->d_name, part)) found = 2;
+            else if (!found && !strcasecmp(de->d_name, part)) {
+                snprintf(hit, sizeof hit, "%s", de->d_name);
+                found = 1;
+            }
+        }
+        closedir(d);
+        if (!found) return NULL;
+        if (found == 1) snprintf(part, sizeof part, "%s", hit);
+        const size_t pl = strlen(part);
+        if (o + pl + 2 >= sizeof out) return NULL;
+        if (o && out[o - 1] != '/') out[o++] = '/';
+        memcpy(out + o, part, pl + 1);
+        o += pl;
+    }
+    return fopen(out, "rb");
+}
+#endif
+
 static uint8_t *read_all(const char *path, size_t *n) {
     FILE *f = fopen(path, "rb");
+#ifndef _WIN32
+    if (!f) f = open_nocase(path);
+#endif
     if (!f) return NULL;
     fseek(f, 0, SEEK_END);
     long len = ftell(f);
@@ -386,16 +492,50 @@ static int SDLCALL loader(void *arg) {
 }
 
 /* psprecomp's replacer: on the GE's thread, at every texture decode. */
-static int replace(uint32_t addr, int bufw, int w, int h, int fmt, int swizzled, int *ow, int *oh, uint32_t **rgba,
-                   uint32_t *gl_fmt, uint32_t *bytes) {
+/* TextureReplacer's LookupWildcard: the full key, then with parts zeroed. */
+static int lookup(uint64_t ck, uint32_t hash) {
+    const uint64_t lo = ck & 0xFFFFFFFFull, hi = ck & ~0xFFFFFFFFull;
+    int fi;
+    if ((fi = find(ck, hash)) >= 0) return fi;
+    if ((fi = find(lo, 0)) >= 0) return fi;             /* the CLUT hash only */
+    if (!g_ignore_addr && (fi = find(ck, 0)) >= 0) return fi;
+    if ((fi = find(lo, hash)) >= 0) return fi;          /* no address */
+    if (!g_ignore_addr && (fi = find(hi, hash)) >= 0) return fi;   /* no CLUT hash */
+    if (!g_ignore_addr && (fi = find(hi, 0)) >= 0) return fi;      /* the address only */
+    return find(0, hash);                               /* the data alone */
+}
+
+static int replace(uint32_t addr, int bufw, int w, int h, int fmt, int swizzled, uint32_t dim, const uint8_t *clut,
+                   uint32_t clut_bytes, int *ow, int *oh, uint32_t **rgba, uint32_t *gl_fmt, uint32_t *bytes) {
     (void)swizzled;                                     /* PPSSPP hashes swizzled ones as they lie, too */
     if (fmt < 0 || fmt > 7 || w <= 0 || h <= 0 || bufw <= 0) return PSP_REPLACE_NONE;
     const uint32_t hash = texture_hash(addr, bufw, w, h, fmt);
-    /* PPSSPP's wildcards, those that need no CLUT hash: the address with this
-     * data, then the data alone (how packs made with "ignore address" list them). */
-    int fi = find((uint64_t)(addr & 0x3FFFFFFFu) << 32, hash);
-    if (fi < 0) fi = find(0, hash);
-    if (fi < 0) { g_misses++; return PSP_REPLACE_NONE; }
+    /* PPSSPP's key (TexCacheEntry::CacheKey): the address above, TSIZE's log2
+     * sizes below, XORed with the CLUT's hash for a paletted texture (XXH32 of
+     * the CLUT bytes, seed 0xC0108888, as its replacer has it). Issue #14: a
+     * pack listing the title and button icons by address and CLUT. */
+    uint64_t ck = (uint64_t)(addr & 0x3FFFFFFFu) << 32 | (dim & 0xF0Fu);
+    if ((fmt & 4) && clut) ck ^= xxh32(clut, clut_bytes, 0xC0108888u);
+    if (g_ignore_addr) ck &= 0xFFFFFFFFull;
+    int fi = lookup(ck, hash);
+    if (fi < 0) {
+        g_misses++;
+        /* MHFU_TEXPACK_LOG=1: each texture the pack lacks, once, in the ini's key form. */
+        static int log = -1, nseen;
+        static uint32_t seen[256];
+        if (log < 0) { const char *e = getenv("MHFU_TEXPACK_LOG"); log = e && *e && *e != '0'; }
+        if (log && nseen < 256) {
+            int have = 0;
+            for (int i = 0; i < nseen; i++) have |= seen[i] == hash;
+            if (!have) {
+                seen[nseen++] = hash;
+                printf("texpack: not in the pack: %016llx%08x (%dx%d, format %d, at 0x%08X)\n",
+                       (unsigned long long)ck, hash, w, h, fmt, addr);
+                fflush(stdout);
+            }
+        }
+        return PSP_REPLACE_NONE;
+    }
     int r = PSP_REPLACE_NONE;
     SDL_LockMutex(g_lock);
     pfile *f = &g_files[fi];
