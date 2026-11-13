@@ -10,6 +10,7 @@
 
 #include "achievements.h"
 #include "lobby.h"
+#include "window.h"
 
 #define FN(name) JNICALL Java_com_pateeerq_mhfu_MhfuActivity_##name
 
@@ -92,5 +93,12 @@ JNIEXPORT void FN(achLogin)(JNIEnv *env, jclass cls, jstring user, jstring token
 JNIEXPORT void FN(achLogout)(JNIEnv *env, jclass cls) { (void)env; (void)cls; mhfu_ach_logout(); }
 
 JNIEXPORT jstring FN(achUser)(JNIEnv *env, jclass cls) { (void)cls; return (*env)->NewStringUTF(env, mhfu_ach_user()); }
+
+/* The combo buttons (window_sdl.c). */
+JNIEXPORT jint FN(comboGet)(JNIEnv *env, jclass cls, jint slot) { (void)env; (void)cls; return (jint)mhfu_window_combo_get(slot); }
+JNIEXPORT void FN(comboSet)(JNIEnv *env, jclass cls, jint slot, jint bits) {
+    (void)env; (void)cls;
+    mhfu_window_combo_set(slot, (uint32_t)bits);
+}
 
 #endif
