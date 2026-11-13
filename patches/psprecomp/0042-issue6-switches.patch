@@ -1,0 +1,70 @@
+diff --git a/src/hle/ge.c b/src/hle/ge.c
+index fc63763..7fe2532 100644
+--- a/src/hle/ge.c
++++ b/src/hle/ge.c
+@@ -1088,6 +1088,9 @@ static void dump_prim(uint32_t type, uint32_t count, const cvertex *v, uint32_t
+             g_ds.clear ? " CLEAR" : "", g_ds.blend ? " blend" : "", VT_THROUGH(g_ge.vtype) ? " through" : "",
+             g_lt.enable ? " lit" : "", g_ds.ztest, g_ds.ztest_func, g_ds.zwrite,
+             g_ds.tex_enable, g_ds.tex_addr, g_ds.tex_fmt, g_ds.tex_w, g_ds.tex_h, g_ds.tex_func, g_xf.uv_mode);
++    fprintf(g_dump, "    atest %d fn %d ref %02X mask %02X  filter min %s mag %s  texalpha %d\n", g_ds.atest,
++            g_ds.atest_func, g_ds.atest_ref & 0xFF, g_ds.atest_mask & 0xFF, g_ds.tex_min_linear ? "linear" : "nearest",
++            g_ds.tex_mag_linear ? "linear" : "nearest", g_ds.tex_alpha);
+     /* Each distinct texture once, decoded as the rasterizer sees it. */
+     static uint32_t seen[64];
+     static int nseen;
+diff --git a/src/render_gl.c b/src/render_gl.c
+index c84734d..a81d62b 100644
+--- a/src/render_gl.c
++++ b/src/render_gl.c
+@@ -717,6 +717,27 @@ static int tex_inplace(void) {
+     return v;
+ }
+ 
++/* Issue #6 experiments (AMD RX 9070 XT, driver 26.10: MHFU's font text, drawn
++ * through mode with linear filtering and an alpha test "alpha != 0", loses its
++ * thin strokes). PSPRECOMP_TEX_FILTER=nearest (or MHFU_TEX_FILTER) samples 2D
++ * draws nearest; PSPRECOMP_ATEST=0 (or MHFU_ATEST) skips the alpha test in the
++ * shader (blending still hides alpha 0). Both off by default. */
++static int env_flag(const char *a, const char *b, const char *on) {
++    const char *e = getenv(a);
++    if (!e || !*e) e = getenv(b);
++    return e && *e && !strcmp(e, on);
++}
++static int tex_filter_nearest(void) {
++    static int v = -1;
++    if (v < 0) v = env_flag("PSPRECOMP_TEX_FILTER", "MHFU_TEX_FILTER", "nearest");
++    return v;
++}
++static int atest_off(void) {
++    static int v = -1;
++    if (v < 0) v = env_flag("PSPRECOMP_ATEST", "MHFU_ATEST", "0");
++    return v;
++}
++
+ static float uv_nudge(void) {
+     static float v = -1.0f;
+     if (v < 0.0f) {
+@@ -815,11 +836,12 @@ static void gl_draw(int prim, const psp_vertex *v, int count, const psp_draw_sta
+                 s.mode[1] = st->tex_func;
+                 s.min_f = st->tex_min_linear ? GL_LINEAR : GL_NEAREST;
+                 s.mag_f = st->tex_mag_linear ? GL_LINEAR : GL_NEAREST;
++                if (count > 0 && v[0].w <= 0.0f && tex_filter_nearest()) s.min_f = s.mag_f = GL_NEAREST;   /* 2D */
+                 rgb_of(st->tex_env, s.env);
+             }
+         }
+         if (st->fog) { s.mode[0] |= MODE_FOG; rgb_of(st->fog_color, s.fogc); }
+-        if (st->atest) {
++        if (st->atest && !atest_off()) {
+             s.mode[0] |= MODE_ATEST;
+             s.mode[2] = st->atest_func;
+             s.mode[3] = (st->atest_ref & 0xFF) | (st->atest_mask & 0xFF) << 8;
+@@ -1208,6 +1230,9 @@ static int setup(void) {
+         fprintf(stderr, "render_gl: %s / %s / %s\n", vn ? vn : "?", rn ? rn : "?", vs ? vs : "?");
+         fprintf(stderr, "render_gl: depth inset %s, uv nudge %s\n", z_inset() ? "on" : "off",
+                 uv_nudge() > 0.0f ? "on" : "off");
++        if (tex_filter_nearest() || atest_off())
++            fprintf(stderr, "render_gl: 2D filter %s, alpha test %s\n", tex_filter_nearest() ? "nearest" : "game's",
++                    atest_off() ? "off" : "on");
+     }
+     find_formats();
+     g_prog = program(VS_DRAW, FS_DRAW);
