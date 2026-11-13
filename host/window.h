@@ -55,4 +55,9 @@ void mhfu_window_notify(const char *head, const char *title, const char *text, c
  * while: `self` 1 for this player's own, 2 for a notice (no name). Any thread. */
 void mhfu_window_chat(const char *nick, const char *text, int self);
 
+/* The touch controls' combo buttons (window_sdl.c only): slot 0-2, the PSP
+ * button bits it holds (0: off). Set from Android's dialog, any thread. */
+uint32_t mhfu_window_combo_get(int slot);
+void mhfu_window_combo_set(int slot, uint32_t bits);
+
 #endif
