@@ -317,6 +317,7 @@ static int     g_style = STYLE_MOBILE;                  /* the button style */
  * middle, the d-pad a ring of four arcs around it (8 ways; a finger slides
  * round it). 0: the two apart, as before. */
 static int     g_pad_combined = 1;
+static int     g_swipe_tilt = 1;      /* the swipe camera also looks up and down (issue #15: off = sideways only) */
 #define PAD_INNER 0.62f                                  /* the stick's part of the radius */
 static float   g_attack_kx, g_attack_ky;                /* the attack pad's knob, -1..1 */
 static int     g_attack_held;
@@ -389,6 +390,7 @@ static void settings_load(void) {
         if (sscanf(line, "weapon_buttons=%d", &v) == 1) g_skills_on = v != 0;
         if (sscanf(line, "button_style=%d", &v) == 1 && v >= 0) g_style = v ? STYLE_MOBILE : STYLE_PSP;   /* 2: the old Auto */
         if (sscanf(line, "pad_combined=%d", &v) == 1) g_pad_combined = v != 0;
+        if (sscanf(line, "swipe_tilt=%d", &v) == 1) g_swipe_tilt = v != 0;
         if (sscanf(line, "resolution=%d", &v) == 1 && v >= 1 && v <= 4) g_res_setting = v;
         if (sscanf(line, "fps60=%d", &v) == 1) g_fps60 = v != 0;
         if (sscanf(line, "widescreen=%d", &v) == 1) g_wide = v != 0;
@@ -444,7 +446,7 @@ static void settings_save(void) {
     fprintf(f, "fps60=%d\nwidescreen=%d\nweapon_buttons=%d\nbutton_style=%d\ntexpack=%d\n", g_fps60, g_wide,
             g_skills_on, g_style, g_texpack);
     if (g_texstyle[0]) fprintf(f, "texpack_style=%s\n", g_texstyle);
-    fprintf(f, "pad_combined=%d\nge_thread=%d\nvibration=%d\n", g_pad_combined, g_gethread, g_vibe);
+    fprintf(f, "pad_combined=%d\nswipe_tilt=%d\nge_thread=%d\nvibration=%d\n", g_pad_combined, g_swipe_tilt, g_gethread, g_vibe);
     for (int i = 0; i < COMBOS; i++) fprintf(f, "combo%d=%x\n", i + 1, (unsigned)g_combo[i]);
     for (int i = 0; i < mhfu_mod_count(); i++) fprintf(f, "mod_%s=%d\n", mhfu_mod_id(i), mhfu_mod_on(i));
     for (int g = 0; g < G_COUNT; g++)
@@ -1232,8 +1234,8 @@ static void touch_update(float w, float h) {
             const float dx = f->x - f->sx, dy = f->y - f->sy;
             if (dx > L.h * 0.04f) b |= PSP_CTRL_RIGHT;
             if (dx < -L.h * 0.04f) b |= PSP_CTRL_LEFT;
-            if (dy > L.h * 0.08f) b |= PSP_CTRL_DOWN;
-            if (dy < -L.h * 0.08f) b |= PSP_CTRL_UP;
+            if (g_swipe_tilt && dy > L.h * 0.08f) b |= PSP_CTRL_DOWN;
+            if (g_swipe_tilt && dy < -L.h * 0.08f) b |= PSP_CTRL_UP;
             rx = f->sx;
             ry = f->sy;
             rheld = 1;
@@ -2092,7 +2094,7 @@ static void draw_editor(canvas *c, float s) {
  * dialogs (MhfuActivity, over JNI): they need text fields. */
 
 enum { M_NET, M_NET_CREATE, M_NET_JOIN, M_NET_LEAVE, M_ACH, M_VPAD, M_STYLE, M_PAD, M_EDIT, M_OPACITY, M_SKILLS, M_FPS, M_RES, M_SMOOTH, M_GETHREAD, M_WIDE, M_CHEATS, M_TEXPACK, M_TEXSTYLE, M_TEXINSTALL, M_MOD0, M_MOD1, M_MOD2, M_SAVES, M_FILES, M_CRASH, M_UPDATE, M_ABOUT, M_EXIT,
-       M_NET_FIND, M_ROOM0, M_ROOM_END = M_ROOM0 + 8, M_NET_WHERE, M_VOLUME, M_MSENS, M_MLOOK, M_COMBO, M_VIBE };
+       M_NET_FIND, M_ROOM0, M_ROOM_END = M_ROOM0 + 8, M_NET_WHERE, M_VOLUME, M_MSENS, M_MLOOK, M_COMBO, M_VIBE, M_SWIPE };
 enum { K_TOGGLE, K_CYCLE, K_STEP, K_ACTION };
 static SDL_AtomicInt g_net_busy;        /* a desktop room action is under way */
 typedef struct { int id, kind, restart; const char *text, *help; } menu_item;
@@ -2120,6 +2122,7 @@ static const menu_item k_tab_controls[] = {
     { M_VPAD, K_CYCLE, 0, "Virtual gamepad", "Automatic hides the on-screen buttons while a controller is connected. On always shows them, Off never." },
     { M_STYLE, K_CYCLE, 0, "Button style", "Mobile: the buttons follow what you can do (an attack pad with the weapon out, Yes and No in menus). Legacy PSP: the PSP's buttons everywhere." },
     { M_PAD, K_CYCLE, 0, "Stick and d-pad", "Combined: one round control, the stick in the middle and the d-pad as a ring around it. Separate: the two apart. Mobile style only." },
+    { M_SWIPE, K_CYCLE, 0, "Swipe camera", "Dragging a finger over the screen turns the camera. Turn and tilt: up and down look up and down too. Turn only: sideways only." },
     { M_OPACITY, K_STEP, 0, "Button opacity", "How solid the on-screen buttons are." },
     { M_SKILLS, K_TOGGLE, 0, "Weapon buttons", "Buttons for your weapon's moves (guard, aim, charge, demon mode, spirit) while it is drawn." },
     { M_EDIT, K_ACTION, 0, "Edit button layout", "Move and resize every on-screen button: touch one to pick it, drag it, and make it smaller or bigger." },
@@ -2271,6 +2274,7 @@ static const char *menu_value(int id) {
     case M_SKILLS: return g_skills_on ? "On" : "Off";
     case M_STYLE: return g_style == STYLE_MOBILE ? "Mobile" : "Legacy PSP";
     case M_PAD: return g_pad_combined ? "Combined" : "Separate";
+    case M_SWIPE: return g_swipe_tilt ? "Turn and tilt" : "Turn only";
     case M_SMOOTH: return !MHFU_HAS_FPS60 ? "Not in this build" : !g_fps60 ? "Off" : mhfu_fps_target() >= 60 ? "On" : "On, room at 30";
     case M_WIDE: return mhfu_mod_widescreen() ? "On" : "Off";
     case M_GETHREAD: return g_gethread ? "On" : "Off";
@@ -2408,6 +2412,7 @@ static int menu_choices(int id, int *at) {
     case M_VPAD: *at = g_vpad_mode; return 3;
     case M_STYLE: *at = g_style == STYLE_MOBILE; return 2;
     case M_PAD: *at = !g_pad_combined; return 2;
+    case M_SWIPE: *at = !g_swipe_tilt; return 2;
 #ifndef __ANDROID__
     case M_NET_WHERE: *at = g_net_lan || !mhfu_lobby_has_relay(); return 2;
 #endif
@@ -3035,6 +3040,7 @@ static void menu_act(const menu_item *it, int dir) {
     case M_VPAD: g_vpad_mode = (g_vpad_mode + 1) % 3; settings_save(); break;
     case M_STYLE: g_style = !g_style; touch_release_all(); settings_save(); break;
     case M_PAD: g_pad_combined = !g_pad_combined; touch_release_all(); settings_save(); break;
+    case M_SWIPE: g_swipe_tilt = !g_swipe_tilt; settings_save(); break;
     case M_SKILLS: g_skills_on = !g_skills_on; touch_release_all(); settings_save(); break;
     case M_FPS: g_show_fps = !g_show_fps; g_show_fps_init = g_show_fps; settings_save(); break;
     case M_SMOOTH:
