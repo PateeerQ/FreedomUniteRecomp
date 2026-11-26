@@ -74,7 +74,7 @@ param(
     # The USA build (setup.ps1 with the ULUS10391 EBOOT: work\us, build-us), or
     # the Japanese Portable 2nd G (ULJM05500: work\jp, build-jp).
     [ValidateSet("EU", "US", "JP", "FUC")] [string]$Region = "EU",
-    # -Universal: the game from build-all (scripts\build-universal.ps1),
+    # -Universal: the game from build-all-ninja or build-all, the newer (scripts\build-universal.ps1),
     # mhfu_host_<region>.exe, instead of the region's own build folder.
     [switch]$Universal,
     # -Exe path\mhfu_host.exe: that build instead (e.g. build-perf, to compare builds).
@@ -90,7 +90,12 @@ $gameId = @{ EU = "ULES01213"; US = "ULUS10391"; JP = "ULJM05500"; FUC = "ULJM05
 
 $exe = @(
     $(if ($Exe) { (Resolve-Path $Exe).Path }),
-    $(if ($Universal) { "$repo\build-all\$Config\mhfu_host_$($Region.ToLower()).exe" }),
+    # the newer of build-all-ninja (build-universal.ps1 since 2026-11-11) and the old VS build-all
+    $(if ($Universal) {
+        @("$repo\build-all-ninja\$Config\mhfu_host_$($Region.ToLower()).exe",
+          "$repo\build-all\$Config\mhfu_host_$($Region.ToLower()).exe") | Where-Object { Test-Path $_ } |
+            Sort-Object { (Get-Item $_).LastWriteTime } -Descending | Select-Object -First 1
+    }),
     "$repo\$buildDir\$Config\mhfu_host.exe",
     "$repo\$buildDir\mhfu_host.exe"
 ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1

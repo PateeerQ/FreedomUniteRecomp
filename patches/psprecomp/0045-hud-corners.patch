@@ -1,0 +1,165 @@
+--- a/include/psprecomp/render.h
++++ b/include/psprecomp/render.h
+@@ -175,6 +175,13 @@
+  * PSP's aspect (for a game told to draw wider: a widescreen hack). Any time,
+  * from any thread. */
+ void psp_render_gl_set_stretch(int on);
++/* While stretched: 2D drawn at the window's sides instead of a 16:9-ish middle
++ * (an ultrawide HUD in the corners). 2D draws that touch are one element; an
++ * element reaching left of `left` (PSP pixels) and not right of `right` is
++ * narrowed about x 0, the other way about x 480, one wholly above `top` that
++ * starts in the left half about x 0, the rest about the middle as before.
++ * Any thread, any time (the host switches it per frame). */
++void psp_render_gl_set_hud_corners(int on, float left, float right, float top);
+ 
+ /* Texture replacement (a host's texture pack, as PPSSPP's): asked on the GE's
+  * thread each time a texture is decoded from memory, with its address, buffer
+--- a/src/render_gl.c
++++ b/src/render_gl.c
+@@ -704,6 +704,101 @@
+ /* How much narrower 2D is drawn while the picture is stretched over a window
+  * wider than the PSP's 480:272 (present() sets it): 1 when not. */
+ static volatile float g_hud_k = 1.0f;
++/* psp_render_gl_set_hud_corners: 2D narrowed toward the window's sides. */
++static volatile int   g_hud_corners;
++static volatile float g_hud_left = 160.0f, g_hud_right = 320.0f, g_hud_top = 0.0f;
++void psp_render_gl_set_hud_corners(int on, float left, float right, float top) {
++    g_hud_left = left;
++    g_hud_right = right;
++    g_hud_top = top;
++    g_hud_corners = on;
++}
++
++/* This frame's 2D draws while the HUD goes to the corners: their vertices in
++ * the frame's buffer and their box in PSP pixels. MHFU draws one element (a
++ * box, its frame, each glyph of its text) as many draws: narrowed one by one
++ * about their own side, a box across a dividing line came apart (Muhammad,
++ * 2026-11-17, the "Time limit" notice). So draws that touch are one element,
++ * and the element's box picks the side. */
++typedef struct { uint32_t first, n; float x0, y0, x1, y1; int fb, fbw, root; } hud_rec;
++static hud_rec *g_hr;
++static int g_nhr, g_chr;
++static int *g_hord;
++
++static void hud_note(uint32_t first, uint32_t n, float x0, float y0, float x1, float y1, const gfb *fb) {
++    if (g_nhr == g_chr) {
++        const int cap = g_chr ? g_chr * 2 : 256;
++        hud_rec *p = (hud_rec *)realloc(g_hr, sizeof *p * (size_t)cap);
++        int *o = (int *)realloc(g_hord, sizeof *o * (size_t)cap);
++        if (o) g_hord = o;
++        if (!p || !o) return;
++        g_hr = p;
++        g_chr = cap;
++    }
++    hud_rec *r = &g_hr[g_nhr++];
++    r->first = first; r->n = n;
++    r->x0 = x0; r->y0 = y0; r->x1 = x1; r->y1 = y1;
++    r->fb = fb->id; r->fbw = fb->w;
++    r->root = g_nhr - 1;
++}
++
++static int hud_root(int i) {
++    while (g_hr[i].root != i) i = g_hr[i].root = g_hr[g_hr[i].root].root;
++    return i;
++}
++
++static int hud_by_x0(const void *a, const void *b) {
++    const float d = g_hr[*(const int *)a].x0 - g_hr[*(const int *)b].x0;
++    return d < 0 ? -1 : d > 0;
++}
++
++/* At the frame's end: join the draws that touch (3 pixels apart at most, on
++ * one target), then narrow each element about the side it keeps to: one that
++ * reaches left of `left` and not right of `right` about x 0, the other way
++ * about x 480, one wholly above `top` that starts in the left half about x 0
++ * (MHFU's health bars run from the clock to x 420), the rest (a notice in
++ * the middle, or one across the screen) about the middle. Through-mode
++ * vertices have w 1, so x in clip space is linear in the PSP's x. */
++static void hud_apply(gframe *f) {
++    const int n = g_nhr;
++    g_nhr = 0;
++    const float hk = g_hud_k;
++    if (!n || hk >= 0.999f) return;
++    const float GAP = 3.0f;
++    for (int i = 0; i < n; i++) g_hord[i] = i;
++    qsort(g_hord, (size_t)n, sizeof *g_hord, hud_by_x0);
++    for (int a = 0; a < n; a++) {
++        const hud_rec *ri = &g_hr[g_hord[a]];
++        for (int b = a + 1; b < n; b++) {
++            const hud_rec *rj = &g_hr[g_hord[b]];
++            if (rj->x0 > ri->x1 + GAP) break;
++            if (rj->fb != ri->fb || rj->y0 > ri->y1 + GAP || rj->y1 < ri->y0 - GAP) continue;
++            const int x = hud_root(g_hord[a]), y = hud_root(g_hord[b]);
++            if (x != y) g_hr[y].root = x;
++        }
++    }
++    /* each element's box, kept in its root's record (x0..y1 of the root grow) */
++    for (int i = 0; i < n; i++) {
++        const int r = hud_root(i);
++        if (r == i) continue;
++        hud_rec *e = &g_hr[r];
++        if (g_hr[i].x0 < e->x0) e->x0 = g_hr[i].x0;
++        if (g_hr[i].y0 < e->y0) e->y0 = g_hr[i].y0;
++        if (g_hr[i].x1 > e->x1) e->x1 = g_hr[i].x1;
++        if (g_hr[i].y1 > e->y1) e->y1 = g_hr[i].y1;
++    }
++    gvert *vx = (gvert *)f->vtx.p;
++    const size_t nv = f->vtx.n / sizeof(gvert);
++    for (int i = 0; i < n; i++) {
++        const hud_rec *r = &g_hr[i], *e = &g_hr[hud_root(i)];
++        const int L = e->x0 < g_hud_left, R = e->x1 > g_hud_right;
++        float ax = (float)SW * 0.5f;
++        if ((L && !R) || (!R && e->y1 <= g_hud_top && e->x0 < (float)SW * 0.5f)) ax = 0.0f;
++        else if (R && !L) ax = (float)SW;
++        const float a = ax / (float)r->fbw * 2.0f - 1.0f;
++        for (uint32_t k = r->first; k < r->first + r->n && k < nv; k++) vx[k].x = a + (vx[k].x - a) * hk;
++    }
++}
+ 
+ static void gl_target(uint32_t addr, uint32_t stride, int fmt) {
+     g_tgt_addr = addr;
+@@ -881,16 +976,26 @@
+      * wide as the screen (a background) is left stretched, so nothing is bare. */
+     /* About the screen's middle, not each draw's own: MHFU draws text a glyph
+      * per draw and bars in pieces, which narrowed one by one left gaps. */
++    /* With the HUD in the corners (psp_render_gl_set_hud_corners) the draw is
++     * only noted here (hud_note) and narrowed at the frame's end with the
++     * draws it touches (hud_apply): one element (a box, its text) moves whole. */
+     const float hk = g_hud_k;
++    int hud_rec = 0;
++    float hx0 = 0, hy0 = 0, hx1 = 0, hy1 = 0;
+     if (hk < 0.999f && count > 0 && fb->w >= SW && fb->h >= SH) {
+-        float x0 = v[0].fx, x1 = v[0].fx;
++        float x0 = v[0].fx, x1 = v[0].fx, y0 = v[0].fy, y1 = v[0].fy;
+         int flat2d = 1;
+         for (int i = 0; i < count && flat2d; i++) {
+             if (v[i].w != 0.0f) flat2d = 0;
+             if (v[i].fx < x0) x0 = v[i].fx;
+             if (v[i].fx > x1) x1 = v[i].fx;
++            if (v[i].fy < y0) y0 = v[i].fy;
++            if (v[i].fy > y1) y1 = v[i].fy;
+         }
+-        if (flat2d && x1 - x0 < (float)SW - 8.0f) {
++        if (flat2d && x1 - x0 < (float)SW - 8.0f && g_hud_corners) {
++            hud_rec = 1;
++            hx0 = x0; hy0 = y0; hx1 = x1; hy1 = y1;
++        } else if (flat2d && x1 - x0 < (float)SW - 8.0f) {
+             static psp_vertex *nv;
+             static int ncap;
+             if (count > ncap) {
+@@ -951,6 +1056,7 @@
+ #undef TRI
+     const uint32_t n = (uint32_t)(f->vtx.n / sizeof(gvert)) - first;
+     if (!n) return;
++    if (hud_rec) hud_note(first, n, hx0, hy0, hx1, hy1, fb);
+ 
+     /* Same state, right after the previous draw with nothing in between: one
+      * batch. */
+@@ -977,6 +1083,7 @@
+      * (MHFU's movies show the decoder's output straight from RAM) is left as
+      * it is, and is never an FBO, so it is shown from memory. */
+     if ((addr & 0x0F000000u) == 0x04000000u) addr = 0x04000000u | (addr & 0x001FFFFFu);
++    hud_apply(&g_frames[g_rec]);                 /* the HUD in the corners: this frame's 2D, element by element */
+     c_present *c = (c_present *)cmd_add(C_PRESENT, sizeof *c);
+     gfb *f = fb_find(addr);
+     if (f && f->drawn) {

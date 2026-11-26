@@ -317,6 +317,7 @@ static int     g_style = STYLE_MOBILE;                  /* the button style */
  * middle, the d-pad a ring of four arcs around it (8 ways; a finger slides
  * round it). 0: the two apart, as before. */
 static int     g_pad_combined = 1;
+static int     g_pad_combined_psp = 0;   /* issue #23: the same for Legacy PSP, off by default */
 static int     g_swipe_tilt = 1;      /* the swipe camera also looks up and down (issue #15: off = sideways only) */
 #define PAD_INNER 0.62f                                  /* the stick's part of the radius */
 static float   g_attack_kx, g_attack_ky;                /* the attack pad's knob, -1..1 */
@@ -362,6 +363,7 @@ static int vpad_visible(void) {
 static int g_res_setting;
 static int g_fps60;                  /* the 60 fps mode (mhfu_fps_set_preferred) */
 static int g_wide;                   /* the widescreen mod (mhfu_mod_set_widescreen) */
+static int g_hudc;                   /* with it, the HUD in the corners (mhfu_mod_set_hud_corners) */
 /* A texture pack (texpack.c): 1 use one when there is one, 0 not; read at
  * start (texpack_off tells mhfu_texpack_init through MHFU_TEXPACK=0), so a
  * change shows after a restart. */
@@ -390,10 +392,12 @@ static void settings_load(void) {
         if (sscanf(line, "weapon_buttons=%d", &v) == 1) g_skills_on = v != 0;
         if (sscanf(line, "button_style=%d", &v) == 1 && v >= 0) g_style = v ? STYLE_MOBILE : STYLE_PSP;   /* 2: the old Auto */
         if (sscanf(line, "pad_combined=%d", &v) == 1) g_pad_combined = v != 0;
+        if (sscanf(line, "pad_combined_psp=%d", &v) == 1) g_pad_combined_psp = v != 0;
         if (sscanf(line, "swipe_tilt=%d", &v) == 1) g_swipe_tilt = v != 0;
         if (sscanf(line, "resolution=%d", &v) == 1 && v >= 1 && v <= 4) g_res_setting = v;
         if (sscanf(line, "fps60=%d", &v) == 1) g_fps60 = v != 0;
         if (sscanf(line, "widescreen=%d", &v) == 1) g_wide = v != 0;
+        if (sscanf(line, "hud_corners=%d", &v) == 1) g_hudc = v != 0;
         if (sscanf(line, "texpack=%d", &v) == 1) g_texpack = v != 0;
         if (sscanf(line, "ge_thread=%d", &v) == 1) g_gethread = v != 0;
         if (sscanf(line, "vibration=%d", &v) == 1 && v >= 0 && v <= 3) g_vibe = v;
@@ -446,7 +450,8 @@ static void settings_save(void) {
     fprintf(f, "fps60=%d\nwidescreen=%d\nweapon_buttons=%d\nbutton_style=%d\ntexpack=%d\n", g_fps60, g_wide,
             g_skills_on, g_style, g_texpack);
     if (g_texstyle[0]) fprintf(f, "texpack_style=%s\n", g_texstyle);
-    fprintf(f, "pad_combined=%d\nswipe_tilt=%d\nge_thread=%d\nvibration=%d\n", g_pad_combined, g_swipe_tilt, g_gethread, g_vibe);
+    fprintf(f, "pad_combined=%d\npad_combined_psp=%d\nswipe_tilt=%d\nge_thread=%d\nvibration=%d\n", g_pad_combined, g_pad_combined_psp, g_swipe_tilt, g_gethread, g_vibe);
+    fprintf(f, "hud_corners=%d\n", g_hudc);
     for (int i = 0; i < COMBOS; i++) fprintf(f, "combo%d=%x\n", i + 1, (unsigned)g_combo[i]);
     for (int i = 0; i < mhfu_mod_count(); i++) fprintf(f, "mod_%s=%d\n", mhfu_mod_id(i), mhfu_mod_on(i));
     for (int g = 0; g < G_COUNT; g++)
@@ -507,7 +512,9 @@ static layout layout_for(float w, float h) {
 }
 
 /* Each group's sizes, from the screen's height and its factor. */
-static int pad_combined(void) { return g_pad_combined && g_style == STYLE_MOBILE; }
+/* The current style's "Stick and d-pad" choice. */
+static int *pad_flag(void) { return g_style == STYLE_MOBILE ? &g_pad_combined : &g_pad_combined_psp; }
+static int pad_combined(void) { return *pad_flag(); }
 static float stick_r(const layout *L) { return (pad_combined() ? 0.21f : 0.15f) * L->h * L->k[G_STICK]; }
 static float rstick_r(const layout *L) { return 0.13f * L->h * L->k[G_RSTICK]; }
 static float dpad_r(const layout *L)  { return 0.15f * L->h * L->k[G_DPAD]; }
@@ -551,9 +558,14 @@ static int hunt_ctx(void) {
  * - UI_WINDOW: in the lobby while a window, a question or a message is open:
  *   Yes, No and Square (a quest's details), always the same three (separate
  *   Next and detail buttons came and went, Muhammad) */
-enum { UI_PLAY, UI_MENU, UI_TALK, UI_OBJ, UI_WINDOW };
+enum { UI_PLAY, UI_MENU, UI_TALK, UI_OBJ, UI_WINDOW, UI_FISH };
+/* Fishing in a quest: the prompt byte reads 24 while the line is out (US phone
+ * log 2026-11-17: hold 0x80, qwin 2/0); only Cross is wanted there (reel in),
+ * the stick hidden (a Discord player; Muhammad: "cukup perlu tombol X"). */
+#define PROMPT_FISH 24
 #define WINDOW_ENTER_MS 120
 #define WINDOW_KEEP_MS (MHFU_ADDR_LOBBY_WINDOW ? 250 : 1500)   /* JP/FUC's flag is exact */
+#define QUEST_END_KEEP_MS 6000                                  /* past the end screens' flag (a reward movie between them) */
 /* The object in reach: its kind (region.h) and a door's destination. */
 enum { OBJ_DOOR = 1, OBJ_GATE = 2, OBJ_TRAINING = 3, OBJ_BOX = 7, OBJ_CHAIR = 8, OBJ_BOARD = 9,
        OBJ_SUPPLY = 24, OBJ_BED = 30, OBJ_DELIVERY = 33,
@@ -585,15 +597,19 @@ static uint32_t obj_bit(int kind) { return quest_obj(kind) ? PSP_CTRL_CIRCLE : P
 static int ui_ctx(void) {
     if (g_style != STYLE_MOBILE || g_edit) return UI_PLAY;
     const int lobby = mhfu_in_lobby(), quest = mhfu_in_quest();
-    /* Once the screens after a quest begin (rewards, send to box), Yes/No stay
-     * until game_task is gone: a reward movie or scene between them cleared the
-     * flags and brought the hunting buttons back (Muhammad, 2026-11-10). */
-    static int quest_done;
-    if (!quest) quest_done = 0;
-    else if (psp_read8(MHFU_ADDR_QUEST_PHASE) == 2) quest_done = 1;   /* not the prompt byte: a cancelled window would latch */
-    if (quest_done) return UI_WINDOW;
+    /* The screens after a quest (rewards, send to box): Yes/No stay up to
+     * QUEST_END_KEEP_MS past the last sight of the flag, so a reward movie or
+     * scene between them does not bring the hunting buttons back (Muhammad,
+     * 2026-11-10). Never a latch until game_task is gone: the old flag was a
+     * buffer byte and stuck Yes/No for the rest of the quest (#17, #19). */
+    static uint64_t quest_end_last;
+    const uint64_t now = SDL_GetTicks();
+    if (!quest) quest_end_last = 0;
+    else if (psp_read8(MHFU_ADDR_QUEST_END) == 1) quest_end_last = now;
+    if (quest_end_last && now - quest_end_last < QUEST_END_KEEP_MS) return UI_WINDOW;
     if (!lobby && !quest) return UI_MENU;                   /* title, character select, options */
     if (psp_read8(MHFU_ADDR_MENU_OPEN)) return UI_MENU;
+    if (quest && psp_read8(MHFU_ADDR_UI_PROMPT) == PROMPT_FISH) return UI_FISH;
     /* a window is open: the hunter is held (that bit also drops while running)
      * and a question, a message or a menu (prompt id 3 and up) is up */
     /* The window flags must hold WINDOW_ENTER_MS to count (one blinks for a
@@ -602,7 +618,6 @@ static int ui_ctx(void) {
      * (between a dialog's lines) keeps the buttons. */
     static int in_window;
     static uint64_t flags_since, flags_last;
-    const uint64_t now = SDL_GetTicks();
     const unsigned hold = psp_read8(MHFU_ADDR_HUNTER_FREE);
     const int held = (lobby || quest) && !(hold & 0x04);
     /* In a quest a window or a screen (the Supply Box, Abandon Quest, "Quest
@@ -619,7 +634,7 @@ static int ui_ctx(void) {
      * every quest dump without a window): FUC dumps 22:47. 1 and 2 are an
      * object's prompt (2 seen standing still in a quest): windows are 3 up. */
     if (quest && psp_read8(MHFU_ADDR_UI_PROMPT) >= 3) quest_held = 1;
-    if (quest && psp_read8(MHFU_ADDR_QUEST_PHASE) == 2) quest_held = 1;   /* the screens after a quest */
+    if (quest && psp_read8(MHFU_ADDR_QUEST_END) == 1) quest_held = 1;     /* the screens after a quest */
     /* The house's bed (save, "Exit Game?") leaves the lobby's window flag at 0:
      * the hunter's scripted-act byte tells it, with the hold bit down. */
     /* Only at that bed (object kind 5) with its prompt gone: the byte is 1 in
@@ -674,10 +689,10 @@ static int ui_ctx_settled(void) {
         settled = now_ctx;
         pending = -1;
         /* Which flags chose it, to find a wrong one from a phone's log. */
-        static const char *const name[] = { "play", "menu", "talk", "object", "window" };
-        printf("touch ui: %s (qwin %u/%u win %u free %02X yesno %u message %u prompt %u menu %u talk %08X obj %08X objprompt %u)\n",
+        static const char *const name[] = { "play", "menu", "talk", "object", "window", "fish" };
+        printf("touch ui: %s (qwin %u/%u end %u win %u free %02X yesno %u message %u prompt %u menu %u talk %08X obj %08X objprompt %u)\n",
                settled >= 0 && settled < 5 ? name[settled] : "?", psp_read8(MHFU_ADDR_QUEST_WIN_A),
-               psp_read8(MHFU_ADDR_QUEST_WIN_B),
+               psp_read8(MHFU_ADDR_QUEST_WIN_B), psp_read8(MHFU_ADDR_QUEST_END),
                MHFU_ADDR_LOBBY_WINDOW && mhfu_in_lobby() ? psp_read8(MHFU_ADDR_LOBBY_WINDOW) : 0u,
                psp_read8(MHFU_ADDR_HUNTER_FREE),
                psp_read8(MHFU_ADDR_YESNO), psp_read8(MHFU_ADDR_MESSAGE), psp_read8(MHFU_ADDR_UI_PROMPT),
@@ -748,6 +763,7 @@ static int group_shown(int g) {
     if (ctx_group && !g_edit) return 0;               /* placed in the editor; drawn by the context */
     if (hunt_new && g_style != STYLE_MOBILE) return 0;   /* the Mobile style's own */
     if (g_edit) return edit_page_has(g) && g != G_RUN;
+    if (g_uictx == UI_FISH) return g == G_MENU;           /* fishing: only the big Cross */
     if ((g_uictx == UI_MENU || g_uictx == UI_WINDOW) &&
         (g == G_FACE || g == G_L || g == G_R || g == G_SKILL || g == G_ATTACK || g == G_ROLL || g == G_ITEM || hunt_new))
         return 0;                                      /* Yes and No instead */
@@ -902,6 +918,7 @@ static int obj_icon(int kind) {
     }
 }
 static int asks_yes_no(void) { return g_uictx == UI_MENU || g_uictx == UI_WINDOW; }
+static int fish_now(void) { return g_uictx == UI_FISH && !g_edit; }
 /* Square (a quest's details) above Yes and No, in the lobby's windows. */
 static void detail_pos(const layout *L, float *x, float *y) { *x = L->x[G_YESNO] - yn_o(L) * 0.30f; *y = L->y[G_YESNO] - yn_o(L) * 1.15f; }
 /* Not at a bookshelf (object kind 10): its question takes Yes and No only. */
@@ -1024,6 +1041,9 @@ static int hit(const layout *L, float x, float y) {
             detail_pos(L, &bx, &by);
             if (dist(x, y, bx, by) < yn_r(L) * 1.4f) return T_DETAIL;
         }
+    } else if (fish_now()) {
+        yes_pos(L, &bx, &by);
+        if (dist(x, y, bx, by) < big_r(L) * 1.4f) return T_YES;
     } else if (g_uictx == UI_TALK || g_uictx == UI_OBJ) {
         act_pos(L, &bx, &by);
         if (dist(x, y, bx, by) < act_r(L) * 1.2f) return T_ACT;
@@ -1099,6 +1119,7 @@ static int hit(const layout *L, float x, float y) {
         skill_pos(L, i, ns, &sx, &sy);
         if (dist(x, y, sx, sy) < skill_r(L) * 1.2f) return T_SKILL0 + i;
     }
+    if (fish_now()) return T_NONE;                     /* no stick while fishing */
     if (pad_combined()) {
         /* one round control: the middle is the stick, the ring the d-pad */
         const float d = dist(x, y, L->x[G_STICK], L->y[G_STICK]), r = stick_r(L);
@@ -1119,7 +1140,7 @@ static uint32_t elem_button(int e) {
     case T_SELECT: return PSP_CTRL_SELECT;   case T_START: return PSP_CTRL_START;
     case T_ROLL: return PSP_CTRL_CROSS;      case T_ITEM: return PSP_CTRL_SQUARE;
     case T_RUN: return PSP_CTRL_RTRIGGER;
-    case T_YES: return yes_bit();
+    case T_YES: return fish_now() ? PSP_CTRL_CROSS : yes_bit();
     case T_NO: return no_bit();
     case T_ACT: return g_uictx == UI_TALK ? act_bit() : g_uictx == UI_OBJ ? obj_bit(g_obj_kind) : 0;
     case T_ACT2: return g_uictx == UI_OBJ ? obj_extra(g_obj_kind, g_obj_dest) : 0;
@@ -1193,7 +1214,7 @@ static int stick_runs(void) {
     if (g_style != STYLE_MOBILE || g_edit) return 0;
     /* Not while a menu or a window is up: there R is the menu's own (the
      * smithy's requirements, pages), and the stick only moves the cursor. */
-    if (g_uictx == UI_MENU || g_uictx == UI_WINDOW) return 0;
+    if (g_uictx == UI_MENU || g_uictx == UI_WINDOW || g_uictx == UI_FISH) return 0;
     return lobby_now() || (mhfu_in_quest() && hunt_ctx() == CTX_SHEATHED);
 }
 static int g_stick_run;                        /* it does now: its outline glows */
@@ -1617,7 +1638,9 @@ static void draw_vpad(canvas *c, float s) {
     /* the stick */
     const float sr = stick_r(&L);
     const float scx = L.x[G_STICK], scy = L.y[G_STICK];
-    if (pad_combined()) {
+    if (fish_now()) {
+        /* fishing: no stick */
+    } else if (pad_combined()) {
         /* the d-pad ring: plain, four parts (up, right, down, left) parted by
          * thin lines on the diagonals, a chevron on each (filled in while its
          * direction is held), then the stick's well inside */
@@ -1802,6 +1825,12 @@ static void draw_vpad(canvas *c, float s) {
             ring(c, S(bx), S(by), S(dr), t * 1.3f, line);
             face_shape(c, S(bx), S(by), S(dr * 0.42f), face[2].shape, t * 1.6f, face[2].tint);
         }
+    } else if (fish_now()) {
+        /* Fishing: one big Cross (reel in), where Yes sits */
+        yes_pos(&L, &bx, &by);
+        disc(c, S(bx), S(by), S(br), elem_held(T_YES) ? on : dark);
+        ring(c, S(bx), S(by), S(br), t * 1.6f, line);
+        face_shape(c, S(bx), S(by), S(br * 0.45f), face[0].shape, t * 2.0f, face[0].tint);
     } else if (g_uictx == UI_TALK || edit_act) {
         /* Talk: the thought bubble (in the editor too, to place) */
         const float ar = act_r(&L);
@@ -2094,7 +2123,8 @@ static void draw_editor(canvas *c, float s) {
  * dialogs (MhfuActivity, over JNI): they need text fields. */
 
 enum { M_NET, M_NET_CREATE, M_NET_JOIN, M_NET_LEAVE, M_ACH, M_VPAD, M_STYLE, M_PAD, M_EDIT, M_OPACITY, M_SKILLS, M_FPS, M_RES, M_SMOOTH, M_GETHREAD, M_WIDE, M_CHEATS, M_TEXPACK, M_TEXSTYLE, M_TEXINSTALL, M_MOD0, M_MOD1, M_MOD2, M_SAVES, M_FILES, M_CRASH, M_UPDATE, M_ABOUT, M_EXIT,
-       M_NET_FIND, M_ROOM0, M_ROOM_END = M_ROOM0 + 8, M_NET_WHERE, M_VOLUME, M_MSENS, M_MLOOK, M_COMBO, M_VIBE, M_SWIPE };
+       M_NET_FIND, M_ROOM0, M_ROOM_END = M_ROOM0 + 8, M_NET_WHERE, M_VOLUME, M_MSENS, M_MLOOK, M_COMBO, M_VIBE, M_SWIPE,
+       M_HUDC };
 enum { K_TOGGLE, K_CYCLE, K_STEP, K_ACTION };
 static SDL_AtomicInt g_net_busy;        /* a desktop room action is under way */
 typedef struct { int id, kind, restart; const char *text, *help; } menu_item;
@@ -2121,7 +2151,7 @@ static const menu_item k_tab_display[] = {
 static const menu_item k_tab_controls[] = {
     { M_VPAD, K_CYCLE, 0, "Virtual gamepad", "Automatic hides the on-screen buttons while a controller is connected. On always shows them, Off never." },
     { M_STYLE, K_CYCLE, 0, "Button style", "Mobile: the buttons follow what you can do (an attack pad with the weapon out, Yes and No in menus). Legacy PSP: the PSP's buttons everywhere." },
-    { M_PAD, K_CYCLE, 0, "Stick and d-pad", "Combined: one round control, the stick in the middle and the d-pad as a ring around it. Separate: the two apart. Mobile style only." },
+    { M_PAD, K_CYCLE, 0, "Stick and d-pad", "Combined: one round control, the stick in the middle and the d-pad as a ring around it. Separate: the two apart. Kept per button style." },
     { M_SWIPE, K_CYCLE, 0, "Swipe camera", "Dragging a finger over the screen turns the camera. Turn and tilt: up and down look up and down too. Turn only: sideways only." },
     { M_OPACITY, K_STEP, 0, "Button opacity", "How solid the on-screen buttons are." },
     { M_SKILLS, K_TOGGLE, 0, "Weapon buttons", "Buttons for your weapon's moves (guard, aim, charge, demon mode, spirit) while it is drawn." },
@@ -2157,6 +2187,7 @@ static SDL_AtomicInt g_found_ready;          /* g_found_new is filled */
 #endif
 static const menu_item k_tab_mods[] = {
     { M_WIDE, K_TOGGLE, 0, "Widescreen", "Widens the 3D view to the screen's shape; menus and the HUD keep the PSP's shape in the middle." },
+    { M_HUDC, K_TOGGLE, 0, "HUD in the corners (beta)", "With Widescreen: while hunting, the health bars, map and item bar sit at the screen's corners. Menus stay in the middle." },
     /* the built-in mods (mods.c), in mhfu_builtin_mods' order */
     { M_MOD0, K_TOGGLE, 0, "Target Camera", "Locks the camera on a large monster and shows a crosshair. The Target button locks on; slide it to switch." },
     { M_MOD1, K_TOGGLE, 0, "Damage Numbers", "Shows the damage of every hit as numbers over the monster." },
@@ -2273,10 +2304,11 @@ static const char *menu_value(int id) {
     case M_FPS: return g_show_fps ? "On" : "Off";
     case M_SKILLS: return g_skills_on ? "On" : "Off";
     case M_STYLE: return g_style == STYLE_MOBILE ? "Mobile" : "Legacy PSP";
-    case M_PAD: return g_pad_combined ? "Combined" : "Separate";
+    case M_PAD: return *pad_flag() ? "Combined" : "Separate";
     case M_SWIPE: return g_swipe_tilt ? "Turn and tilt" : "Turn only";
     case M_SMOOTH: return !MHFU_HAS_FPS60 ? "Not in this build" : !g_fps60 ? "Off" : mhfu_fps_target() >= 60 ? "On" : "On, room at 30";
     case M_WIDE: return mhfu_mod_widescreen() ? "On" : "Off";
+    case M_HUDC: return !mhfu_mod_hud_corners() ? "Off" : mhfu_mod_widescreen() ? "On" : "On, needs Widescreen";
     case M_GETHREAD: return g_gethread ? "On" : "Off";
 #if MHFU_TEXPACK
     case M_TEXPACK:
@@ -2393,6 +2425,7 @@ static int menu_on(int id) {
     case M_SKILLS: return g_skills_on;
     case M_SMOOTH: return MHFU_HAS_FPS60 ? g_fps60 : -1;
     case M_WIDE: return mhfu_mod_widescreen() != 0;
+    case M_HUDC: return mhfu_mod_hud_corners() != 0;
     case M_GETHREAD: return g_gethread;
 #if MHFU_TEXPACK
     case M_TEXPACK: return g_texpack;
@@ -2411,7 +2444,7 @@ static int menu_choices(int id, int *at) {
     switch (id) {
     case M_VPAD: *at = g_vpad_mode; return 3;
     case M_STYLE: *at = g_style == STYLE_MOBILE; return 2;
-    case M_PAD: *at = !g_pad_combined; return 2;
+    case M_PAD: *at = !*pad_flag(); return 2;
     case M_SWIPE: *at = !g_swipe_tilt; return 2;
 #ifndef __ANDROID__
     case M_NET_WHERE: *at = g_net_lan || !mhfu_lobby_has_relay(); return 2;
@@ -3039,7 +3072,7 @@ static void menu_act(const menu_item *it, int dir) {
     switch (it->id) {
     case M_VPAD: g_vpad_mode = (g_vpad_mode + 1) % 3; settings_save(); break;
     case M_STYLE: g_style = !g_style; touch_release_all(); settings_save(); break;
-    case M_PAD: g_pad_combined = !g_pad_combined; touch_release_all(); settings_save(); break;
+    case M_PAD: *pad_flag() = !*pad_flag(); touch_release_all(); settings_save(); break;
     case M_SWIPE: g_swipe_tilt = !g_swipe_tilt; settings_save(); break;
     case M_SKILLS: g_skills_on = !g_skills_on; touch_release_all(); settings_save(); break;
     case M_FPS: g_show_fps = !g_show_fps; g_show_fps_init = g_show_fps; settings_save(); break;
@@ -3047,6 +3080,7 @@ static void menu_act(const menu_item *it, int dir) {
         if (!MHFU_HAS_FPS60) break;
         g_fps60 = !g_fps60; mhfu_fps_set_preferred(g_fps60 ? 60 : 30); settings_save(); break;
     case M_WIDE: g_wide = !mhfu_mod_widescreen(); mhfu_mod_set_widescreen(g_wide); settings_save(); break;
+    case M_HUDC: g_hudc = !mhfu_mod_hud_corners(); mhfu_mod_set_hud_corners(g_hudc); settings_save(); break;
     case M_GETHREAD: g_gethread = !g_gethread; settings_save(); break;
 #if MHFU_TEXPACK
     case M_TEXPACK: g_texpack = !g_texpack; settings_save(); break;
@@ -3734,6 +3768,7 @@ int mhfu_window_gl(void) {
     g_gl = 1;
     if (g_fps60) mhfu_fps_set_preferred(60);
     if (g_wide) mhfu_mod_set_widescreen(1);
+    if (g_hudc) mhfu_mod_set_hud_corners(1);
     for (int i = 0; i < mhfu_mod_count(); i++)
         if (g_mod_set[i] >= 0) mhfu_mod_set(i, g_mod_set[i]);
     wake(g_ev_wake);
@@ -4030,6 +4065,9 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
                 case SDL_EVENT_WINDOW_RESTORED:
                 case SDL_EVENT_WINDOW_EXPOSED:
                 case SDL_EVENT_DID_ENTER_FOREGROUND:
+#ifdef __ANDROID__
+                    if (e.type == SDL_EVENT_DID_ENTER_FOREGROUND) mhfu_audio_reopen();   /* issue #24 */
+#endif
                     SDL_SetAtomicInt(&g_remake, 1);
                     moving = 1;
                     break;

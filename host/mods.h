@@ -18,6 +18,12 @@
  * stretched over it. MHFU_WIDESCREEN=1 at start, or the settings. */
 int  mhfu_mod_widescreen(void);
 void mhfu_mod_set_widescreen(int on);
+/* The HUD at the window's corners while hunting (with widescreen):
+ * 0 off, 1 on, 2 everywhere (testing). MHFU_HUD_CORNERS at start, or the
+ * settings; mhfu_mod_hud_frame once a game frame. */
+int  mhfu_mod_hud_corners(void);
+void mhfu_mod_set_hud_corners(int on);
+void mhfu_mod_hud_frame(void);
 /* Called by the patched camera code: the aspect as float bits. */
 unsigned mhfu_mod_aspect(unsigned original);
 

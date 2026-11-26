@@ -1,0 +1,45 @@
+diff --git a/src/render_gl.c b/src/render_gl.c
+index c558dc7..2397d40 100644
+--- a/src/render_gl.c
++++ b/src/render_gl.c
+@@ -845,6 +845,12 @@ static int atest_off(void) {
+     return v;
+ }
+ 
++static int atest_2d_keep(void) {
++    static int v = -1;
++    if (v < 0) v = env_flag("PSPRECOMP_ATEST", "MHFU_ATEST", "1");
++    return v;
++}
++
+ static float uv_nudge(void) {
+     static float v = -1.0f;
+     if (v < 0.0f) {
+@@ -948,7 +954,14 @@ static void gl_draw(int prim, const psp_vertex *v, int count, const psp_draw_sta
+             }
+         }
+         if (st->fog) { s.mode[0] |= MODE_FOG; rgb_of(st->fog_color, s.fogc); }
+-        if (st->atest && !atest_off()) {
++        /* Issue #6: on AMD (RX 9070 XT, 26.x drivers) the "alpha != 0" / "alpha > 0" test
++         * drops MHFU's font strokes; MHFU_ATEST=0 brought them back but also dropped it
++         * from foliage. A blended 2D draw shows alpha 0 as nothing anyway, so skip it
++         * there only. PSPRECOMP_ATEST=1 (or MHFU_ATEST=1) keeps it everywhere. */
++        const int atest_2d_skip = count > 0 && v[0].w <= 0.0f && st->blend && (st->atest_ref & 0xFF) == 0 &&
++                                  (st->atest_func == 3 || st->atest_func == 6) &&
++                                  !atest_2d_keep();
++        if (st->atest && !atest_off() && !atest_2d_skip) {
+             s.mode[0] |= MODE_ATEST;
+             s.mode[2] = st->atest_func;
+             s.mode[3] = (st->atest_ref & 0xFF) | (st->atest_mask & 0xFF) << 8;
+@@ -1349,9 +1362,8 @@ static int setup(void) {
+         fprintf(stderr, "render_gl: %s / %s / %s\n", vn ? vn : "?", rn ? rn : "?", vs ? vs : "?");
+         fprintf(stderr, "render_gl: depth inset %s, uv nudge %s\n", z_inset() ? "on" : "off",
+                 uv_nudge() > 0.0f ? "on" : "off");
+-        if (tex_filter_nearest() || atest_off())
+-            fprintf(stderr, "render_gl: 2D filter %s, alpha test %s\n", tex_filter_nearest() ? "nearest" : "game's",
+-                    atest_off() ? "off" : "on");
++        fprintf(stderr, "render_gl: 2D filter %s, alpha test %s\n", tex_filter_nearest() ? "nearest" : "game's",
++                atest_off() ? "off" : atest_2d_keep() ? "on" : "on (2D alpha>0 skipped)");
+     }
+     find_formats();
+     g_prog = program(VS_DRAW, FS_DRAW);

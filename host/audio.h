@@ -8,6 +8,10 @@
  * failure the game runs silent, as before. */
 int mhfu_audio_start(void);
 
+/* SDL output only (Android): close and reopen the device stream, after the app
+ * comes back from the background. Main (SDL) thread. */
+void mhfu_audio_reopen(void);
+
 /* Totals since the start: frames the game sent, frames missing when the
  * output needed them (gaps), and frames dropped for running too far ahead. */
 #include <stdint.h>

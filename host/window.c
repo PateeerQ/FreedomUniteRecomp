@@ -188,7 +188,7 @@ static void grab(void) {
 enum {
     ID_CREATE = 100, ID_JOIN, ID_LEAVE, ID_ABOUT,
     ID_DLG_OK, ID_DLG_CANCEL, ID_PASS_EDIT, ID_CODE_EDIT, ID_ROOM_LIST, ID_REFRESH, ID_TEXT_EDIT,
-    ID_WHERE_NET, ID_WHERE_LAN, ID_MOUSE_LOOK, ID_WIDESCREEN,
+    ID_WHERE_NET, ID_WHERE_LAN, ID_MOUSE_LOOK, ID_WIDESCREEN, ID_HUD_CORNERS,
     ID_VOLUME = 200,                     /* + 0..10: 0 %, 10 % ... 100 % */
     ID_SENS = 220,                       /* + an index into k_sens */
     ID_MOD = 240,                        /* + a built-in mod's index (mods.c) */
@@ -510,6 +510,7 @@ static HMENU make_menu(void) {
     AppendMenuA(opt, MF_STRING, ID_MOUSE_LOOK, "&Mouse look\tF7");
     AppendMenuA(opt, MF_SEPARATOR, 0, NULL);
     AppendMenuA(opt, MF_STRING, ID_WIDESCREEN, "&Widescreen (fill the window)");
+    AppendMenuA(opt, MF_STRING, ID_HUD_CORNERS, "&HUD in the corners (widescreen, beta)");
     if (mhfu_mod_count()) {
         HMENU mods = CreatePopupMenu();
         for (int i = 0; i < mhfu_mod_count(); i++) AppendMenuA(mods, MF_STRING, ID_MOD + i, mhfu_mod_name(i));
@@ -534,6 +535,10 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             /* The picture fills the window at once; the camera widens from the next area on. */
             mhfu_mod_set_widescreen(!mhfu_mod_widescreen());
             option_save("widescreen", mhfu_mod_widescreen());
+            break;
+        case ID_HUD_CORNERS:
+            mhfu_mod_set_hud_corners(!mhfu_mod_hud_corners());
+            option_save("hud_corners", mhfu_mod_hud_corners());
             break;
         default:
             if (LOWORD(wp) >= ID_VOLUME && LOWORD(wp) <= ID_VOLUME + 10) {
@@ -567,6 +572,7 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             CheckMenuItem(m, ID_SENS + i, MF_BYCOMMAND | (mouse_sens() == k_sens[i] ? MF_CHECKED : MF_UNCHECKED));
         CheckMenuItem(m, ID_MOUSE_LOOK, MF_BYCOMMAND | (g_mlook_lock ? MF_CHECKED : MF_UNCHECKED));
         CheckMenuItem(m, ID_WIDESCREEN, MF_BYCOMMAND | (mhfu_mod_widescreen() ? MF_CHECKED : MF_UNCHECKED));
+        CheckMenuItem(m, ID_HUD_CORNERS, MF_BYCOMMAND | (mhfu_mod_hud_corners() ? MF_CHECKED : MF_UNCHECKED));
         for (int i = 0; i < mhfu_mod_count(); i++)
             CheckMenuItem(m, ID_MOD + i, MF_BYCOMMAND | (mhfu_mod_on(i) ? MF_CHECKED : MF_UNCHECKED));
         return 0;

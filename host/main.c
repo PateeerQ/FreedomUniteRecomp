@@ -63,6 +63,11 @@
 #include <windows.h>
 #include <mmsystem.h>
 #pragma comment(lib, "winmm.lib")
+/* Issue #22: laptops with an iGPU and a dGPU gave the game the iGPU. These exports ask the
+ * NVIDIA Optimus and AMD switchable-graphics drivers for the dGPU (Windows' own per-app
+ * Graphics settings still win). */
+__declspec(dllexport) DWORD NvOptimusEnablement = 1;
+__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 #else
 #include <pthread.h>
 #include <unistd.h>

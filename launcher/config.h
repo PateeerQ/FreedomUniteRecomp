@@ -34,6 +34,7 @@ struct Config {
     int  volume = 100;                  // the game's master volume, percent (MHFU_VOLUME)
     int  mouse_sens = 100;              // the mouse camera's sensitivity, percent (MHFU_MOUSE_SENS)
     bool widescreen = false;            // fill the window (MHFU_WIDESCREEN)
+    bool hud_corners = false;           // with widescreen: the HUD at the corners while hunting (MHFU_HUD_CORNERS)
     bool texpack = true;                // a texture pack, when there is one (MHFU_TEXPACK=0 when off)
     std::string texpack_dir;            // its folder; empty: <root>/textures/<game id>
     std::string texpack_style;          // a style in its ADDONS/ (MHFU_TEXPACK_STYLE); empty: MAIN's own

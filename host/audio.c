@@ -180,6 +180,19 @@ static void SDLCALL pull(void *user, SDL_AudioStream *stream, int additional, in
     g_dev_frames = (uint64_t)(SDL_GetAudioStreamQueued(stream) / 4);
 }
 
+static SDL_AudioStream *g_stream;
+
+static int open_stream(void) {
+    const SDL_AudioSpec spec = { SDL_AUDIO_S16, 2, 44100 };
+    g_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, pull, NULL);
+    if (!g_stream) {
+        fprintf(stderr, "audio: SDL: %s\n", SDL_GetError());
+        return -1;
+    }
+    SDL_ResumeAudioStreamDevice(g_stream);
+    return 0;
+}
+
 int mhfu_audio_start(void) {
     /* A short device buffer: 256 frames, under 6 ms. On Android AAudio with
      * that little took about 35000 frames a second instead of 44100 (the
@@ -193,15 +206,19 @@ int mhfu_audio_start(void) {
         fprintf(stderr, "audio: SDL: %s\n", SDL_GetError());
         return -1;
     }
-    const SDL_AudioSpec spec = { SDL_AUDIO_S16, 2, 44100 };
-    SDL_AudioStream *s = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, pull, NULL);
-    if (!s) {
-        fprintf(stderr, "audio: SDL: %s\n", SDL_GetError());
-        return -1;
-    }
+    if (open_stream() < 0) return -1;
     psp_audio_set_sink(sink);
-    SDL_ResumeAudioStreamDevice(s);
     return 0;
+}
+
+/* Issue #24: back from the background on Android the sound stayed off until a
+ * restart: SDL only restarts the AAudio stream it had, which Android may have
+ * disconnected meanwhile. A new stream on the default device each time. */
+void mhfu_audio_reopen(void) {
+    if (!g_stream) return;
+    SDL_DestroyAudioStream(g_stream);
+    g_stream = NULL;
+    if (open_stream() == 0) fprintf(stderr, "audio: output reopened\n");
 }
 
 #elif defined(_WIN32)

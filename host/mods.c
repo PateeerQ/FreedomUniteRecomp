@@ -1,6 +1,7 @@
 /* MHFU-Android -- see mods.h. The cheat engine follows PPSSPP's CWCheat one
  * (Core/CwCheat.cpp): the same code types and the same meaning. */
 #include "mods.h"
+#include "hle_mhfu.h"
 #include "region.h"
 #include "mods_builtin.h"
 #include "overlays.h"
@@ -48,6 +49,76 @@ unsigned mhfu_mod_aspect(unsigned original) {
     union { float f; unsigned u; } a;
     a.f = (float)w / (float)h;
     return a.u;
+}
+
+/* ---- the HUD in the corners (with widescreen) ----
+ * On an ultrawide window the HUD keeps to the window's corners instead of a
+ * 16:9-ish middle (a request from Reddit, 2026-11-17). Only while hunting:
+ * a menu or window in a quest (and the lobby, title, menus) stays in the
+ * middle, as its pieces span the dividing lines. MHFU_HUD_CORNERS=1, or 2
+ * for everywhere (testing); MHFU_HUD_ZONES=left,right,top in PSP pixels. */
+static volatile int g_hud_opt = -1;
+/* An element reaching left of 40 keeps to the left (clock, names), right of
+ * 440 to the right (map, item bar), one wholly above 40 from the left half
+ * to the left (health and stamina, to x 420); the rest stays in the middle. */
+static float g_hud_zone[3] = { 40.0f, 440.0f, 40.0f };
+
+int mhfu_mod_hud_corners(void) {
+    if (g_hud_opt < 0) {
+        const char *e = getenv("MHFU_HUD_CORNERS");
+        g_hud_opt = e ? atoi(e) : 0;
+        const char *z = getenv("MHFU_HUD_ZONES");
+        if (z) sscanf(z, "%f,%f,%f", &g_hud_zone[0], &g_hud_zone[1], &g_hud_zone[2]);
+    }
+    return g_hud_opt;
+}
+
+void mhfu_mod_set_hud_corners(int on) {
+    mhfu_mod_hud_corners();                 /* the zones from the environment */
+    g_hud_opt = on;
+}
+
+/* Hunting with nothing open: the flags ui_ctx (window_sdl.c) uses for a
+ * quest's windows. The Start menu's flag was only checked in the village. */
+static int hud_hunting(unsigned *why) {
+    *why = 0;
+    if (!mhfu_in_quest()) return 0;
+    const unsigned menu = psp_read8(MHFU_ADDR_MENU_OPEN), prompt = psp_read8(MHFU_ADDR_UI_PROMPT);
+    const unsigned wa = psp_read8(MHFU_ADDR_QUEST_WIN_A), wb = psp_read8(MHFU_ADDR_QUEST_WIN_B);
+    const unsigned end = psp_read8(MHFU_ADDR_QUEST_END);
+    *why = menu << 24 | prompt << 16 | wa << 8 | wb;
+    if (menu || prompt >= 3 || end == 1) return 0;
+    if ((wa == 2 && wb == 5) || (wa == 10 && wb == 10)) return 0;
+    return 1;
+}
+
+/* Once a game frame (input.c): to the corners after 10 frames of hunting
+ * (a third of a second at 30 fps), back to the middle at once when something
+ * opens. */
+void mhfu_mod_hud_frame(void) {
+    static int shown = 0, frames;
+    const int opt = mhfu_mod_hud_corners();
+    unsigned why = 0;
+    const int want = g_wide == 1 && (opt == 2 || (opt == 1 && hud_hunting(&why)));
+    static unsigned last_why = ~0u;
+    if (opt == 1 && g_wide == 1 && !want && mhfu_in_quest() && why != last_why) {   /* in a quest, held in the middle: by what */
+        printf("hud: held in the middle (menu %u prompt %u qwin %u/%u end %u)\n", why >> 24, why >> 16 & 0xFF,
+               why >> 8 & 0xFF, why & 0xFF, psp_read8(MHFU_ADDR_QUEST_END));
+        fflush(stdout);
+    }
+    last_why = why;
+    int next = shown;
+    if (!want) { next = 0; frames = 0; }
+    else if (!shown && ++frames >= 10) next = 1;
+    if (next != shown) {
+        shown = next;
+        psp_render_gl_set_hud_corners(shown, g_hud_zone[0], g_hud_zone[1], g_hud_zone[2]);
+        if (opt == 1) {                     /* a wrong flag shows here in a player's log */
+            printf("hud: %s (menu %u prompt %u qwin %u/%u)\n", shown ? "corners" : "middle", why >> 24,
+                   why >> 16 & 0xFF, why >> 8 & 0xFF, why & 0xFF);
+            fflush(stdout);
+        }
+    }
 }
 
 /* ---- the built-in code mods ---- */

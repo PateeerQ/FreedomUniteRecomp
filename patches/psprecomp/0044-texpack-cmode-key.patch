@@ -1,0 +1,51 @@
+diff --git a/include/psprecomp/render.h b/include/psprecomp/render.h
+index 0db2e84..395a038 100644
+--- a/include/psprecomp/render.h
++++ b/include/psprecomp/render.h
+@@ -83,6 +83,7 @@ typedef struct {
+     uint32_t clut_version;   /* changes whenever a CLOAD changed `clut`'s bytes */
+     uint32_t clut_load_bytes;/* bytes the last CLOAD loaded (PPSSPP's clutTotalBytes_) */
+     uint32_t clut_max_bytes; /* the most any CLOAD loaded (clutMaxBytes_): texture packs' CLUT hash */
++    uint32_t clut_cmode;     /* the whole CMODE word as PPSSPP keeps it (0xC5 << 24 | arg): XORed into its key */
+ 
+     int      blend;          /* ABE */
+     int      blend_src, blend_dst, blend_op;   /* ALPHA */
+@@ -186,10 +187,11 @@ void psp_render_gl_set_stretch(int on);
+  * it off. `dim` is TSIZE0's log2 sizes (h << 8 | w), and a paletted texture
+  * comes with the CLUT bytes PPSSPP hashes for its key (`clut`, `clut_bytes`:
+  * the last load plus the start offset, at most the largest load; NULL, 0 for
+- * the others). */
++ * the others) and the CMODE word (`cmode`, 0xC5 << 24 | its argument), which
++ * PPSSPP XORs into the CLUT hash ("cluthash = clutHash_ ^ gstate.clutformat"). */
+ enum { PSP_REPLACE_NONE = 0, PSP_REPLACE_PENDING = 1, PSP_REPLACE_READY = 2 };
+ typedef int (*psp_texture_replacer)(uint32_t addr, int bufw, int w, int h, int fmt, int swizzled,
+-                                    uint32_t dim, const uint8_t *clut, uint32_t clut_bytes,
++                                    uint32_t dim, const uint8_t *clut, uint32_t clut_bytes, uint32_t cmode,
+                                     int *out_w, int *out_h, uint32_t **data, uint32_t *gl_fmt, uint32_t *bytes);
+ void psp_render_gl_set_replacer(psp_texture_replacer fn);
+ 
+diff --git a/src/hle/ge.c b/src/hle/ge.c
+index c7829c9..a4762c0 100644
+--- a/src/hle/ge.c
++++ b/src/hle/ge.c
+@@ -1522,6 +1522,7 @@ static void run_list(ge_queue *q) {
+             g_ds.clut_shift = (int)((arg >> 2) & 0x1F);
+             g_ds.clut_mask = (int)((arg >> 8) & 0xFF);
+             g_ds.clut_start = (int)((arg >> 16) & 0x1F);
++            g_ds.clut_cmode = (uint32_t)GE_CMODE << 24 | arg;
+             break;
+ 
+         case GE_SCISSOR1:
+diff --git a/src/render_gl.c b/src/render_gl.c
+index fb8065d..d5c4bee 100644
+--- a/src/render_gl.c
++++ b/src/render_gl.c
+@@ -476,7 +476,7 @@ static int tex_replace(gtex *t, const psp_draw_state *st) {
+         clut = st->clut;
+     }
+     t->repl = rep(st->tex_addr, st->tex_bw, st->tex_w, hh, st->tex_fmt, st->tex_swizzle, lh << 8 | lw, clut,
+-                  clut_bytes, &rw, &rh, &rpx, &gl_fmt, &bytes);
++                  clut_bytes, st->clut_cmode, &rw, &rh, &rpx, &gl_fmt, &bytes);
+     if (t->repl != PSP_REPLACE_READY) return 0;
+     if (!rpx || rw <= 0 || rh <= 0 || (gl_fmt && !bytes)) {                          /* said ready, gave nothing */
+         free(rpx);

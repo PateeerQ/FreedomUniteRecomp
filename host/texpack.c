@@ -506,16 +506,19 @@ static int lookup(uint64_t ck, uint32_t hash) {
 }
 
 static int replace(uint32_t addr, int bufw, int w, int h, int fmt, int swizzled, uint32_t dim, const uint8_t *clut,
-                   uint32_t clut_bytes, int *ow, int *oh, uint32_t **rgba, uint32_t *gl_fmt, uint32_t *bytes) {
+                   uint32_t clut_bytes, uint32_t cmode, int *ow, int *oh, uint32_t **rgba, uint32_t *gl_fmt,
+                   uint32_t *bytes) {
     (void)swizzled;                                     /* PPSSPP hashes swizzled ones as they lie, too */
     if (fmt < 0 || fmt > 7 || w <= 0 || h <= 0 || bufw <= 0) return PSP_REPLACE_NONE;
     const uint32_t hash = texture_hash(addr, bufw, w, h, fmt);
     /* PPSSPP's key (TexCacheEntry::CacheKey): the address above, TSIZE's log2
      * sizes below, XORed with the CLUT's hash for a paletted texture (XXH32 of
-     * the CLUT bytes, seed 0xC0108888, as its replacer has it). Issue #14: a
-     * pack listing the title and button icons by address and CLUT. */
+     * the CLUT bytes, seed 0xC0108888, as its replacer has it) and the whole
+     * CMODE word ("cluthash = clutHash_ ^ gstate.clutformat", command byte
+     * 0xC5 included; v0.4.8 left it out and still missed every paletted key).
+     * Issue #14: a pack listing the title and button icons by address and CLUT. */
     uint64_t ck = (uint64_t)(addr & 0x3FFFFFFFu) << 32 | (dim & 0xF0Fu);
-    if ((fmt & 4) && clut) ck ^= xxh32(clut, clut_bytes, 0xC0108888u);
+    if ((fmt & 4) && clut) ck ^= xxh32(clut, clut_bytes, 0xC0108888u) ^ cmode;
     if (g_ignore_addr) ck &= 0xFFFFFFFFull;
     int fi = lookup(ck, hash);
     if (fi < 0) {

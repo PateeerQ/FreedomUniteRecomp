@@ -134,10 +134,15 @@
  * dumps without a window (FUC dumps 20:05, 20:58). */
 #define MHFU_ADDR_QUEST_WIN_A   (MHFU_ADDR_WEAPON_CLASS + 0xD2u)
 #define MHFU_ADDR_QUEST_WIN_B   (MHFU_ADDR_WEAPON_CLASS + 0x176u)
-/* u8 (game state, FUC 0x08B51445 = EU 0x08B55705 by the -0x42C0 rule): 2 on the
- * screens after a quest (Take Reward, Send to Item Box, End, ...), 0 while
- * playing (8 end-screen dumps 22:47 / 23:06 against 41 quest dumps). */
-#define MHFU_ADDR_QUEST_PHASE   (MHFU_ADDR_WEAPON_CLASS - 0x55DF23u)
+/* u8 +0x404 (hunter struct): 1 on the screens after a quest (Take Reward, Send
+ * to Item Box, End, ...): all 8 FUC end-screen dumps (22:47, 23:06); 0 in the 62
+ * FUC quest dumps (boxes, carving, gathering, bed), the 4 Abandon/Retired ones
+ * and all 50 EU dumps. Not seen during the BBQ spit or a used-up gathering point
+ * (no dumps), so ui_ctx only keeps a window a few seconds past it, never latches.
+ * The old flag (FUC 0x08B51445, "quest phase") was a byte in a data buffer: in
+ * EU the BBQ spit and mining left it at 2, latching Yes/No until the quest
+ * ended (issues #17, #19). */
+#define MHFU_ADDR_QUEST_END     (MHFU_ADDR_WEAPON_CLASS + 0x404u)
 /* u8: not 0 while the game shows an object's prompt ("Enter", "Depart", ...);
  * the object pointer above can stay set when the hunter has walked away (EU
  * dumps). Not at the heap's usual distance: EU 0x09993C75 (two gate dumps

@@ -584,6 +584,7 @@ static void page_play(float w, float h) {
             g_cfg.volume = now.volume;
             g_cfg.mouse_sens = now.mouse_sens;
             g_cfg.widescreen = now.widescreen;
+            g_cfg.hud_corners = now.hud_corners;
             g_cfg.mods = now.mods;
         }
     }
@@ -1146,6 +1147,13 @@ static void page_mods(float w, float) {
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 34);
     dim("The camera takes the window's shape and the picture is stretched over it (with an Output wider than 16:9).");
     ImGui::PopFont();
+    if (g_cfg.widescreen) {
+        if (ImGui::Checkbox("HUD in the corners (beta)", &g_cfg.hud_corners)) changed();
+        ImGui::PushFont(g_small);
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 34);
+        dim("While hunting, the health bars, map and item bar sit at the window's corners (ultrawide); menus stay in the middle.");
+        ImGui::PopFont();
+    }
     if (region().fps60 && ImGui::Checkbox("60 FPS (beta)", &g_cfg.fps60)) changed();
     ImGui::Spacing();
 
@@ -1441,6 +1449,15 @@ int main(int, char **) {
         if (SDL_GetWindowFlags(g_window) & SDL_WINDOW_MINIMIZED) { SDL_Delay(50); continue; }
         // In the background (the game in front): about 10 frames a second is plenty.
         if (!shot && !(SDL_GetWindowFlags(g_window) & SDL_WINDOW_INPUT_FOCUS)) SDL_Delay(90);
+        // A controller steers the launcher only while it is in front and the game is not running:
+        // ImGui's SDL3 backend reads the pads even in the background, so the buttons pressed in
+        // the game also moved through the launcher's pages and pressed its buttons (Discord, 2026-11-17).
+        {
+            ImGuiIO &io = ImGui::GetIO();
+            const bool pad_nav = (SDL_GetWindowFlags(g_window) & SDL_WINDOW_INPUT_FOCUS) && !game_running();
+            if (pad_nav) io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+            else io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableGamepad;
+        }
 
         if (g_recheck) { g_checks = ready_check(g_cfg, g_gpu); g_recheck = false; }
         {
