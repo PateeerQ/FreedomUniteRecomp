@@ -1,6 +1,8 @@
 # Packs a release into release\v<version>\ (gitignored):
 #   FreedomUniteRecomp-v<version>-windows-x64.zip   launcher, game, FFmpeg, README
 #   FreedomUniteRecomp-v<version>-android-arm64.apk the release APK
+#   FreedomUniteRecomp-v<version>-android-armv7.apk the same for 32-bit phones (not with -NoBuild;
+#                                           needs ABI=armeabi-v7a scripts/build-ffmpeg-android.sh once)
 #
 #   .\scripts\release.ps1                   # builds first (Release + assembleRelease)
 #   .\scripts\release.ps1 -NoBuild
@@ -81,5 +83,17 @@ $apk = "$repo\android\app\build\outputs\apk\release\app-release.apk"
 if (-not (Test-Path $apk)) { throw "no release APK: build it (without -NoBuild)" }
 # The APK is the last one Gradle built: with -NoBuild, make sure it was this region's.
 Copy-Item $apk "$out\$name-android-arm64$suffix.apk" -Force
+# 32-bit (armeabi-v7a), after the 64-bit one: Gradle writes the same app-release.apk. The Updater picks by ABI.
+if (-not $NoBuild) {
+    if (-not (Test-Path "$repo\deps\ffmpeg-android-armeabi-v7a\lib\libavcodec.a")) {
+        throw "no 32-bit FFmpeg: run ABI=armeabi-v7a scripts/build-ffmpeg-android.sh (Git Bash) first"
+    }
+    $ErrorActionPreference = "Continue"
+    # No PGO: the profile is from the 64-bit build.
+    & "$repo\android\gradlew.bat" -p "$repo\android" assembleRelease "-Pmhfu.region=$Region" "-Pmhfu.abi=armeabi-v7a" "-Pmhfu.pgo=off" --console=plain 2>&1 | ForEach-Object { "$_" }
+    $ErrorActionPreference = "Stop"
+    if ($LASTEXITCODE) { throw "the 32-bit Android build failed" }
+    Copy-Item $apk "$out\$name-android-armv7$suffix.apk" -Force
+}
 
 Get-ChildItem $out | Select-Object Name, @{ n = "MB"; e = { [math]::Round($_.Length / 1MB, 1) } }

@@ -187,6 +187,10 @@ if(MHFU_SDL_WINDOW AND NOT MHFU_GAMEPAD)
 endif()
 if(ANDROID)
     set(MHFU_FFMPEG_DEFAULT "${CMAKE_CURRENT_SOURCE_DIR}/deps/ffmpeg-android")
+    if(NOT ANDROID_ABI STREQUAL "arm64-v8a")
+        # ABI=armeabi-v7a scripts/build-ffmpeg-android.sh
+        set(MHFU_FFMPEG_DEFAULT "${MHFU_FFMPEG_DEFAULT}-${ANDROID_ABI}")
+    endif()
 elseif(UNIX AND NOT APPLE)
     # Static, only the decoders the game uses (scripts/build-ffmpeg-linux.sh).
     set(MHFU_FFMPEG_DEFAULT "${CMAKE_CURRENT_SOURCE_DIR}/deps/ffmpeg-linux")

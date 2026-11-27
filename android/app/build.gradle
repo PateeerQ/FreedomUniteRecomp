@@ -37,7 +37,7 @@ android {
         minSdk 26
         targetSdk 35
         versionCode 18
-        versionName '0.4.10'
+        versionName '0.5.0'
         if (mhfuSub) applicationIdSuffix ".${mhfuSub}"
         // What the Java side checks the player's files against (host/region.h has the same).
         buildConfigField 'String', 'GAME_ID', "\"${mhfuIds[0]}\""
@@ -69,7 +69,8 @@ android {
             }
         }
         ndk {
-            abiFilters 'arm64-v8a'
+            // -Pmhfu.abi=armeabi-v7a: a 32-bit trial build (FFmpeg: ABI=armeabi-v7a scripts/build-ffmpeg-android.sh)
+            abiFilters((project.findProperty('mhfu.abi') ?: 'arm64-v8a').toString())
         }
     }
 

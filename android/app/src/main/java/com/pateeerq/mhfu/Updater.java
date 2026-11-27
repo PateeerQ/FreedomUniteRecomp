@@ -99,6 +99,8 @@ final class Updater {
                 String an = as.optString("name").toLowerCase();
                 String tag = BuildConfig.REGION_TAG.toLowerCase();
                 boolean other = an.endsWith("-us.apk") || an.endsWith("-jp.apk") || an.endsWith("-fuc.apk");
+                // The 32-bit APK (-armv7) only for a phone that cannot run 64-bit code.
+                if (an.contains("-armv7") != (Build.SUPPORTED_64_BIT_ABIS.length == 0)) continue;
                 if (an.endsWith(".apk") && (tag.equals("eu") ? !other : an.endsWith("-" + tag + ".apk"))) {
                     r.apkUrl = as.optString("browser_download_url");
                     r.apkSize = as.optLong("size");

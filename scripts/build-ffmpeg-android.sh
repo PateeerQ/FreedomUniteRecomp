@@ -8,24 +8,32 @@
 #
 # Run from Git Bash on Windows (the NDK's own clang and make do the work):
 #   scripts/build-ffmpeg-android.sh [path/to/ffmpeg-source]
+#   ABI=armeabi-v7a scripts/build-ffmpeg-android.sh   (32-bit, into deps/ffmpeg-android-armeabi-v7a)
 # The source defaults to deps/ffmpeg-src (FFmpeg 7.1.1, the same as the
 # Windows build: https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz).
 set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 src="${1:-$repo/deps/ffmpeg-src}"
-out="$repo/deps/ffmpeg-android"
+abi="${ABI:-arm64-v8a}"
+case "$abi" in
+    arm64-v8a)   suffix=""; arch=aarch64; cpu=armv8-a; triple=aarch64-linux-android; abicflags="" ;;
+    armeabi-v7a) suffix="-$abi"; arch=arm; cpu=armv7-a; triple=armv7a-linux-androideabi
+                 abicflags="-mfpu=neon -mfloat-abi=softfp" ;;
+    *) echo "unknown ABI $abi"; exit 1 ;;
+esac
+out="$repo/deps/ffmpeg-android$suffix"
 ndk="${ANDROID_NDK:-$LOCALAPPDATA/Android/Sdk/ndk/27.0.12077973}"
 ndk="$(cygpath -u "$ndk" 2>/dev/null || echo "$ndk")"
 api=26
 tc="$ndk/toolchains/llvm/prebuilt/windows-x86_64"
 make="$ndk/prebuilt/windows-x86_64/bin/make.exe"
-target="aarch64-linux-android$api"
+target="$triple$api"
 
 [ -f "$src/configure" ] || { echo "no FFmpeg source in $src"; exit 1; }
 [ -x "$tc/bin/clang.exe" ] || { echo "no NDK clang in $tc"; exit 1; }
 
-build="$repo/deps/ffmpeg-android-build"
+build="$repo/deps/ffmpeg-android-build$suffix"
 # Emptied rather than removed: Windows will not remove a folder a shell is in.
 mkdir -p "$build" && rm -rf "${build:?}"/* && mkdir -p "$build/tmp" && cd "$build"
 # configure's scratch files: Git Bash inherits a Windows TEMP it cannot use.
@@ -33,7 +41,7 @@ export TMPDIR="$build/tmp"
 
 "$src/configure" \
     --prefix="$out" \
-    --target-os=android --arch=aarch64 --cpu=armv8-a --enable-cross-compile \
+    --target-os=android --arch=$arch --cpu=$cpu --enable-cross-compile \
     --cc="$tc/bin/clang.exe" --cxx="$tc/bin/clang++.exe" --ld="$tc/bin/clang.exe" \
     --ar="$tc/bin/llvm-ar.exe" --nm="$tc/bin/llvm-nm.exe" --ranlib="$tc/bin/llvm-ranlib.exe" \
     --strip="$tc/bin/llvm-strip.exe" \
@@ -41,7 +49,7 @@ export TMPDIR="$build/tmp"
     --host-cc="$tc/bin/clang.exe" \
     --host-cflags="--target=$target --sysroot=$tc/sysroot" \
     --host-ldflags="--target=$target --sysroot=$tc/sysroot" \
-    --extra-cflags="--target=$target -O2 -fPIC" \
+    --extra-cflags="--target=$target $abicflags -O2 -fPIC" \
     --extra-ldflags="--target=$target" \
     --enable-static --disable-shared --enable-pic \
     --disable-programs --disable-doc --disable-debug \
@@ -72,4 +80,4 @@ done
 for h in avconfig.h ffversion.h; do
     [ -f "$out/include/libavutil/$h" ] || cp "$build/libavutil/$h" "$out/include/libavutil/"
 done
-echo "FFmpeg for arm64-v8a in $out"
+echo "FFmpeg for $abi in $out"
