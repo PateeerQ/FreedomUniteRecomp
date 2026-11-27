@@ -13,7 +13,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="License: GPL-3.0"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20x64-0078d6" alt="Windows x64">
   <img src="https://img.shields.io/badge/platform-Linux%20%7C%20Steam%20Deck-fcc624" alt="Linux and Steam Deck x64">
-  <img src="https://img.shields.io/badge/platform-Android%208%2B%20(arm64)-3ddc84" alt="Android 8+ arm64">
+  <img src="https://img.shields.io/badge/platform-Android%208%2B%20(arm64%20%7C%20armv7)-3ddc84" alt="Android 8+ arm64 and armv7">
   <a href="https://github.com/sp00nznet/psprecomp"><img src="https://img.shields.io/badge/built%20with-psprecomp-555" alt="Built with psprecomp"></a>
   <a href="https://discord.gg/gCqSPkfUhj"><img src="https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
 </p>
@@ -76,16 +76,18 @@ Get the newest build from **[Releases](https://github.com/PateeerQ/FreedomUniteR
 |---|---|---|
 | Windows 10/11 x64 | `FreedomUniteRecomp-v<version>-windows-x64-universal.zip` | OpenGL 3.3 GPU |
 | Linux x64 / Steam Deck | `FreedomUniteRecomp-v<version>-linux-x64-universal.tar.gz` | OpenGL 3.3 GPU, glibc 2.38+ (SteamOS 3.6+, Ubuntu 24.04+, Fedora 40+, Arch) |
-| Android 8+ arm64 | `FreedomUniteRecomp-v<version>-android-arm64-universal.apk` | OpenGL ES 3.0 GPU |
+| Android 8+ arm64 | `FreedomUniteRecomp-v<version>-android-arm64-universal.apk` | OpenGL ES 3.0 GPU (most phones) |
+| Android 8+ 32-bit | `FreedomUniteRecomp-v<version>-android-armv7-universal.apk` | OpenGL ES 3.0 GPU; only for phones that cannot install the arm64 one |
 
 All of them check for updates by themselves (the launcher on PC, the app at start or from its menu).
 
 ## Status
 
-Version **0.4.7**. The game boots, plays its movies, creates and saves a character, and runs the village,
+Version **0.5.0**. The game boots, plays its movies, creates and saves a character, and runs the village,
 the Gathering Hall and quests in 3D at its own 30 fps, or 60 in 60 FPS mode, with sound, music, keyboard,
 controllers and touch buttons. Quests have been played start to finish, alone and together through a room, on
 PC and on Android (Poco X7 Pro). The Linux build is new (v0.4.7): checked in WSL, not yet on a real Steam Deck.
+The 32-bit Android build is new (v0.5.0): checked on a Poco X3 Pro, not yet on a 32-bit-only phone.
 
 <details>
 <summary><b>Progress by area</b> (rough estimates, 2026-11-12)</summary>
@@ -176,7 +178,8 @@ menu; add `start.sh` to Steam as a non-Steam game and choose *Fullscreen* on the
 
 ### Android
 
-1. Install `FreedomUniteRecomp-v<version>-android-arm64-universal.apk` (arm64, Android 8+).
+1. Install `FreedomUniteRecomp-v<version>-android-arm64-universal.apk` (arm64, Android 8+). If the phone refuses it
+   (a 32-bit phone), install `...-android-armv7-universal.apk` instead; the app's updater keeps to the right one.
 2. Put the ISO and the EBOOT in one folder on the phone.
 3. Open the app and pick that folder (*"Use this folder"*). After that it goes straight into the game.
 
@@ -244,11 +247,12 @@ install; give another folder with `-Fonts <folder>`. A USA EBOOT builds into `wo
 ### Android
 
 Needs the Android SDK, NDK `27.0.12077973` and a JDK 17–21. FFmpeg for Android is built once with
-`scripts/build-ffmpeg-android.sh` (Git Bash). Then, after the Windows setup has generated the C:
+`scripts/build-ffmpeg-android.sh` (Git Bash), and for the 32-bit app also with
+`ABI=armeabi-v7a scripts/build-ffmpeg-android.sh`. Then, after the Windows setup has generated the C:
 
 ```powershell
 $env:JAVA_HOME = "$env:USERPROFILE\.jdks\jbr-21.0.11"
-cd android; .\gradlew.bat assembleDebug          # -Pmhfu.region=US for the USA app
+cd android; .\gradlew.bat assembleDebug          # -Pmhfu.region=US for the USA app, -Pmhfu.abi=armeabi-v7a for 32-bit
 adb install -r app\build\outputs\apk\debug\app-debug.apk
 ```
 
@@ -269,11 +273,11 @@ On Linux itself: `scripts/build-linux.sh [--universal] [--package]`.
 ### Packaging a release
 
 ```powershell
-.\scripts\release.ps1 -Region ALL     # every release set up: the universal zip and APK
+.\scripts\release.ps1 -Region ALL     # every release set up: the universal zip and both APKs (arm64, armv7)
 .\scripts\build-linux.ps1 -Universal -Package
 ```
 
-writes `release\v<version>\`: the Windows zip, the APK and the Linux tarball. The version is `MHFU_VERSION` in `host/about.h` and
+writes `release\v<version>\`: the Windows zip, the two APKs and the Linux tarball. The version is `MHFU_VERSION` in `host/about.h` and
 `versionName` in `android/app/build.gradle`; they must match. Both packages contain code recompiled from your EBOOT
 (though no game files): keep that in mind before publishing them. Builds use ccache and Ninja when installed.
 
