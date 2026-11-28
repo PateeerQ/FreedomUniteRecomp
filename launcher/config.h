@@ -40,6 +40,7 @@ struct Config {
     std::string texpack_style;          // a style in its ADDONS/ (MHFU_TEXPACK_STYLE); empty: MAIN's own
     std::map<std::string, bool> mods;   // built-in mods by id (mod_<id>= in the ini); one not there is on
     bool fps60 = false;                 // the 60 fps mode (MHFU_FPS=60; in a room, as the room allows)
+    bool smooth = false;                // 60 fps by in-between frames (MHFU_SMOOTH=1): the game stays at 30; never with fps60
     std::string nick;                   // multiplayer name (--nick); empty: net.cfg's
     std::string gamepad;                // "": the first connected, "none": keyboard only, else an SDL GUID
     std::string gamepad_name;           // that GUID's device name, for showing
