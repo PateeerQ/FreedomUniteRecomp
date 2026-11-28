@@ -3712,6 +3712,11 @@ static void gl_swap(void *user) {
             printf("window: GL cannot bind the surface yet (%s)\n", SDL_GetError());
         }
     }
+    /* With in-between frames (smooth 60), vsync: twice as many pictures at
+     * times of their own tore the picture every second or two (window.c). */
+    static int vsync = -1;
+    const int want = psp_render_gl_interpolation();
+    if (want != vsync) { SDL_GL_SetSwapInterval(want); vsync = want; }
     if (!SDL_GL_SwapWindow(g_window)) SDL_SetAtomicInt(&g_remake, 1);
 }
 
