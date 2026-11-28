@@ -49,7 +49,7 @@ Questions, bug reports, finding other hunters: join the **[Discord server](https
 |---|---|
 | **Native** | The EBOOT and all 298 overlays (menus, stages, monsters) recompiled to C; firmware reimplemented in the host |
 | **Online play** | **Create Server / Join Server** with room codes and optional passcodes, on your Wi-Fi or over the internet relay; no port forwarding. Windows, Linux and Android in the same room. Room chat and ping |
-| **60 FPS (beta)** | The game at 60 fps and normal speed. A room plays at its slowest player's rate |
+| **60 FPS (beta)** | Two ways: **Interpolation** (recommended): 60 pictures a second, one made between each two of the game's, so everything keeps its speed. **CWCheat**: the game itself at 60; some things run too fast, and a room plays at its slowest player's rate |
 | **One app, every release** | Europe, USA, Japan and the FUComplete translation from one launcher and one app, told from your disc; every release can share a room |
 | **Mods** | Widescreen, CWCheat cheats, and built-in mods: Target Camera + Crosshair, Damage Numbers, Gathering Node Indicators |
 | **Texture packs** | HD packs made for PPSSPP (PNG or KTX2, with their style variants), optional |
@@ -83,8 +83,8 @@ All of them check for updates by themselves (the launcher on PC, the app at star
 
 ## Status
 
-Version **0.5.0**. The game boots, plays its movies, creates and saves a character, and runs the village,
-the Gathering Hall and quests in 3D at its own 30 fps, or 60 in 60 FPS mode, with sound, music, keyboard,
+Version **0.5.1**. The game boots, plays its movies, creates and saves a character, and runs the village,
+the Gathering Hall and quests in 3D at its own 30 fps, or shown at 60 (interpolation or the CWCheat 60 FPS code), with sound, music, keyboard,
 controllers and touch buttons. Quests have been played start to finish, alone and together through a room, on
 PC and on Android (Poco X7 Pro). The Linux build is new (v0.4.7): checked in WSL, not yet on a real Steam Deck.
 The 32-bit Android build is new (v0.5.0): checked on a Poco X3 Pro, not yet on a 32-bit-only phone.
