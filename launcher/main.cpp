@@ -293,6 +293,28 @@ static std::string disc_file(const char *name) {
 }
 static void changed() { g_dirty = true; }
 
+/* The 60 FPS choice: off, in-between frames (the game stays at 30: nothing
+ * runs too fast), or the CWCheat patches (the game itself at 60). One at most. */
+static void fps_combo(const char *id) {
+    static const char *const names[] = { "Off (30 FPS)", "Interpolation (Recommended, BETA)", "CWCheat (BETA)" };
+    static const char *const tips[] = {
+        "The game's own 30 frames a second.",
+        "60 pictures a second: one made between each two of the game's. The game itself stays at 30, so\n"
+        "monsters, attacks and timers keep their speed. Beta: a small glitch now and then while running.",
+        "The game itself at 60 (the CWCheat \"60 FPS\" code). Some things run too fast (monster despawns,\n"
+        "some attacks). In a room everyone plays at the slowest player's rate. F4 in game toggles it.",
+    };
+    const int cur = g_cfg.smooth ? 1 : g_cfg.fps60 ? 2 : 0;
+    if (ImGui::BeginCombo(id, names[cur])) {
+        for (int i = 0; i < 3; i++) {
+            if (i == 2 && !region().fps60) continue;
+            if (ImGui::Selectable(names[i], cur == i)) { g_cfg.smooth = i == 1; g_cfg.fps60 = i == 2; changed(); }
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tips[i]);
+        }
+        ImGui::EndCombo();
+    }
+}
+
 // The file dialog answers on whichever thread SDL likes.
 static std::mutex g_pick_lock;
 static std::string g_pick_result;
@@ -544,11 +566,9 @@ static void page_play(float w, float h) {
     }
     ImGui::SetCursorPosX(lw);
     if (ImGui::Checkbox("Fullscreen", &g_cfg.fullscreen)) changed();
-    ImGui::SameLine();
-    if (region().fps60 && ImGui::Checkbox("60 FPS (beta)", &g_cfg.fps60)) changed();
-    if (region().fps60 && ImGui::IsItemHovered())
-        ImGui::SetTooltip("The game at 60 frames a second. In a room everyone plays at the slowest player's rate.\n"
-                          "Beta: tell PateeerQ if something runs too fast or too slow. F4 in game toggles it.");
+    label("60 FPS");
+    ImGui::SetNextItemWidth(width - lw);
+    fps_combo("##fps");
     label("Volume");
     ImGui::SetNextItemWidth(width - lw);
     if (ImGui::SliderInt("##volume", &g_cfg.volume, 0, 100, g_cfg.volume ? "%d%%" : "Muted")) changed();
@@ -1154,7 +1174,11 @@ static void page_mods(float w, float) {
         dim("While hunting, the health bars, map and item bar sit at the window's corners (ultrawide); menus stay in the middle.");
         ImGui::PopFont();
     }
-    if (region().fps60 && ImGui::Checkbox("60 FPS (beta)", &g_cfg.fps60)) changed();
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("60 FPS");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(320);
+    fps_combo("##fps_mods");
     ImGui::Spacing();
 
     // Texture packs (host/texpack.c): optional, the game's own textures unless one is put there.
