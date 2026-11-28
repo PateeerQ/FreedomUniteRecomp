@@ -28,6 +28,7 @@
 #include "net/client.h"
 #include "stats.h"
 #include "mods.h"
+#include "region.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -606,8 +607,16 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             if (g_gl) gl_overlay_text(overlay_line());
             return 0;
         }
-        if (wp == VK_F4 && !(lp & (1 << 30))) {                /* 60 fps mode (in a room: as the room allows) */
-            mhfu_fps_set_preferred(mhfu_fps_preferred() >= 60 ? 30 : 60);
+        if (wp == VK_F4 && !(lp & (1 << 30))) {
+            /* 60 FPS: off -> interpolation (in-between frames, the game at 30)
+             * -> CWCheat (the game at 60; in a room, as the room allows) -> off */
+            static const char *const names[] = { "60 FPS off (30)", "60 FPS: Interpolation (BETA)", "60 FPS: CWCheat (BETA)" };
+            int mode = psp_render_gl_interpolation() ? 1 : mhfu_fps_preferred() >= 60 ? 2 : 0;
+            mode = (mode + 1) % 3;
+            if (mode == 2 && !MHFU_HAS_FPS60) mode = 0;
+            psp_render_gl_set_interpolation(mode == 1);
+            mhfu_fps_set_preferred(mode == 2 ? 60 : 30);
+            mhfu_window_chat(NULL, names[mode], 1);
             if (g_gl) gl_overlay_text(overlay_line());
             return 0;
         }
@@ -790,6 +799,8 @@ void mhfu_window_on_close(void (*fn)(void)) { g_on_close = fn; }
 /* ---- OpenGL: the context psprecomp's render thread draws with ---- */
 
 static HDC g_gl_dc;
+typedef BOOL (WINAPI *interval_fn)(int);
+static interval_fn g_swap_interval;   /* wglSwapIntervalEXT */
 
 /* On the render thread: a GL 3.3 core context on the window. */
 static int gl_ctx_init(void *user) {
@@ -825,10 +836,9 @@ static int gl_ctx_init(void *user) {
     if (!ctx || !wglMakeCurrent(g_gl_dc, ctx)) return -1;
 
     /* No vsync: the game paces itself, and a blocked swap would hold up the
-     * frame after it. */
-    typedef BOOL (WINAPI *interval_fn)(int);
-    interval_fn interval = (interval_fn)(void *)wglGetProcAddress("wglSwapIntervalEXT");
-    if (interval) interval(0);
+     * frame after it. With in-between frames on, vsync (gl_swap). */
+    g_swap_interval = (interval_fn)(void *)wglGetProcAddress("wglSwapIntervalEXT");
+    if (g_swap_interval) g_swap_interval(0);
     return 0;
 }
 
@@ -844,7 +854,17 @@ static void *gl_proc(void *user, const char *name) {
     return p;
 }
 
-static void gl_swap(void *user) { (void)user; SwapBuffers(g_gl_dc); }
+/* In-between frames (smooth 60) go out twice as often, at times of their
+ * own: without vsync the picture tore, a line that drifted through it every
+ * second or two while running (Muhammad, 2026-11-28). The render thread lets
+ * the game go before it draws, so a swap that waits holds nothing up. */
+static void gl_swap(void *user) {
+    (void)user;
+    static int vsync = -1;
+    const int want = psp_render_gl_interpolation();
+    if (want != vsync && g_swap_interval) { g_swap_interval(want); vsync = want; }
+    SwapBuffers(g_gl_dc);
+}
 
 static void gl_size(void *user, int *w, int *h) {
     (void)user;
