@@ -160,6 +160,7 @@ bool config_load(Config &c) {
         else if (k == "output") c.output = v;
         else if (k == "fullscreen") b(c.fullscreen);
         else if (k == "fps60") b(c.fps60);
+        else if (k == "smooth") b(c.smooth);
         else if (k == "volume") c.volume = std::clamp(atoi(v.c_str()), 0, 100);
         else if (k == "mouse_sens") c.mouse_sens = std::clamp(atoi(v.c_str()), 25, 300);
         else if (k == "widescreen") b(c.widescreen);
@@ -228,6 +229,7 @@ bool config_save(const Config &c) {
     o << "output=" << escape(c.output) << "\n";
     o << "fullscreen=" << (c.fullscreen ? 1 : 0) << "\n";
     o << "fps60=" << (c.fps60 ? 1 : 0) << "\n";
+    o << "smooth=" << (c.smooth ? 1 : 0) << "\n";
     o << "volume=" << c.volume << "\n";
     o << "mouse_sens=" << c.mouse_sens << "\n";
     o << "widescreen=" << (c.widescreen ? 1 : 0) << "\n";
