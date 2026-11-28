@@ -211,7 +211,8 @@ bool game_start(const Config &c, std::string &err) {
     if (!c.extra_args.empty()) cmd += L" " + W(c.extra_args);
 
     std::map<std::string, std::string> env{{"MHFU_RENDER", "gl"}};
-    if (c.fps60) env["MHFU_FPS"] = "60";
+    if (c.smooth) env["MHFU_SMOOTH"] = "1";
+    else if (c.fps60) env["MHFU_FPS"] = "60";
     if (c.volume != 100) env["MHFU_VOLUME"] = std::to_string(c.volume);
     if (c.mouse_sens != 100) env["MHFU_MOUSE_SENS"] = std::to_string(c.mouse_sens);
     if (c.widescreen) env["MHFU_WIDESCREEN"] = "1";
@@ -385,7 +386,8 @@ bool game_start(const Config &c, std::string &err) {
     if (!c.extra_args.empty()) split_args(c.extra_args, args);
 
     std::map<std::string, std::string> env{{"MHFU_RENDER", "gl"}};
-    if (c.fps60) env["MHFU_FPS"] = "60";
+    if (c.smooth) env["MHFU_SMOOTH"] = "1";
+    else if (c.fps60) env["MHFU_FPS"] = "60";
     if (c.volume != 100) env["MHFU_VOLUME"] = std::to_string(c.volume);
     if (c.mouse_sens != 100) env["MHFU_MOUSE_SENS"] = std::to_string(c.mouse_sens);
     if (c.widescreen) env["MHFU_WIDESCREEN"] = "1";
