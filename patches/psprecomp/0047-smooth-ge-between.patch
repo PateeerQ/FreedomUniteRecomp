@@ -1,0 +1,679 @@
+diff --git a/include/psprecomp/render.h b/include/psprecomp/render.h
+index 8c19715..fe4ef68 100644
+--- a/include/psprecomp/render.h
++++ b/include/psprecomp/render.h
+@@ -171,6 +171,19 @@ void psp_render_gl_overlay_scaled(const uint32_t *rgba, int w, int h, int dst_w,
+ void psp_render_gl_set_interpolation(int on);
+ int  psp_render_gl_interpolation(void);
+ 
++/* The GE side of in-between frames. While on, ge.c knows each 3D draw again
++ * in the next frame (by its vertex and index addresses, format, count and
++ * how many times the frame drew them), transforms the same vertices with the
++ * previous frame's matrices too, and hands the backend, during its draw()
++ * call, the draw as it is halfway between the two frames, clipped on its own:
++ * psp_render_between_v/n/prim (v NULL: the draw is the same in both, as 2D
++ * is). flip() is called once a frame, at present, with the GE idle. */
++void psp_ge_set_between(int on);
++void psp_ge_between_flip(void);
++void psp_ge_between_stats(uint64_t *matched, uint64_t *total);   /* vertices since the last call */
++extern const psp_vertex *psp_render_between_v;
++extern int psp_render_between_n, psp_render_between_prim;
++
+ /* The picture stretched over the whole window instead of letterboxed at the
+  * PSP's aspect (for a game told to draw wider: a widescreen hack). Any time,
+  * from any thread. */
+diff --git a/src/hle/ge.c b/src/hle/ge.c
+index a4762c0..1b6e71a 100644
+--- a/src/hle/ge.c
++++ b/src/hle/ge.c
+@@ -849,6 +849,24 @@ typedef struct {
+ 
+ static int in_front(const cvertex *p) { return p->c[2] + p->c[3] >= 0.0f && p->c[3] > 0.0f; }
+ 
++/* A vertex's own position, normal and texture coordinate, morph targets blended. */
++static void local_vertex(const uint8_t *hp, uint32_t addr, uint32_t vtype, const vlayout *L, int through,
++                         float pos[3], float nrm[3], float uv[2]) {
++    read_record(hp, addr, vtype, L, through, pos, nrm, uv);
++    if (L->morphs > 1) {
++        /* Morph targets blend position, normal and texture coordinate by the
++         * MW weights; colour comes from the first record. */
++        float p[3], n[3], t[2];
++        for (int i = 0; i < 3; i++) { pos[i] *= g_xf.morph[0]; nrm[i] *= g_xf.morph[0]; }
++        uv[0] *= g_xf.morph[0]; uv[1] *= g_xf.morph[0];
++        for (int m = 1; m < L->morphs; m++) {
++            read_record(hp ? hp + m * L->one : NULL, addr + (uint32_t)(m * L->one), vtype, L, through, p, n, t);
++            for (int i = 0; i < 3; i++) { pos[i] += p[i] * g_xf.morph[m]; nrm[i] += n[i] * g_xf.morph[m]; }
++            uv[0] += t[0] * g_xf.morph[m]; uv[1] += t[1] * g_xf.morph[m];
++        }
++    }
++}
++
+ static void read_vertex(uint32_t addr, uint32_t vtype, const vlayout *L, cvertex *out) {
+     /* Through mode reads 8/16-bit values as integers; transformed mode reads
+      * them as fixed point, signed for positions. */
+@@ -863,19 +881,7 @@ static void read_vertex(uint32_t addr, uint32_t vtype, const vlayout *L, cvertex
+     }
+ 
+     float pos[3], nrm[3], uv[2];
+-    read_record(hp, addr, vtype, L, through, pos, nrm, uv);
+-    if (L->morphs > 1) {
+-        /* Morph targets blend position, normal and texture coordinate by the
+-         * MW weights; colour comes from the first record. */
+-        float p[3], n[3], t[2];
+-        for (int i = 0; i < 3; i++) { pos[i] *= g_xf.morph[0]; nrm[i] *= g_xf.morph[0]; }
+-        uv[0] *= g_xf.morph[0]; uv[1] *= g_xf.morph[0];
+-        for (int m = 1; m < L->morphs; m++) {
+-            read_record(hp ? hp + m * L->one : NULL, addr + (uint32_t)(m * L->one), vtype, L, through, p, n, t);
+-            for (int i = 0; i < 3; i++) { pos[i] += p[i] * g_xf.morph[m]; nrm[i] += n[i] * g_xf.morph[m]; }
+-            uv[0] += t[0] * g_xf.morph[m]; uv[1] += t[1] * g_xf.morph[m];
+-        }
+-    }
++    local_vertex(hp, addr, vtype, L, through, pos, nrm, uv);
+ 
+     out->v.rgba = col;
+     out->v.fog = 1.0f;
+@@ -1123,6 +1129,157 @@ static void dump_prim(uint32_t type, uint32_t count, const cvertex *v, uint32_t
+     fflush(g_dump);
+ }
+ 
++/* ---- in-between frames, the GE side (psp_ge_set_between) -------------------
++ *
++ * Each 3D draw is known again in the next frame by what it draws from: the
++ * vertex and index addresses, the format, the count and the primitive, plus
++ * how many times this frame has drawn that already (a model drawn twice). Its
++ * matrices are kept per frame; the next frame transforms the same vertices
++ * with both frames' matrices and takes the point halfway, in clip space, and
++ * only then clips. Matching the backend's vertices afterwards failed: near-
++ * plane clipping changes how many there are from frame to frame (the road
++ * before the camera cracked while running). The vertices' own data is this
++ * frame's: what the CPU moves itself (particles) is not smoothed. */
++const psp_vertex *psp_render_between_v;
++int psp_render_between_n, psp_render_between_prim;
++
++typedef struct { float world[12], view[12], proj[16], bone[8 * 12], morph[8]; } xsnap;
++typedef struct { uint64_t key; uint32_t snap; } bkey;
++#define BTAB 16384                             /* draws a frame can be known by (a power of two) */
++static int      g_bon;
++static bkey    *g_btab[2];
++static xsnap   *g_bsnap[2];
++static uint32_t g_bnsnap[2];
++static int      g_bcur;                        /* this frame's table; the other is the last frame's */
++static uint64_t g_bmatched, g_btotal;
++
++void psp_ge_set_between(int on) { g_bon = on ? 1 : 0; }
++
++void psp_ge_between_flip(void) {
++    if (!g_btab[0]) return;
++    g_bcur ^= 1;
++    memset(g_btab[g_bcur], 0, sizeof(bkey) * BTAB);
++    g_bnsnap[g_bcur] = 0;
++}
++
++void psp_ge_between_stats(uint64_t *matched, uint64_t *total) {
++    *matched = g_bmatched; *total = g_btotal;
++    g_bmatched = g_btotal = 0;
++}
++
++static uint64_t mix64(uint64_t x) {
++    x ^= x >> 33; x *= 0xFF51AFD7ED558CCDull; x ^= x >> 33; x *= 0xC4CEB9FE1A85EC53ull; x ^= x >> 33;
++    return x ? x : 1;
++}
++
++static bkey *bfind(bkey *t, uint64_t key) {
++    for (uint32_t i = (uint32_t)key & (BTAB - 1), n = 0; n < BTAB; i = (i + 1) & (BTAB - 1), n++)
++        if (t[i].key == key || !t[i].key) return &t[i];
++    return NULL;
++}
++
++/* This draw's key in this frame, and its record there (made now, with the
++ * matrices it is drawn with); the last frame's matrices for it, or NULL. */
++static const xsnap *between_key(uint32_t type, uint32_t count) {
++    if (!g_btab[0]) {
++        for (int i = 0; i < 2; i++) {
++            g_btab[i] = (bkey *)calloc(BTAB, sizeof(bkey));
++            g_bsnap[i] = (xsnap *)malloc(sizeof(xsnap) * BTAB);
++            if (!g_btab[i] || !g_bsnap[i]) { g_bon = 0; return NULL; }
++        }
++    }
++    const uint64_t base = mix64(((uint64_t)g_ge.vaddr << 32 | g_ge.iaddr) ^ mix64((uint64_t)g_ge.vtype << 40 ^ (uint64_t)count << 4 ^ type));
++    bkey *cur = g_btab[g_bcur];
++    uint64_t key = base;
++    bkey *e = NULL;
++    for (uint32_t occ = 0; occ < 256; occ++) {   /* the same vertices drawn again: the next occurrence */
++        key = mix64(base + occ * 0x9E3779B97F4A7C15ull);
++        e = bfind(cur, key);
++        if (!e || !e->key) break;
++    }
++    if (!e || e->key || g_bnsnap[g_bcur] >= BTAB) return NULL;
++    e->key = key;
++    e->snap = g_bnsnap[g_bcur]++;
++    xsnap *x = &g_bsnap[g_bcur][e->snap];
++    memcpy(x->world, g_xf.world, sizeof x->world);
++    memcpy(x->view, g_xf.view, sizeof x->view);
++    memcpy(x->proj, g_xf.proj, sizeof x->proj);
++    memcpy(x->bone, g_xf.bone, sizeof x->bone);
++    memcpy(x->morph, g_xf.morph, sizeof x->morph);
++    const bkey *o = bfind(g_btab[g_bcur ^ 1], key);
++    return o && o->key ? &g_bsnap[g_bcur ^ 1][o->snap] : NULL;
++}
++
++/* Vertex `addr`'s clip-space position under the matrices in g_xf. */
++static void vertex_clip(uint32_t addr, uint32_t vtype, const vlayout *L, float c[4]) {
++    const uint8_t *hp = vptr(addr, (uint32_t)L->stride);
++    float pos[3], nrm[3], uv[2], wpos[3], vpos[3];
++    local_vertex(hp, addr, vtype, L, 0, pos, nrm, uv);
++    if (L->w_n) skin(hp, addr, vtype, L, pos, nrm);
++    mul43(g_xf.world, pos, 1.0f, wpos);
++    world_to_clip(wpos, vpos, c);
++}
++
++/* The draw halfway to the last frame's, into psp_render_between_v/n/prim
++ * (left NULL when the last frame did not draw it). Called with the vertices
++ * and indices still mapped (g_vhost, g_ihost). */
++static cvertex    g_bv[65536];
++static psp_vertex g_bflat[65536], *g_btri;
++static void make_between(uint32_t type, uint32_t count, uint32_t vtype, const vlayout *L, int stride, const cvertex *v) {
++    g_btotal += count;
++    const xsnap *o = between_key(type, count);
++    if (!o) return;
++    if (!g_btri && !(g_btri = (psp_vertex *)malloc(sizeof *g_btri * 65536 * 6))) return;
++
++    /* The last frame's positions: its matrices for a moment. */
++    xsnap keep;
++    memcpy(keep.world, g_xf.world, sizeof keep.world); memcpy(g_xf.world, o->world, sizeof keep.world);
++    memcpy(keep.view, g_xf.view, sizeof keep.view);    memcpy(g_xf.view, o->view, sizeof keep.view);
++    memcpy(keep.proj, g_xf.proj, sizeof keep.proj);    memcpy(g_xf.proj, o->proj, sizeof keep.proj);
++    memcpy(keep.bone, g_xf.bone, sizeof keep.bone);    memcpy(g_xf.bone, o->bone, sizeof keep.bone);
++    memcpy(keep.morph, g_xf.morph, sizeof keep.morph); memcpy(g_xf.morph, o->morph, sizeof keep.morph);
++    static float    pc[65536][4];
++    static uint32_t pk[65536], pstamp[65536], pgen;   /* indexed draws repeat vertices: each once */
++    if (++pgen == 0) { memset(pstamp, 0, sizeof pstamp); pgen = 1; }
++    int behind = 0;
++    for (uint32_t n = 0; n < count; n++) {
++        const uint32_t k = vertex_index(vtype, n), slot = k & 0xFFFF;
++        if (pstamp[slot] != pgen || pk[slot] != k) {
++            vertex_clip(g_ge.vaddr + k * (uint32_t)stride, vtype, L, pc[slot]);
++            pstamp[slot] = pgen; pk[slot] = k;
++        }
++        g_bv[n] = v[n];
++        for (int i = 0; i < 4; i++) g_bv[n].c[i] = 0.5f * (pc[slot][i] + v[n].c[i]);
++    }
++    memcpy(g_xf.world, keep.world, sizeof keep.world);
++    memcpy(g_xf.view, keep.view, sizeof keep.view);
++    memcpy(g_xf.proj, keep.proj, sizeof keep.proj);
++    memcpy(g_xf.bone, keep.bone, sizeof keep.bone);
++    memcpy(g_xf.morph, keep.morph, sizeof keep.morph);
++
++    for (uint32_t n = 0; n < count; n++) {
++        if (in_front(&g_bv[n])) clip_to_screen(g_bv[n].c, &g_bv[n].v);
++        else behind = 1;
++    }
++    psp_render_between_prim = (int)type;
++    psp_render_between_v = g_bflat;
++    psp_render_between_n = 0;
++    if (!behind) {
++        for (uint32_t n = 0; n < count; n++) g_bflat[n] = g_bv[n].v;
++        psp_render_between_n = (int)count;
++    } else if (type >= 3 && type <= 5) {
++        const uint64_t clipped = g_xf.clipped, wholly = g_xf.behind;   /* the report counts the frame's own */
++        uint32_t m = 0;
++        for (uint32_t i = 0; i + 2 < count; i += (type == 3 ? 3 : 1))
++            m += clip_triangle(type == 5 ? &g_bv[0] : &g_bv[i], &g_bv[i + 1], &g_bv[i + 2], g_btri + m);
++        g_xf.clipped = clipped; g_xf.behind = wholly;
++        psp_render_between_prim = PSP_PRIM_TRIANGLES;
++        psp_render_between_v = g_btri;
++        psp_render_between_n = (int)m;
++    }
++    g_bmatched += count;
++}
++
+ static void draw_prim(uint32_t type, uint32_t count) {
+     if (!g_ge.vaddr) { g_unsupported += count; return; }
+ 
+@@ -1185,6 +1342,8 @@ static void draw_prim(uint32_t type, uint32_t count) {
+             if (!in_front(&v[n])) behind = 1;
+         }
+     }
++    psp_render_between_v = NULL;
++    if (g_bon && count && !VT_THROUGH(vtype)) make_between(type, count, vtype, &L, stride, v);
+     g_vhost = NULL;
+     g_ihost = NULL;
+     psp_render_trace = dumping();
+@@ -1207,6 +1366,7 @@ static void draw_prim(uint32_t type, uint32_t count) {
+     } else if (behind) {
+         g_xf.behind++;             /* a sprite, line or point behind the eye */
+     }
++    psp_render_between_v = NULL;
+ 
+     /* The GE leaves its pointers just past what it consumed, and games issue
+      * consecutive PRIMs without re-sending VADDR/IADDR. */
+diff --git a/src/render_gl.c b/src/render_gl.c
+index 2397d40..d50f27f 100644
+--- a/src/render_gl.c
++++ b/src/render_gl.c
+@@ -244,11 +244,11 @@ typedef struct { chead h; int32_t id; } c_id;
+ /* The render thread frees pixels. gl_fmt: 0 for RGBA8, else a compressed GL
+  * format of `bytes` bytes (a texture pack's picture). */
+ typedef struct { chead h; int32_t id, w, hgt; uint32_t *pixels; uint32_t gl_fmt, bytes; } c_tex_new;
+-typedef struct { chead h; gstate s; uint32_t first, count; } c_draw;
++typedef struct { chead h; gstate s; uint32_t first, count, bfirst, bcount; } c_draw;   /* b: the in-between frame's (bvtx) */
+ /* fb >= 0: show that framebuffer (its first 480x272); else show `pixels`. */
+ typedef struct { chead h; int32_t fb; uint32_t *pixels; } c_present;
+ 
+-typedef struct { gbuf cmd, vtx; } gframe;
++typedef struct { gbuf cmd, vtx, bvtx; } gframe;   /* bvtx: in-between vertices, while interpolating */
+ 
+ static gframe     g_frames[2];
+ static int        g_rec;                 /* the frame being recorded (GE side) */
+@@ -700,6 +700,7 @@ static void rgb_of(uint32_t c, float out[3]) {
+ /* ---- GE side: the backend ------------------------------------------------ */
+ 
+ static uint64_t g_draws, g_batches;
++static volatile int g_interp;                 /* psp_render_gl_set_interpolation */
+ static size_t   g_last_draw = (size_t)-1;   /* offset of this frame's last C_DRAW */
+ /* How much narrower 2D is drawn while the picture is stretched over a window
+  * wider than the PSP's 480:272 (present() sets it): 1 when not. */
+@@ -720,12 +721,12 @@ void psp_render_gl_set_hud_corners(int on, float left, float right, float top) {
+  * about their own side, a box across a dividing line came apart (Muhammad,
+  * 2026-11-17, the "Time limit" notice). So draws that touch are one element,
+  * and the element's box picks the side. */
+-typedef struct { uint32_t first, n; float x0, y0, x1, y1; int fb, fbw, root; } hud_rec;
++typedef struct { uint32_t first, n, bfirst, bn; float x0, y0, x1, y1; int fb, fbw, root; } hud_rec;
+ static hud_rec *g_hr;
+ static int g_nhr, g_chr;
+ static int *g_hord;
+ 
+-static void hud_note(uint32_t first, uint32_t n, float x0, float y0, float x1, float y1, const gfb *fb) {
++static void hud_note(uint32_t first, uint32_t n, uint32_t bfirst, uint32_t bn, float x0, float y0, float x1, float y1, const gfb *fb) {
+     if (g_nhr == g_chr) {
+         const int cap = g_chr ? g_chr * 2 : 256;
+         hud_rec *p = (hud_rec *)realloc(g_hr, sizeof *p * (size_t)cap);
+@@ -736,7 +737,7 @@ static void hud_note(uint32_t first, uint32_t n, float x0, float y0, float x1, f
+         g_chr = cap;
+     }
+     hud_rec *r = &g_hr[g_nhr++];
+-    r->first = first; r->n = n;
++    r->first = first; r->n = n; r->bfirst = bfirst; r->bn = bn;
+     r->x0 = x0; r->y0 = y0; r->x1 = x1; r->y1 = y1;
+     r->fb = fb->id; r->fbw = fb->w;
+     r->root = g_nhr - 1;
+@@ -789,6 +790,8 @@ static void hud_apply(gframe *f) {
+     }
+     gvert *vx = (gvert *)f->vtx.p;
+     const size_t nv = f->vtx.n / sizeof(gvert);
++    gvert *bvx = (gvert *)f->bvtx.p;
++    const size_t nbv = f->bvtx.n / sizeof(gvert);
+     for (int i = 0; i < n; i++) {
+         const hud_rec *r = &g_hr[i], *e = &g_hr[hud_root(i)];
+         const int L = e->x0 < g_hud_left, R = e->x1 > g_hud_right;
+@@ -797,6 +800,7 @@ static void hud_apply(gframe *f) {
+         else if (R && !L) ax = (float)SW;
+         const float a = ax / (float)r->fbw * 2.0f - 1.0f;
+         for (uint32_t k = r->first; k < r->first + r->n && k < nv; k++) vx[k].x = a + (vx[k].x - a) * hk;
++        for (uint32_t k = r->bfirst; k < r->bfirst + r->bn && k < nbv; k++) bvx[k].x = a + (bvx[k].x - a) * hk;
+     }
+ }
+ 
+@@ -878,9 +882,9 @@ static int z_inset(void) {
+     return v;
+ }
+ 
+-static void put_vertex(gframe *f, const psp_vertex *v, uint32_t rgba, const gfb *fb,
++static void put_vertex(gbuf *buf, const psp_vertex *v, uint32_t rgba, const gfb *fb,
+                        float us, float vs, float uo, float vo) {
+-    gvert *o = (gvert *)gbuf_add(&f->vtx, sizeof *o);
++    gvert *o = (gvert *)gbuf_add(buf, sizeof *o);
+     const float W = v->w > 0.0f ? 1.0f / v->w : 1.0f;
+     o->x = (v->fx / (float)fb->w * 2.0f - 1.0f) * W;
+     o->y = (v->fy / (float)fb->h * 2.0f - 1.0f) * W;
+@@ -893,6 +897,51 @@ static void put_vertex(gframe *f, const psp_vertex *v, uint32_t rgba, const gfb
+     o->fog = v->fog;
+ }
+ 
++/* Everything becomes a triangle list, into `buf`; returns the vertices added. */
++static uint32_t emit(gbuf *buf, int prim, const psp_vertex *v, int count, int flat, const gfb *fb,
++                     float us, float vs, float uo, float vo) {
++    const size_t before = buf->n;
++    /* Everything becomes a triangle list. Flat shading takes each triangle's
++     * last vertex colour, as ge.c's clipper also keeps it last. */
++#define TRI(a, b, c) do { \
++        const uint32_t pc = (c)->rgba; \
++        put_vertex(buf, (a), flat ? pc : (a)->rgba, fb, us, vs, uo, vo); \
++        put_vertex(buf, (b), flat ? pc : (b)->rgba, fb, us, vs, uo, vo); \
++        put_vertex(buf, (c), pc, fb, us, vs, uo, vo); \
++    } while (0)
++    switch (prim) {
++    case PSP_PRIM_TRIANGLES:
++        for (int i = 0; i + 2 < count; i += 3) TRI(&v[i], &v[i + 1], &v[i + 2]);
++        break;
++    case PSP_PRIM_TRIANGLE_STRIP:
++        for (int i = 0; i + 2 < count; i++) TRI(&v[i], &v[i + 1], &v[i + 2]);
++        break;
++    case PSP_PRIM_TRIANGLE_FAN:
++        for (int i = 1; i + 1 < count; i++) TRI(&v[0], &v[i], &v[i + 1]);
++        break;
++    default:
++        /* A sprite: two corners of a rectangle, coloured, deep and fogged by
++         * the second; texture coordinates run corner to corner. */
++        for (int i = 0; i + 1 < count; i += 2) {
++            const psp_vertex *a = &v[i], *b = &v[i + 1];
++            psp_vertex c[4];
++            for (int k = 0; k < 4; k++) {
++                c[k] = *b;
++                c[k].w = 0;
++            }
++            c[0].fx = a->fx; c[0].fy = a->fy; c[0].u = a->u; c[0].v = a->v;
++            c[1].fx = b->fx; c[1].fy = a->fy; c[1].u = b->u; c[1].v = a->v;
++            c[2].fx = a->fx; c[2].fy = b->fy; c[2].u = a->u; c[2].v = b->v;
++            c[3].fx = b->fx; c[3].fy = b->fy; c[3].u = b->u; c[3].v = b->v;
++            TRI(&c[0], &c[1], &c[2]);
++            TRI(&c[1], &c[3], &c[2]);
++        }
++        break;
++    }
++#undef TRI
++    return (uint32_t)((buf->n - before) / sizeof(gvert));
++}
++
+ static void gl_draw(int prim, const psp_vertex *v, int count, const psp_draw_state *st) {
+     if (prim != PSP_PRIM_SPRITES && (prim < PSP_PRIM_TRIANGLES || prim > PSP_PRIM_TRIANGLE_FAN)) return;
+     if (!g_started) return;
+@@ -1026,62 +1075,41 @@ static void gl_draw(int prim, const psp_vertex *v, int count, const psp_draw_sta
+         }
+     }
+ 
+-    /* Everything becomes a triangle list. Flat shading takes each triangle's
+-     * last vertex colour, as ge.c's clipper also keeps it last. */
+     gframe *f = &g_frames[g_rec];
+-    const uint32_t first = (uint32_t)(f->vtx.n / sizeof(gvert));
+     const int flat = !st->gouraud && !st->clear;
+-#define TRI(a, b, c) do { \
+-        const uint32_t pc = (c)->rgba; \
+-        put_vertex(f, (a), flat ? pc : (a)->rgba, fb, us, vs, uo, vo); \
+-        put_vertex(f, (b), flat ? pc : (b)->rgba, fb, us, vs, uo, vo); \
+-        put_vertex(f, (c), pc, fb, us, vs, uo, vo); \
+-    } while (0)
+-    switch (prim) {
+-    case PSP_PRIM_TRIANGLES:
+-        for (int i = 0; i + 2 < count; i += 3) TRI(&v[i], &v[i + 1], &v[i + 2]);
+-        break;
+-    case PSP_PRIM_TRIANGLE_STRIP:
+-        for (int i = 0; i + 2 < count; i++) TRI(&v[i], &v[i + 1], &v[i + 2]);
+-        break;
+-    case PSP_PRIM_TRIANGLE_FAN:
+-        for (int i = 1; i + 1 < count; i++) TRI(&v[0], &v[i], &v[i + 1]);
+-        break;
+-    default:
+-        /* A sprite: two corners of a rectangle, coloured, deep and fogged by
+-         * the second; texture coordinates run corner to corner. */
+-        for (int i = 0; i + 1 < count; i += 2) {
+-            const psp_vertex *a = &v[i], *b = &v[i + 1];
+-            psp_vertex c[4];
+-            for (int k = 0; k < 4; k++) {
+-                c[k] = *b;
+-                c[k].w = 0;
+-            }
+-            c[0].fx = a->fx; c[0].fy = a->fy; c[0].u = a->u; c[0].v = a->v;
+-            c[1].fx = b->fx; c[1].fy = a->fy; c[1].u = b->u; c[1].v = a->v;
+-            c[2].fx = a->fx; c[2].fy = b->fy; c[2].u = a->u; c[2].v = b->v;
+-            c[3].fx = b->fx; c[3].fy = b->fy; c[3].u = b->u; c[3].v = b->v;
+-            TRI(&c[0], &c[1], &c[2]);
+-            TRI(&c[1], &c[3], &c[2]);
+-        }
+-        break;
++    const uint32_t first = (uint32_t)(f->vtx.n / sizeof(gvert));
++    const uint32_t n = emit(&f->vtx, prim, v, count, flat, fb, us, vs, uo, vo);
++    /* The in-between frame's: ge.c's for a 3D draw it knows from the last
++     * frame, else (2D, a new draw) the same as this frame's. */
++    const uint32_t bfirst = (uint32_t)(f->bvtx.n / sizeof(gvert));
++    uint32_t bn = 0;
++    if (g_interp && n) {
++        if (psp_render_between_v) {
++            const int bp = psp_render_between_prim;
++            if (bp == PSP_PRIM_SPRITES || (bp >= PSP_PRIM_TRIANGLES && bp <= PSP_PRIM_TRIANGLE_FAN))
++                bn = emit(&f->bvtx, bp, psp_render_between_v, psp_render_between_n, flat, fb, us, vs, uo, vo);
++        } else bn = emit(&f->bvtx, prim, v, count, flat, fb, us, vs, uo, vo);
+     }
+-#undef TRI
+-    const uint32_t n = (uint32_t)(f->vtx.n / sizeof(gvert)) - first;
+     if (!n) return;
+-    if (hud_rec) hud_note(first, n, hx0, hy0, hx1, hy1, fb);
++    if (hud_rec) hud_note(first, n, bfirst, bn, hx0, hy0, hx1, hy1, fb);
+ 
+     /* Same state, right after the previous draw with nothing in between: one
+      * batch. */
+     if (g_last_draw != (size_t)-1 && g_last_draw + ((sizeof(c_draw) + 7) & ~(size_t)7) == f->cmd.n) {
+         c_draw *d = (c_draw *)(f->cmd.p + g_last_draw);
+-        if (d->first + d->count == first && !memcmp(&d->s, &s, sizeof s)) { d->count += n; return; }
++        if (d->first + d->count == first && d->bfirst + d->bcount == bfirst && !memcmp(&d->s, &s, sizeof s)) {
++            d->count += n;
++            d->bcount += bn;
++            return;
++        }
+     }
+     g_last_draw = f->cmd.n;
+     c_draw *d = (c_draw *)cmd_add(C_DRAW, sizeof *d);
+     d->s = s;
+     d->first = first;
+     d->count = n;
++    d->bfirst = bfirst;
++    d->bcount = bn;
+     g_batches++;
+ }
+ 
+@@ -1130,6 +1158,8 @@ static void gl_present(void) {
+     g_rec ^= 1;
+     g_frames[g_rec].cmd.n = 0;
+     g_frames[g_rec].vtx.n = 0;
++    g_frames[g_rec].bvtx.n = 0;
++    psp_ge_between_flip();                       /* the GE is idle at a present */
+     g_bound = -1;
+     g_last_tex = -1;
+     g_last_draw = (size_t)-1;
+@@ -1620,7 +1650,7 @@ static void present(const c_present *c) {
+ /* What play() runs: an ordinary frame runs everything; one shown with an
+  * in-between frame first makes its textures and framebuffers, then draws
+  * twice (the in-between vertices, then its own), then frees. */
+-enum { PLAY_MAKE = 1, PLAY_DRAW = 2, PLAY_FREE = 4, PLAY_PRESENT = 8, PLAY_ALL = 15 };
++enum { PLAY_MAKE = 1, PLAY_DRAW = 2, PLAY_FREE = 4, PLAY_PRESENT = 8, PLAY_ALL = 15, PLAY_BETWEEN = 16 };   /* BETWEEN: bfirst/bcount */
+ 
+ static void play(gframe *f, int what, const gbuf *vtx) {
+     glUseProgram(g_prog);
+@@ -1676,7 +1706,8 @@ static void play(gframe *f, int what, const gbuf *vtx) {
+             const c_draw *c = (const c_draw *)h;
+             if (!g_cur_fb_h) break;
+             apply(&c->s);
+-            glDrawArrays(GL_TRIANGLES, (GLint)c->first, (GLsizei)c->count);
++            if (what & PLAY_BETWEEN) { if (c->bcount) glDrawArrays(GL_TRIANGLES, (GLint)c->bfirst, (GLsizei)c->bcount); }
++            else glDrawArrays(GL_TRIANGLES, (GLint)c->first, (GLsizei)c->count);
+             break;
+         }
+         case C_PRESENT:
+@@ -1691,32 +1722,21 @@ static void play(gframe *f, int what, const gbuf *vtx) {
+  *
+  * The GE side hands over a frame and records the next meanwhile; the render
+  * thread copies the frame (so the GE side need not wait for both showings)
+- * and, when the frame before it was a drawn one too, shows first a frame made
+- * from the two: each of this frame's draws that the previous frame also had
+- * (same framebuffer, same state, as many vertices, found in the same order)
+- * gets every vertex halfway between its two positions. Draws with no
+- * counterpart, and draws whose vertices jump far (a particle slot reused),
+- * keep this frame's vertices. Half a frame later this frame itself is shown.
+- * When too little matches (a cut, a new scene), when a frame came late
+- * (loading), or when the frame is shown from memory (a movie), it is shown
+- * alone, at once. */
+-
+-static volatile int g_interp;
+-void psp_render_gl_set_interpolation(int on) { g_interp = on ? 1 : 0; }
++ * and, when the frame before it was a drawn one too, shows first the frame's
++ * in-between vertices (bvtx: ge.c's, each 3D draw transformed halfway to the
++ * last frame's matrices, see psp_ge_set_between), then half a frame later
++ * the frame itself. A frame that came late (loading) or is shown from memory
++ * (a movie) is shown alone, at once. */
++
++void psp_render_gl_set_interpolation(int on) { g_interp = on ? 1 : 0; psp_ge_set_between(g_interp); }
+ void psp_render_gl_set_stretch(int on) { g_stretch = on ? 1 : 0; }
+ int  psp_render_gl_interpolation(void) { return g_interp; }
+ 
+-typedef struct { int32_t fb; gstate s; uint32_t first, count; } idraw;
+-
+ static gframe   g_cur;                       /* the render thread's copy of the frame */
+-static gbuf     g_ivtx;                      /* its in-between vertices */
+-static gbuf     g_prev_vtx;                  /* the previous frame's vertices */
+-static idraw   *g_prev;                      /* and its draws */
+-static size_t   g_nprev, g_capprev;
+ static int      g_have_prev;
+ static uint64_t g_last_arrival, g_interval_us = 33367;
+-static uint64_t g_smooth_frames, g_alone_frames, g_moved, g_kept;
+-static uint64_t g_why_noprev, g_why_nopresent, g_why_memory, g_why_late, g_why_few;   /* frames shown alone */
++static uint64_t g_smooth_frames, g_alone_frames;
++static uint64_t g_why_nopresent, g_why_memory, g_why_noprev, g_why_late;   /* frames shown alone */
+ static host_mutex g_sleep_m = HOST_MUTEX_INIT;
+ static host_cond  g_sleep_cv = HOST_COND_INIT;
+ 
+@@ -1735,86 +1755,6 @@ static const c_present *find_present(const gframe *f) {
+     return p;
+ }
+ 
+-/* This frame's draws, with the framebuffer each went to, for the next frame. */
+-static void remember(const gframe *f) {
+-    gbuf_copy(&g_prev_vtx, &f->vtx);
+-    g_nprev = 0;
+-    int32_t fb = -1;
+-    for (size_t at = 0; at < f->cmd.n; ) {
+-        const chead *h = (const chead *)(f->cmd.p + at);
+-        at += h->size;
+-        if (h->op == C_FB_BIND) fb = ((const c_id *)h)->id;
+-        if (h->op != C_DRAW) continue;
+-        if (g_nprev == g_capprev) {
+-            g_capprev = g_capprev ? g_capprev * 2 : 1024;
+-            g_prev = (idraw *)realloc(g_prev, g_capprev * sizeof *g_prev);
+-            if (!g_prev) { fputs("render_gl: out of memory\n", stderr); abort(); }
+-        }
+-        const c_draw *d = (const c_draw *)h;
+-        g_prev[g_nprev].fb = fb;
+-        g_prev[g_nprev].s = d->s;
+-        g_prev[g_nprev].first = d->first;
+-        g_prev[g_nprev].count = d->count;
+-        g_nprev++;
+-    }
+-}
+-
+-static float ndc(float c, float w) { return w != 0.0f ? c / w : c; }
+-
+-/* The in-between vertices of `f` into g_ivtx; the share of vertices that moved
+- * from a counterpart (0..1). */
+-static float make_between(const gframe *f) {
+-    gbuf_copy(&g_ivtx, &f->vtx);
+-    gvert *out = (gvert *)g_ivtx.p;
+-    const gvert *old = (const gvert *)g_prev_vtx.p;
+-    size_t cursor = 0, total = 0, matched = 0;
+-    int32_t fb = -1;
+-    for (size_t at = 0; at < f->cmd.n; ) {
+-        const chead *h = (const chead *)(f->cmd.p + at);
+-        at += h->size;
+-        if (h->op == C_FB_BIND) fb = ((const c_id *)h)->id;
+-        if (h->op != C_DRAW) continue;
+-        const c_draw *d = (const c_draw *)h;
+-        total += d->count;
+-        /* Its counterpart: the next draw of the previous frame like it, not far on. */
+-        const idraw *e = NULL;
+-        for (size_t j = cursor, k = 0; j < g_nprev && k < 64; j++, k++)
+-            if (g_prev[j].fb == fb && g_prev[j].count == d->count && !memcmp(&g_prev[j].s, &d->s, sizeof d->s)) {
+-                e = &g_prev[j];
+-                cursor = j + 1;
+-                break;
+-            }
+-        if (!e) continue;
+-        const gvert *a = old + e->first;
+-        gvert *b = out + d->first;
+-        /* A vertex that jumps more than an eighth of the screen is another
+-         * thing in the same slot: the whole draw keeps this frame's. */
+-        int jump = 0;
+-        for (uint32_t i = 0; i < d->count && !jump; i++) {
+-            if ((a[i].w > 0) != (b[i].w > 0)) jump = 1;
+-            else if (fabsf(ndc(a[i].x, a[i].w) - ndc(b[i].x, b[i].w)) > 0.25f ||
+-                     fabsf(ndc(a[i].y, a[i].w) - ndc(b[i].y, b[i].w)) > 0.25f) jump = 1;
+-        }
+-        if (jump) continue;
+-        for (uint32_t i = 0; i < d->count; i++) {
+-            b[i].x = (a[i].x + b[i].x) * 0.5f;
+-            b[i].y = (a[i].y + b[i].y) * 0.5f;
+-            b[i].z = (a[i].z + b[i].z) * 0.5f;
+-            b[i].w = (a[i].w + b[i].w) * 0.5f;
+-            b[i].fog = (a[i].fog + b[i].fog) * 0.5f;
+-            /* Scrolling textures move; a texture that flips frames does not blend. */
+-            if (fabsf(a[i].u - b[i].u) < 0.1f && fabsf(a[i].v - b[i].v) < 0.1f) {
+-                b[i].u = (a[i].u + b[i].u) * 0.5f;
+-                b[i].v = (a[i].v + b[i].v) * 0.5f;
+-            }
+-        }
+-        matched += d->count;
+-    }
+-    g_moved += matched;
+-    g_kept += total - matched;
+-    return total ? (float)matched / (float)total : 0.0f;
+-}
+-
+ static void sleep_until(uint64_t deadline) {
+     host_mutex_lock(&g_sleep_m);
+     while (host_deadline_us() < deadline && !host_cond_until(&g_sleep_cv, &g_sleep_m, deadline)) { }
+@@ -1831,30 +1771,37 @@ static void play_smooth(gframe *f) {
+     int between = 0;
+     if (!p) g_why_nopresent++;
+     else if (p->fb < 0) g_why_memory++;
+-    else if (!g_have_prev) g_why_noprev++;
++    else if (!g_have_prev || !f->bvtx.n) g_why_noprev++;
+     else if (since > 60000) g_why_late++;
+-    else if (make_between(f) < 0.5f) g_why_few++;
+     else between = 1;
+     if (between) {
+         play(f, PLAY_MAKE, &f->vtx);
+-        play(f, PLAY_DRAW | PLAY_PRESENT, &g_ivtx);             /* the in-between frame, now */
+-        sleep_until(now + g_interval_us / 2);
+-        play(f, PLAY_DRAW | PLAY_FREE | PLAY_PRESENT, &f->vtx);   /* and this frame, half a frame on */
++        play(f, PLAY_DRAW | PLAY_PRESENT | PLAY_BETWEEN, &f->bvtx);   /* the in-between frame, now */
++        /* PSPRECOMP_SMOOTH_ONLY=1: only the in-between frames (to see them in snapshots) */
++        static int only = -1;
++        if (only < 0) { const char *e = getenv("PSPRECOMP_SMOOTH_ONLY"); only = e && *e == '1'; }
++        if (only) play(f, PLAY_FREE, &f->vtx);
++        else {
++            sleep_until(now + g_interval_us / 2);
++            play(f, PLAY_DRAW | PLAY_FREE | PLAY_PRESENT, &f->vtx);   /* and this frame, half a frame on */
++        }
+         g_smooth_frames++;
+     } else {
+         play(f, PLAY_ALL, &f->vtx);
+         g_alone_frames++;
+     }
+     g_have_prev = p && p->fb >= 0;
+-    if (g_have_prev) remember(f);
+-    if (((g_smooth_frames + g_alone_frames) % 600) == 0)
+-        fprintf(stderr, "render_gl: in-between frames for %llu of the last 600 frames, %.0f%% of vertices moved "
+-                "(alone: %llu no present, %llu from memory, %llu after one, %llu late, %llu too different)\n",
+-                (unsigned long long)g_smooth_frames, g_moved + g_kept ? 100.0 * (double)g_moved / (double)(g_moved + g_kept) : 0.0,
++    if (((g_smooth_frames + g_alone_frames) % 600) == 0) {
++        uint64_t matched, total;
++        psp_ge_between_stats(&matched, &total);
++        fprintf(stderr, "render_gl: in-between frames for %llu of the last 600 frames, %.0f%% of 3D vertices "
++                "known from the frame before (alone: %llu no present, %llu from memory, %llu after one, %llu late)\n",
++                (unsigned long long)g_smooth_frames, total ? 100.0 * (double)matched / (double)total : 0.0,
+                 (unsigned long long)g_why_nopresent, (unsigned long long)g_why_memory, (unsigned long long)g_why_noprev,
+-                (unsigned long long)g_why_late, (unsigned long long)g_why_few),
+-        g_smooth_frames = g_alone_frames = g_moved = g_kept = 0,
+-        g_why_nopresent = g_why_memory = g_why_noprev = g_why_late = g_why_few = 0;
++                (unsigned long long)g_why_late);
++        g_smooth_frames = g_alone_frames = 0;
++        g_why_nopresent = g_why_memory = g_why_noprev = g_why_late = 0;
++    }
+ }
+ 
+ static void *render_thread(void *arg) {
+@@ -1877,6 +1824,7 @@ static void *render_thread(void *arg) {
+              * time the game spends on its next one. */
+             gbuf_copy(&g_cur.cmd, &f->cmd);
+             gbuf_copy(&g_cur.vtx, &f->vtx);
++            gbuf_copy(&g_cur.bvtx, &f->bvtx);
+             host_mutex_lock(&g_m);
+             g_pending = -1;
+             host_cond_broadcast(&g_cv);
