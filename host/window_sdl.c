@@ -361,7 +361,17 @@ static int vpad_visible(void) {
  * 0: what the game was started with). The renderer takes it when it starts,
  * so a change shows after a restart. */
 static int g_res_setting;
-static int g_fps60;                  /* the 60 fps mode (mhfu_fps_set_preferred) */
+/* 60 FPS: 0 off, 1 interpolation (in-between frames, the game stays at 30;
+ * settings.ini smooth=1), 2 CWCheat (the game at 60, mhfu_fps_set_preferred;
+ * fps60=1). One at most. */
+static int g_fps60;
+static const char *const k_fps_names[3] = { "Off", "Interpolation (Recommended, BETA)", "CWCheat (BETA)" };
+static void fps_mode_set(int m) {
+    if (m == 2 && !MHFU_HAS_FPS60) m = 0;
+    g_fps60 = m;
+    psp_render_gl_set_interpolation(m == 1);
+    mhfu_fps_set_preferred(m == 2 ? 60 : 30);
+}
 static int g_wide;                   /* the widescreen mod (mhfu_mod_set_widescreen) */
 static int g_hudc;                   /* with it, the HUD in the corners (mhfu_mod_set_hud_corners) */
 /* A texture pack (texpack.c): 1 use one when there is one, 0 not; read at
@@ -395,7 +405,8 @@ static void settings_load(void) {
         if (sscanf(line, "pad_combined_psp=%d", &v) == 1) g_pad_combined_psp = v != 0;
         if (sscanf(line, "swipe_tilt=%d", &v) == 1) g_swipe_tilt = v != 0;
         if (sscanf(line, "resolution=%d", &v) == 1 && v >= 1 && v <= 4) g_res_setting = v;
-        if (sscanf(line, "fps60=%d", &v) == 1) g_fps60 = v != 0;
+        if (sscanf(line, "fps60=%d", &v) == 1 && v) g_fps60 = 2;
+        if (sscanf(line, "smooth=%d", &v) == 1 && v) g_fps60 = 1;
         if (sscanf(line, "widescreen=%d", &v) == 1) g_wide = v != 0;
         if (sscanf(line, "hud_corners=%d", &v) == 1) g_hudc = v != 0;
         if (sscanf(line, "texpack=%d", &v) == 1) g_texpack = v != 0;
@@ -447,7 +458,7 @@ static void settings_save(void) {
     fprintf(f, "# MHFU: the in-game menu's settings\nvirtual_gamepad=%d\nshow_fps=%d\nbutton_opacity=%d\n",
             g_vpad_mode, g_show_fps_init, g_vpad_alpha);
     if (g_res_setting) fprintf(f, "resolution=%d\n", g_res_setting);
-    fprintf(f, "fps60=%d\nwidescreen=%d\nweapon_buttons=%d\nbutton_style=%d\ntexpack=%d\n", g_fps60, g_wide,
+    fprintf(f, "fps60=%d\nsmooth=%d\nwidescreen=%d\nweapon_buttons=%d\nbutton_style=%d\ntexpack=%d\n", g_fps60 == 2, g_fps60 == 1, g_wide,
             g_skills_on, g_style, g_texpack);
     if (g_texstyle[0]) fprintf(f, "texpack_style=%s\n", g_texstyle);
     fprintf(f, "pad_combined=%d\npad_combined_psp=%d\nswipe_tilt=%d\nge_thread=%d\nvibration=%d\n", g_pad_combined, g_pad_combined_psp, g_swipe_tilt, g_gethread, g_vibe);
@@ -2150,7 +2161,7 @@ static int mouse_sens(void) {
 
 static const menu_item k_tab_display[] = {
     { M_RES, K_STEP, 1, "Resolution", "The 3D picture's size, a multiple of the PSP's 480x272. Higher is sharper but slower on weak phones. Applies at the next start." },
-    { M_SMOOTH, K_TOGGLE, 0, "60 FPS (beta)", "Runs the game at 60 frames a second. In a room, the room plays at its slowest player's rate." },
+    { M_SMOOTH, K_CYCLE, 0, "60 FPS", "Interpolation: 60 pictures a second, one made between each two of the game's; the game stays at 30, so nothing runs too fast (a small glitch now and then while running). CWCheat: the game itself at 60; some things run too fast, and a room plays at its slowest player's rate." },
     { M_GETHREAD, K_TOGGLE, 1, "Multi-core drawing (beta)", "Draws the picture on a second CPU core while the game runs on its own, as the PSP's graphics chip did: faster on phones with several cores. Applies at the next start." },
     { M_FPS, K_TOGGLE, 0, "Show FPS", "Shows the frame rate in the top-left corner, and the ping while you are in a room." },
 };
@@ -2312,7 +2323,7 @@ static const char *menu_value(int id) {
     case M_STYLE: return g_style == STYLE_MOBILE ? "Mobile" : "Legacy PSP";
     case M_PAD: return *pad_flag() ? "Combined" : "Separate";
     case M_SWIPE: return g_swipe_tilt ? "Turn and tilt" : "Turn only";
-    case M_SMOOTH: return !MHFU_HAS_FPS60 ? "Not in this build" : !g_fps60 ? "Off" : mhfu_fps_target() >= 60 ? "On" : "On, room at 30";
+    case M_SMOOTH: return g_fps60 == 2 && mhfu_fps_target() < 60 ? "CWCheat, room at 30" : k_fps_names[g_fps60];
     case M_WIDE: return mhfu_mod_widescreen() ? "On" : "Off";
     case M_HUDC: return !mhfu_mod_hud_corners() ? "Off" : mhfu_mod_widescreen() ? "On" : "On, needs Widescreen";
     case M_GETHREAD: return g_gethread ? "On" : "Off";
@@ -2429,7 +2440,6 @@ static int menu_on(int id) {
     switch (id) {
     case M_FPS: return g_show_fps;
     case M_SKILLS: return g_skills_on;
-    case M_SMOOTH: return MHFU_HAS_FPS60 ? g_fps60 : -1;
     case M_WIDE: return mhfu_mod_widescreen() != 0;
     case M_HUDC: return mhfu_mod_hud_corners() != 0;
     case M_GETHREAD: return g_gethread;
@@ -3082,9 +3092,7 @@ static void menu_act(const menu_item *it, int dir) {
     case M_SWIPE: g_swipe_tilt = !g_swipe_tilt; settings_save(); break;
     case M_SKILLS: g_skills_on = !g_skills_on; touch_release_all(); settings_save(); break;
     case M_FPS: g_show_fps = !g_show_fps; g_show_fps_init = g_show_fps; settings_save(); break;
-    case M_SMOOTH:
-        if (!MHFU_HAS_FPS60) break;
-        g_fps60 = !g_fps60; mhfu_fps_set_preferred(g_fps60 ? 60 : 30); settings_save(); break;
+    case M_SMOOTH: fps_mode_set((g_fps60 + 1) % 3); settings_save(); break;
     case M_WIDE: g_wide = !mhfu_mod_widescreen(); mhfu_mod_set_widescreen(g_wide); settings_save(); break;
     case M_HUDC: g_hudc = !mhfu_mod_hud_corners(); mhfu_mod_set_hud_corners(g_hudc); settings_save(); break;
     case M_GETHREAD: g_gethread = !g_gethread; settings_save(); break;
@@ -3777,7 +3785,7 @@ int mhfu_window_gl(void) {
     if (psp_render_gl_start(&host, g_scale) != 0) return -1;
     if (psp_render_select("gl") != 0) return -1;
     g_gl = 1;
-    if (g_fps60) mhfu_fps_set_preferred(60);
+    if (g_fps60) fps_mode_set(g_fps60);
     if (g_wide) mhfu_mod_set_widescreen(1);
     if (g_hudc) mhfu_mod_set_hud_corners(1);
     for (int i = 0; i < mhfu_mod_count(); i++)
@@ -4186,11 +4194,12 @@ int mhfu_window_main(int (*game)(int, char **), int argc, char **argv) {
                         break;
                     }
 #ifndef __ANDROID__
-                    if (down && !e.key.repeat && e.key.scancode == SDL_SCANCODE_F4 && MHFU_HAS_FPS60) {
-                        g_fps60 = mhfu_fps_preferred() < 60;   /* 60 fps mode (in a room: as the room allows) */
-                        mhfu_fps_set_preferred(g_fps60 ? 60 : 30);
+                    if (down && !e.key.repeat && e.key.scancode == SDL_SCANCODE_F4) {
+                        fps_mode_set((g_fps60 + 1) % 3);   /* off -> interpolation -> CWCheat */
                         settings_save();
-                        mhfu_window_chat(NULL, g_fps60 ? "60 FPS on" : "60 FPS off (30)", 1);
+                        char line[64];
+                        snprintf(line, sizeof line, "60 FPS: %s", k_fps_names[g_fps60]);
+                        mhfu_window_chat(NULL, line, 1);
                         moving = 1;
                         break;
                     }
