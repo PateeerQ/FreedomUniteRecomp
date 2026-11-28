@@ -565,6 +565,9 @@ enum { UI_PLAY, UI_MENU, UI_TALK, UI_OBJ, UI_WINDOW, UI_FISH };
 #define PROMPT_FISH 24
 #define WINDOW_ENTER_MS 120
 #define WINDOW_KEEP_MS (MHFU_ADDR_LOBBY_WINDOW ? 250 : 1500)   /* JP/FUC's flag is exact */
+/* A quest window's prompt byte drops between lines while the cursor moves (the
+ * pouch-full swap menu, issue #31): kept this long past its last sight. */
+#define QUEST_WINDOW_KEEP_MS 600
 #define QUEST_END_KEEP_MS 6000                                  /* past the end screens' flag (a reward movie between them) */
 /* The object in reach: its kind (region.h) and a door's destination. */
 enum { OBJ_DOOR = 1, OBJ_GATE = 2, OBJ_TRAINING = 3, OBJ_BOX = 7, OBJ_CHAIR = 8, OBJ_BOARD = 9,
@@ -609,7 +612,6 @@ static int ui_ctx(void) {
     if (quest_end_last && now - quest_end_last < QUEST_END_KEEP_MS) return UI_WINDOW;
     if (!lobby && !quest) return UI_MENU;                   /* title, character select, options */
     if (psp_read8(MHFU_ADDR_MENU_OPEN)) return UI_MENU;
-    if (quest && psp_read8(MHFU_ADDR_UI_PROMPT) == PROMPT_FISH) return UI_FISH;
     /* a window is open: the hunter is held (that bit also drops while running)
      * and a question, a message or a menu (prompt id 3 and up) is up */
     /* The window flags must hold WINDOW_ENTER_MS to count (one blinks for a
@@ -620,6 +622,9 @@ static int ui_ctx(void) {
     static uint64_t flags_since, flags_last;
     const unsigned hold = psp_read8(MHFU_ADDR_HUNTER_FREE);
     const int held = (lobby || quest) && !(hold & 0x04);
+    /* 24 is also a line's help text in the pouch-full menu, with the hunter free
+     * (hold 0xA4; issue #31): fishing holds the hunter (0x80). */
+    if (quest && held && psp_read8(MHFU_ADDR_UI_PROMPT) == PROMPT_FISH) return UI_FISH;
     /* In a quest a window or a screen (the Supply Box, Abandon Quest, "Quest
      * Retired", the save question) drops 0x20 as well as 0x04 (0xA4 -> 0x82 /
      * 0x80; FUC dumps 20:05, 20:58), but so do attacks, dodges and area changes
@@ -657,6 +662,7 @@ static int ui_ctx(void) {
         flags_last = now;
         if (now - flags_since >= WINDOW_ENTER_MS) in_window = 1;
     } else flags_since = 0;
+    if (in_window && quest && now - flags_last < QUEST_WINDOW_KEEP_MS) return UI_WINDOW;
     if (in_window && (quest ? quest_held : held || (MHFU_ADDR_LOBBY_WINDOW && lobby)) && now - flags_last < WINDOW_KEEP_MS)
         return UI_WINDOW;
     in_window = 0;
@@ -691,7 +697,7 @@ static int ui_ctx_settled(void) {
         /* Which flags chose it, to find a wrong one from a phone's log. */
         static const char *const name[] = { "play", "menu", "talk", "object", "window", "fish" };
         printf("touch ui: %s (qwin %u/%u end %u win %u free %02X yesno %u message %u prompt %u menu %u talk %08X obj %08X objprompt %u)\n",
-               settled >= 0 && settled < 5 ? name[settled] : "?", psp_read8(MHFU_ADDR_QUEST_WIN_A),
+               settled >= 0 && settled < 6 ? name[settled] : "?", psp_read8(MHFU_ADDR_QUEST_WIN_A),
                psp_read8(MHFU_ADDR_QUEST_WIN_B), psp_read8(MHFU_ADDR_QUEST_END),
                MHFU_ADDR_LOBBY_WINDOW && mhfu_in_lobby() ? psp_read8(MHFU_ADDR_LOBBY_WINDOW) : 0u,
                psp_read8(MHFU_ADDR_HUNTER_FREE),

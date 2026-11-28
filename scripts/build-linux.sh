@@ -77,6 +77,15 @@ strip "$stage"/mhfu_host* "$stage/mhfu_launcher"
 cat > "$stage/start.sh" <<'EOF'
 #!/bin/sh
 # Starts the launcher from wherever this folder is (Steam: add this file as a non-Steam game).
+# Laptops with two GPUs: ask for the dedicated one (issue #30), unless the player chose
+# (MHFU_IGPU=1, or DRI_PRIME / __NV_PRIME_RENDER_OFFLOAD already set). One GPU: nothing changes.
+if [ -z "$MHFU_IGPU$DRI_PRIME$__NV_PRIME_RENDER_OFFLOAD" ] && [ "$(ls -d /sys/class/drm/card[0-9]* 2>/dev/null | grep -c -v -- -)" -gt 1 ]; then
+    if [ -e /proc/driver/nvidia/version ]; then
+        export __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia __VK_LAYER_NV_optimus=NVIDIA_only
+    else
+        export DRI_PRIME=1
+    fi
+fi
 cd "$(dirname "$(readlink -f "$0")")" && exec ./mhfu_launcher "$@"
 EOF
 chmod +x "$stage/start.sh" "$stage/mhfu_launcher" "$stage"/mhfu_host*

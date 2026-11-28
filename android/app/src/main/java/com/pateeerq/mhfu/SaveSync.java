@@ -33,7 +33,8 @@ import java.util.Map;
  *
  * The folder can be any of a memory stick's levels, told by what is in it: a
  * memory stick (it has PSP/, or is empty: PSP/SAVEDATA/... is made there), a
- * SAVEDATA folder (it has ULES01213... / ULUS10391... folders: only those are used), or one
+ * SAVEDATA folder (it has ULES01213... / ULUS10391... folders: only those are used), a PSP folder (only
+ * its SAVEDATA), or one
  * save itself (PARAM.SFO, MHP2NDG.BIN: only its files). The disc image, the
  * EBOOT and fonts kept in the same folder are never copied.
  */
@@ -55,7 +56,9 @@ final class SaveSync {
     private static final class Where {
         final File dir;
         final int only;
-        Where(File dir, int only) { this.dir = dir; this.only = only; }
+        final String doc;                                 // the folder's document to start from (null: the chosen one)
+        Where(File dir, int only) { this(dir, only, null); }
+        Where(File dir, int only, String doc) { this.dir = dir; this.only = only; this.doc = doc; }
     }
 
     private static Where where(Context c, ContentResolver cr, Uri t) {
@@ -69,6 +72,10 @@ final class SaveSync {
         for (String k : top.keySet())
             if (k.equalsIgnoreCase("PARAM.SFO") || k.equalsIgnoreCase("MHP2NDG.BIN"))
                 return new Where(new File(ms, "PSP/SAVEDATA/" + Region.now().gameId), FILES);
+        // A PSP folder (PPSSPP's memstick/PSP): only its SAVEDATA, never GAME/ or the rest.
+        for (Map.Entry<String, String[]> e : top.entrySet())
+            if (Document.MIME_TYPE_DIR.equals(e.getValue()[1]) && e.getKey().equalsIgnoreCase("SAVEDATA"))
+                return new Where(new File(ms, "PSP/SAVEDATA"), DIRS, e.getValue()[0]);
         return new Where(ms, ALL);
     }
 
@@ -140,7 +147,7 @@ final class SaveSync {
             tidy(c);
             Where w = where(c, cr, t);
             w.dir.mkdirs();
-            int n = sync(cr, t, DocumentsContract.getTreeDocumentId(t), w.dir, w.only);
+            int n = sync(cr, t, w.doc != null ? w.doc : DocumentsContract.getTreeDocumentId(t), w.dir, w.only);
             snapshot(local(c), "");                       // what is there now counts as pushed
             return n;
         } catch (Exception e) {
@@ -197,7 +204,7 @@ final class SaveSync {
             tidy(c);
             Where w = where(c, cr, t);
             w.dir.mkdirs();
-            int n = pullAll(cr, t, DocumentsContract.getTreeDocumentId(t), w.dir, w.only);
+            int n = pullAll(cr, t, w.doc != null ? w.doc : DocumentsContract.getTreeDocumentId(t), w.dir, w.only);
             synchronized (pushed) { pushed.clear(); }
             snapshot(local(c), "");                       // now the same on both sides
             return n;
@@ -248,7 +255,7 @@ final class SaveSync {
             Where w = where(c, cr, t);
             if (!w.dir.isDirectory()) return 0;
             String rel = w.dir.getAbsolutePath().substring(local(c).getAbsolutePath().length()).replace('\\', '/');
-            return push(cr, t, DocumentsContract.getTreeDocumentId(t), w.dir, rel, w.only);
+            return push(cr, t, w.doc != null ? w.doc : DocumentsContract.getTreeDocumentId(t), w.dir, rel, w.only);
         } catch (Exception e) {
             Log.w(TAG, "saves: copying to the folder failed: " + e);
             return 0;
